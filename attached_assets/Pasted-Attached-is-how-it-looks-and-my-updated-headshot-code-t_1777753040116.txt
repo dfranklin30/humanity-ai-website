@@ -1,0 +1,767 @@
+Attached is how it looks and my updated headshot, code to embed is below:
+
+FEA0E62A-BF37-4EEB-A32A-35CC22F8B1D3.png
+
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jack Watts – Biography</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+–bg: #ffffff;
+–surface: #f7f7f5;
+–border: #e8e8e4;
+–text-primary: #0f0f0e;
+–text-secondary: #5a5a55;
+–text-muted: #9a9a94;
+–accent: #ff5500;
+–accent-light: #fff2ec;
+–rule: #d0d0ca;
+}
+
+.bio-wrapper {
+font-family: ‘DM Sans’, sans-serif;
+color: var(–text-primary);
+background: var(–bg);
+max-width: 900px;
+margin: 0 auto;
+padding: 0 0 80px;
+-webkit-font-smoothing: antialiased;
+}
+
+/* ── HERO BANNER ─────────────────────────────────────── */
+.bio-hero {
+background: var(–text-primary);
+color: #fff;
+padding: 60px 48px 52px;
+position: relative;
+overflow: hidden;
+}
+
+.bio-hero::before {
+content: ‘’;
+position: absolute;
+top: -40px; right: -60px;
+width: 320px; height: 320px;
+background: radial-gradient(circle, rgba(255,85,0,0.18) 0%, transparent 70%);
+pointer-events: none;
+}
+
+.bio-hero-eyebrow {
+font-family: ‘DM Sans’, sans-serif;
+font-size: 11px;
+font-weight: 600;
+letter-spacing: 0.18em;
+text-transform: uppercase;
+color: var(–accent);
+margin-bottom: 20px;
+}
+
+.bio-hero-name {
+font-family: ‘Bebas Neue’, sans-serif;
+font-size: clamp(56px, 9vw, 96px);
+line-height: 0.92;
+letter-spacing: 0.01em;
+color: #fff;
+margin-bottom: 28px;
+}
+
+.bio-hero-title {
+font-family: ‘DM Serif Display’, serif;
+font-style: italic;
+font-size: clamp(17px, 2.4vw, 22px);
+color: rgba(255,255,255,0.72);
+line-height: 1.4;
+max-width: 560px;
+margin-bottom: 36px;
+}
+
+.bio-hero-meta {
+display: flex;
+gap: 32px;
+flex-wrap: wrap;
+}
+
+.bio-hero-stat {
+display: flex;
+flex-direction: column;
+gap: 4px;
+}
+
+.bio-hero-stat-num {
+font-family: ‘Bebas Neue’, sans-serif;
+font-size: 34px;
+color: var(–accent);
+line-height: 1;
+}
+
+.bio-hero-stat-label {
+font-size: 11px;
+font-weight: 500;
+letter-spacing: 0.1em;
+text-transform: uppercase;
+color: rgba(255,255,255,0.45);
+}
+
+/* ── CVO FEATURE BLOCK ───────────────────────────────── */
+.bio-cvo {
+background: var(–accent);
+color: #fff;
+padding: 44px 48px;
+position: relative;
+}
+
+.bio-cvo-label {
+font-size: 10px;
+font-weight: 700;
+letter-spacing: 0.2em;
+text-transform: uppercase;
+color: rgba(255,255,255,0.65);
+margin-bottom: 10px;
+}
+
+.bio-cvo-headline {
+font-family: ‘Bebas Neue’, sans-serif;
+font-size: clamp(28px, 4vw, 42px);
+letter-spacing: 0.02em;
+line-height: 1;
+margin-bottom: 18px;
+}
+
+.bio-cvo-org {
+font-weight: 600;
+font-size: 13px;
+letter-spacing: 0.04em;
+text-transform: uppercase;
+margin-bottom: 20px;
+opacity: 0.85;
+}
+
+.bio-cvo-body {
+font-size: 15px;
+line-height: 1.7;
+color: rgba(255,255,255,0.9);
+max-width: 640px;
+}
+
+/* ── SECTION HEADERS ────────────────────────────────── */
+.bio-section {
+padding: 56px 48px 0;
+}
+
+.bio-section-header {
+display: flex;
+align-items: center;
+gap: 16px;
+margin-bottom: 36px;
+}
+
+.bio-section-title {
+font-family: ‘Bebas Neue’, sans-serif;
+font-size: 13px;
+letter-spacing: 0.22em;
+text-transform: uppercase;
+color: var(–text-muted);
+white-space: nowrap;
+}
+
+.bio-section-rule {
+flex: 1;
+height: 1px;
+background: var(–rule);
+}
+
+/* ── ABOUT ──────────────────────────────────────────── */
+.bio-about-grid {
+display: grid;
+grid-template-columns: 1fr 1fr;
+gap: 32px;
+}
+
+.bio-about-lead {
+font-family: ‘DM Serif Display’, serif;
+font-size: clamp(18px, 2.4vw, 22px);
+line-height: 1.45;
+color: var(–text-primary);
+grid-column: 1 / -1;
+padding-bottom: 28px;
+border-bottom: 1px solid var(–border);
+margin-bottom: 4px;
+}
+
+.bio-about-block p {
+font-size: 14.5px;
+line-height: 1.75;
+color: var(–text-secondary);
+margin-bottom: 16px;
+}
+
+.bio-about-block p:last-child { margin-bottom: 0; }
+
+/* ── WHAT I DO ──────────────────────────────────────── */
+.bio-pillars {
+display: grid;
+grid-template-columns: 1fr 1fr;
+gap: 2px;
+background: var(–border);
+border: 1px solid var(–border);
+overflow: hidden;
+border-radius: 2px;
+}
+
+.bio-pillar {
+background: var(–bg);
+padding: 28px 28px 28px 32px;
+position: relative;
+}
+
+.bio-pillar::before {
+content: ‘’;
+position: absolute;
+left: 0; top: 20px; bottom: 20px;
+width: 2px;
+background: var(–accent);
+opacity: 0;
+transition: opacity 0.2s;
+}
+
+.bio-pillar:hover::before { opacity: 1; }
+
+.bio-pillar-text {
+font-size: 14px;
+line-height: 1.65;
+color: var(–text-secondary);
+}
+
+/* ── EXPERIENCE ─────────────────────────────────────── */
+.bio-exp-list {
+display: flex;
+flex-direction: column;
+gap: 0;
+}
+
+.bio-exp-item {
+display: grid;
+grid-template-columns: 72px 1fr;
+gap: 24px;
+padding: 28px 0;
+border-bottom: 1px solid var(–border);
+align-items: start;
+}
+
+.bio-exp-item:last-child { border-bottom: none; }
+
+.bio-exp-logo {
+width: 56px;
+height: 56px;
+display: flex;
+align-items: center;
+justify-content: center;
+border: 1px solid var(–border);
+border-radius: 10px;
+overflow: hidden;
+background: #fff;
+flex-shrink: 0;
+}
+
+.bio-exp-logo img {
+width: 48px;
+height: 48px;
+object-fit: contain;
+}
+
+.bio-exp-logo-text {
+font-family: ‘Bebas Neue’, sans-serif;
+font-size: 11px;
+letter-spacing: 0.06em;
+text-align: center;
+color: var(–text-muted);
+line-height: 1.2;
+padding: 4px;
+}
+
+.bio-exp-body {}
+
+.bio-exp-role {
+font-size: 15px;
+font-weight: 600;
+color: var(–text-primary);
+margin-bottom: 3px;
+}
+
+.bio-exp-company-line {
+display: flex;
+align-items: center;
+gap: 10px;
+margin-bottom: 12px;
+}
+
+.bio-exp-company {
+font-size: 13px;
+font-weight: 500;
+color: var(–text-muted);
+}
+
+.bio-exp-dot {
+width: 3px;
+height: 3px;
+border-radius: 50%;
+background: var(–rule);
+}
+
+.bio-exp-dates {
+font-size: 12px;
+color: var(–text-muted);
+font-weight: 400;
+}
+
+.bio-exp-type {
+display: inline-block;
+font-size: 10px;
+font-weight: 600;
+letter-spacing: 0.08em;
+text-transform: uppercase;
+background: var(–surface);
+color: var(–text-muted);
+border-radius: 3px;
+padding: 2px 7px;
+}
+
+.bio-exp-desc {
+font-size: 13.5px;
+line-height: 1.7;
+color: var(–text-secondary);
+}
+
+/* ── WHAT I’M BUILDING ──────────────────────────────── */
+.bio-projects {
+display: flex;
+flex-direction: column;
+gap: 2px;
+}
+
+.bio-project {
+background: var(–surface);
+padding: 28px 32px;
+display: grid;
+grid-template-columns: 40px 1fr;
+gap: 20px;
+align-items: start;
+border-radius: 2px;
+}
+
+.bio-project-icon {
+font-size: 28px;
+line-height: 1;
+margin-top: 2px;
+}
+
+.bio-project-name {
+font-size: 15px;
+font-weight: 600;
+color: var(–text-primary);
+margin-bottom: 6px;
+}
+
+.bio-project-desc {
+font-size: 13.5px;
+line-height: 1.65;
+color: var(–text-secondary);
+}
+
+/* ── TAKE ON AI ─────────────────────────────────────── */
+.bio-takes {
+display: flex;
+flex-direction: column;
+gap: 16px;
+}
+
+.bio-take {
+display: flex;
+gap: 20px;
+align-items: start;
+}
+
+.bio-take-num {
+font-family: ‘Bebas Neue’, sans-serif;
+font-size: 36px;
+color: var(–border);
+line-height: 1;
+flex-shrink: 0;
+width: 28px;
+text-align: right;
+}
+
+.bio-take-text {
+font-family: ‘DM Serif Display’, serif;
+font-size: 17px;
+line-height: 1.5;
+color: var(–text-primary);
+padding-top: 6px;
+border-top: 1px solid var(–border);
+flex: 1;
+}
+
+/* ── CTA ────────────────────────────────────────────── */
+.bio-cta {
+margin: 56px 48px 0;
+padding: 40px 48px;
+background: var(–text-primary);
+display: flex;
+align-items: center;
+justify-content: space-between;
+gap: 24px;
+flex-wrap: wrap;
+}
+
+.bio-cta-text {
+font-family: ‘DM Serif Display’, serif;
+font-style: italic;
+font-size: clamp(16px, 2.2vw, 21px);
+color: rgba(255,255,255,0.85);
+max-width: 480px;
+line-height: 1.45;
+}
+
+.bio-cta-text em {
+color: var(–accent);
+font-style: normal;
+}
+
+/* ── RESPONSIVE ─────────────────────────────────────── */
+@media (max-width: 620px) {
+.bio-hero, .bio-cvo, .bio-section, .bio-cta { padding-left: 24px; padding-right: 24px; }
+.bio-cta { margin-left: 24px; margin-right: 24px; }
+.bio-about-grid, .bio-pillars { grid-template-columns: 1fr; }
+.bio-exp-item { grid-template-columns: 56px 1fr; gap: 16px; }
+.bio-hero-meta { gap: 24px; }
+}
+</style>
+
+</head>
+<body>
+
+<div class="bio-wrapper">
+
+<!-- HERO -->
+
+<div class="bio-hero">
+<div class="bio-hero-eyebrow">Jack of All AI · Full-Stack AI Strategist</div>
+<div class="bio-hero-name">Jack<br>Watts</div>
+<div class="bio-hero-title">
+Turning AI complexity into decisions leaders can actually act on — from GPU compute to last-mile deployment.
+</div>
+<div class="bio-hero-meta">
+<div class="bio-hero-stat">
+<span class="bio-hero-stat-num">17</span>
+<span class="bio-hero-stat-label">Years in Enterprise Tech</span>
+</div>
+<div class="bio-hero-stat">
+<span class="bio-hero-stat-num">12</span>
+<span class="bio-hero-stat-label">Years in AI</span>
+</div>
+<div class="bio-hero-stat">
+<span class="bio-hero-stat-num">$10M+</span>
+<span class="bio-hero-stat-label">Pipeline Built</span>
+</div>
+</div>
+</div>
+
+<!-- CVO BLOCK — pinned to top per brief -->
+
+<div class="bio-cvo">
+<div class="bio-cvo-label">Current Role · Apr 2026 – Present</div>
+<div class="bio-cvo-headline">Chief Visionary Officer</div>
+<div class="bio-cvo-org">Humanity + AI, Inc. · Freelance · Remote</div>
+<div class="bio-cvo-body">
+Responsible for defining the execution model and building the education framework taken to market. Humanity+AI, Inc. is a nonprofit advancing the responsible use of AI for people, communities, and the planet — spanning educational outreach, humanitarian innovation, research &amp; development, and workforce development.<br><br>
+My focus is turning mission into motion: the strategy, the structure, and the go-to-market approach that ensures AI literacy reaches the people and organisations that need it most. AI paired with human values can solve humanity's most pressing challenges. My job is to make sure that's not just a belief — it's a deliverable.
+</div>
+</div>
+
+<!-- ABOUT -->
+
+<div class="bio-section">
+<div class="bio-section-header">
+<span class="bio-section-title">About</span>
+<div class="bio-section-rule"></div>
+</div>
+
+```
+<div class="bio-about-grid">
+<div class="bio-about-lead">
+Most people talk about AI. I've been deploying it. 12 years in AI. 17 in enterprise technology. I've sat at the table with the teams building the infrastructure this industry runs on — and I've watched organisations spend millions getting it wrong.
+</div>
+<div class="bio-about-block">
+<p>I was part of the team that delivered Europe's first NVIDIA DGX-1 deployment. I've built $10M+ in pipeline at global leaders including NVIDIA, NetApp, and Oracle.</p>
+<p>I've advised startups, scaleups, and Fortune 500s — and the problems are almost always the same: too much hype, not enough architecture.</p>
+</div>
+<div class="bio-about-block">
+<p>If you're a business leader, investor, or operator trying to make a real AI decision — not just a PowerPoint one — let's talk.</p>
+<p>These aren't predictions. They're patterns I've watched play out across every layer of the stack.</p>
+</div>
+</div>
+```
+
+</div>
+
+<!-- WHAT I DO -->
+
+<div class="bio-section">
+<div class="bio-section-header">
+<span class="bio-section-title">What I Do</span>
+<div class="bio-section-rule"></div>
+</div>
+<div class="bio-pillars">
+<div class="bio-pillar">
+<div class="bio-pillar-text">Help enterprises navigate the AI infrastructure stack — from GPU compute and NeoCloud economics to last-mile deployment.</div>
+</div>
+<div class="bio-pillar">
+<div class="bio-pillar-text">Translate AI complexity into commercial decisions leaders can act on.</div>
+</div>
+<div class="bio-pillar">
+<div class="bio-pillar-text">Build GTM strategy for AI vendors entering the UK/EU market.</div>
+</div>
+<div class="bio-pillar">
+<div class="bio-pillar-text">Advise on sovereign AI, data locality, and the real cost of hyperscaler lock-in.</div>
+</div>
+</div>
+</div>
+
+<!-- EXPERIENCE -->
+
+<div class="bio-section">
+<div class="bio-section-header">
+<span class="bio-section-title">Experience</span>
+<div class="bio-section-rule"></div>
+</div>
+
+```
+<div class="bio-exp-list">
+
+<!-- SCC -->
+<div class="bio-exp-item">
+<div class="bio-exp-logo">
+<img src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/72/SCC_logo.svg/320px-SCC_logo.svg.png" alt="SCC" onerror="this.style.display='none';this.parentElement.innerHTML='<div class=\'bio-exp-logo-text\'>SCC</div>'">
+</div>
+<div class="bio-exp-body">
+<div class="bio-exp-role">AI Business Development Lead</div>
+<div class="bio-exp-company-line">
+<span class="bio-exp-company">SCC</span>
+<span class="bio-exp-dot"></span>
+<span class="bio-exp-dates">Nov 2025 – Present · Full-time · Hybrid, London</span>
+</div>
+<div class="bio-exp-desc">
+Brought on to develop and manage an ecosystem of partners and strategic customers in the AI space — spanning parties across the full AI infrastructure spectrum: data centres, NeoClouds, ISVs, AI startups, and foundational model builders.
+</div>
+</div>
+</div>
+
+<!-- BLACKLINE -->
+<div class="bio-exp-item">
+<div class="bio-exp-logo">
+<div class="bio-exp-logo-text">BLACK&shy;LINE</div>
+</div>
+<div class="bio-exp-body">
+<div class="bio-exp-role">Chief Revenue Officer</div>
+<div class="bio-exp-company-line">
+<span class="bio-exp-company">BLACKLINE AI Concierge</span>
+<span class="bio-exp-dot"></span>
+<span class="bio-exp-dates">Apr 2026 – Present · Freelance · Remote</span>
+</div>
+<div class="bio-exp-desc">
+Designing and executing the commercial engine behind BLACKLINE — building and qualifying the member base, sourcing top-tier providers, structuring pricing strategy, and owning acquisition across referrals, outreach, and brand-led channels. Revenue driven through consistency, trust, and controlled access — not volume.
+</div>
+</div>
+</div>
+
+<!-- Jack of All AI -->
+<div class="bio-exp-item">
+<div class="bio-exp-logo">
+<div class="bio-exp-logo-text">Jack of All AI</div>
+</div>
+<div class="bio-exp-body">
+<div class="bio-exp-role">Lead Consultant &amp; Managing Director</div>
+<div class="bio-exp-company-line">
+<span class="bio-exp-company">Jack of All AI Limited</span>
+<span class="bio-exp-dot"></span>
+<span class="bio-exp-dates">Jan 2023 – Nov 2025 · 2 yrs 11 mos · Hybrid, UK</span>
+</div>
+<div class="bio-exp-desc">
+Working with businesses of all sizes on AI infrastructure strategy, brand transformation, and deployment advisory — guiding companies from ideas to MVP and beyond.
+</div>
+</div>
+</div>
+
+<!-- Oracle -->
+<div class="bio-exp-item">
+<div class="bio-exp-logo">
+<img src="https://upload.wikimedia.org/wikipedia/commons/5/50/Oracle_logo.svg" alt="Oracle" onerror="this.style.display='none';this.parentElement.innerHTML='<div class=\'bio-exp-logo-text\'>Oracle</div>'">
+</div>
+<div class="bio-exp-body">
+<div class="bio-exp-role">Head of AI/ML – UK &amp; BENELUX</div>
+<div class="bio-exp-company-line">
+<span class="bio-exp-company">Oracle</span>
+<span class="bio-exp-dot"></span>
+<span class="bio-exp-dates">Sep 2023 – Feb 2025 · 1 yr 6 mos · Hybrid, London</span>
+</div>
+<div class="bio-exp-desc">
+Led the AI/ML practice across UK and BENELUX, focusing on sovereign AI, generative AI enterprise deployment, and strategic client advisory across Oracle's infrastructure and cloud portfolio.
+</div>
+</div>
+</div>
+
+<!-- NexGen Cloud -->
+<div class="bio-exp-item">
+<div class="bio-exp-logo">
+<div class="bio-exp-logo-text">Nex&shy;Gen Cloud</div>
+</div>
+<div class="bio-exp-body">
+<div class="bio-exp-role">Short Term Consultant – AI Infrastructure &amp; Ecosystem Growth</div>
+<div class="bio-exp-company-line">
+<span class="bio-exp-company">NexGen Cloud (Hyperstack)</span>
+<span class="bio-exp-dot"></span>
+<span class="bio-exp-dates">Sep 2025 · 1 mo · Hybrid, Farringdon</span>
+</div>
+<div class="bio-exp-desc">
+Engaged to accelerate adoption of Hyperstack and AI Factory among startups building next-generation AI products — advising on GPUaaS solutions, connecting innovators to scalable AI infrastructure, and facilitating strategic partnerships across the ecosystem.
+</div>
+</div>
+</div>
+
+<!-- Aethir -->
+<div class="bio-exp-item">
+<div class="bio-exp-logo">
+<div class="bio-exp-logo-text">Aethir</div>
+</div>
+<div class="bio-exp-body">
+<div class="bio-exp-role">Senior Sales Executive</div>
+<div class="bio-exp-company-line">
+<span class="bio-exp-company">Aethir</span>
+<span class="bio-exp-dot"></span>
+<span class="bio-exp-dates">Apr 2025 – Aug 2025 · 5 mos · Remote</span>
+</div>
+<div class="bio-exp-desc">
+Opening doors for companies to tap into decentralised cloud and GPU infrastructure that scales with their ambitions — working with AI labs, novel technology startups, and forward-looking enterprises to find clarity in accelerated compute.
+</div>
+</div>
+</div>
+
+<!-- NetApp -->
+<div class="bio-exp-item">
+<div class="bio-exp-logo">
+<img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/NetApp_logo.svg/320px-NetApp_logo.svg.png" alt="NetApp" onerror="this.style.display='none';this.parentElement.innerHTML='<div class=\'bio-exp-logo-text\'>NetApp</div>'">
+</div>
+<div class="bio-exp-body">
+<div class="bio-exp-role">AI Specialist – UK&amp;I &amp; EMEA Leader, Artificial Intelligence</div>
+<div class="bio-exp-company-line">
+<span class="bio-exp-company">NetApp</span>
+<span class="bio-exp-dot"></span>
+<span class="bio-exp-dates">Jul 2019 – Jul 2022 · 3 yrs 1 mo</span>
+</div>
+<div class="bio-exp-desc">
+As AI Specialist for UK&amp;I, focused on customers, internal roles, and partners to manage and grow an 8-figure pipeline. As EMEA Leader, primarily responsible for educating internal and external sales advocates of NetApp technology and developing a partner ecosystem to support AI workloads.
+</div>
+</div>
+</div>
+
+<!-- NVIDIA -->
+<div class="bio-exp-item">
+<div class="bio-exp-logo">
+<img src="https://upload.wikimedia.org/wikipedia/sco/2/21/Nvidia_logo.svg" alt="NVIDIA" onerror="this.style.display='none';this.parentElement.innerHTML='<div class=\'bio-exp-logo-text\'>NVIDIA</div>'">
+</div>
+<div class="bio-exp-body">
+<div class="bio-exp-role">Deep Learning Start-up Business Manager – Northern Europe &amp; Channel Sales Manager, Deep Learning – Enterprise</div>
+<div class="bio-exp-company-line">
+<span class="bio-exp-company">NVIDIA</span>
+<span class="bio-exp-dot"></span>
+<span class="bio-exp-dates">Nov 2014 – Feb 2019 · 4 yrs 4 mos · London</span>
+</div>
+<div class="bio-exp-desc">
+Led business and relationship development behind NVIDIA's AI and Deep Learning start-up community across Northern Europe via the NVIDIA Inception Program. Part of the team that delivered Europe's first NVIDIA DGX-1 deployment. Working with the enterprise channel on Accelerated Computing, Professional Visualisation &amp; Cloud Virtualisation, and with leading start-ups and commercial entities researching GPU-powered AI platforms.
+</div>
+</div>
+</div>
+
+</div>
+```
+
+</div>
+
+<!-- WHAT I'M BUILDING -->
+
+<div class="bio-section">
+<div class="bio-section-header">
+<span class="bio-section-title">What I'm Building</span>
+<div class="bio-section-rule"></div>
+</div>
+<div class="bio-projects">
+<div class="bio-project">
+<div class="bio-project-icon">🍰</div>
+<div>
+<div class="bio-project-name">DeployAI — The Layer Cake Series</div>
+<div class="bio-project-desc">A visual and narrative breakdown of the entire AI stack, layer by layer. For operators, builders, and leaders who want to understand what's actually powering the era of intelligence.</div>
+</div>
+</div>
+<div class="bio-project">
+<div class="bio-project-icon">📞</div>
+<div>
+<div class="bio-project-name">AI Receptionist</div>
+<div class="bio-project-desc">Missed calls are killing SMB revenue. Fixing that with intelligent call handling, FAQ automation, and CRM integration — so no opportunity slips through the cracks.</div>
+</div>
+</div>
+<div class="bio-project">
+<div class="bio-project-icon">✨</div>
+<div>
+<div class="bio-project-name">Concierge Platform</div>
+<div class="bio-project-desc">AI-first booking and client management for health, beauty, and wellness businesses. Starting in at-home aesthetics, spa, and personal training.</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- TAKE ON AI -->
+
+<div class="bio-section">
+<div class="bio-section-header">
+<span class="bio-section-title">My Take on Where This Is Going</span>
+<div class="bio-section-rule"></div>
+</div>
+<div class="bio-takes">
+<div class="bio-take">
+<div class="bio-take-num">01</div>
+<div class="bio-take-text">Inference demand will outpace training economics. The real value in AI isn't at the model layer — it's at the last mile of integration.</div>
+</div>
+<div class="bio-take">
+<div class="bio-take-num">02</div>
+<div class="bio-take-text">Sovereignty and data locality will define enterprise AI adoption across UK and EU for the next decade.</div>
+</div>
+<div class="bio-take">
+<div class="bio-take-num">03</div>
+<div class="bio-take-text">Cost control, agent governance, and circuit breakers are the most underrated risks in enterprise AI right now.</div>
+</div>
+<div class="bio-take">
+<div class="bio-take-num">04</div>
+<div class="bio-take-text">AI is a systems problem requiring full-stack thinking. These aren't predictions — they're patterns observed across every layer of the stack.</div>
+</div>
+</div>
+</div>
+
+<!-- CTA -->
+
+<div class="bio-cta">
+<div class="bio-cta-text">
+If you're a business leader, investor, or operator trying to make a <em>real</em> AI decision — not just a PowerPoint one — let's talk.
+</div>
+</div>
+
+</div>
+
+</body>
+</html>

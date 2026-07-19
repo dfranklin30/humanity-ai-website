@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+.narrative-container {
+  scroll-behavior: smooth;
+}
+
+.sticky-rail {
+  position: sticky;
+  top: 50vh;
+  transform: translateY(-50%);
+  height: max-content;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-left: 2rem;
+}
+
+.rail-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--muted);
+  transition: all 0.3s ease;
+}
+
+.rail-dot.active {
+  background-color: var(--primary);
+  transform: scale(1.5);
+}
+
+.section-dark {
+  background-color: hsl(var(--foreground));
+  color: hsl(var(--background));
+}
+
+.section-dark .text-muted-foreground {
+  color: hsl(var(--muted-foreground));
+}
+
+.section-primary {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}

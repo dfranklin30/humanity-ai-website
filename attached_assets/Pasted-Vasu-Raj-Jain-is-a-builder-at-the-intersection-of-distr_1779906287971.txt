@@ -1,0 +1,11 @@
+Vasu Raj Jain is a builder at the intersection of distributed systems, AI infrastructure, and advertising technology. As a Senior Software Development Engineer at Amazon Ads in Seattle, he leads architecture and development of large-scale ad serving infrastructure generating billions in annual revenue across Prime Video, live sports streaming, and Digital Out-of-Home platforms.
+
+Vasu directly leads 30 engineers and influences over 150 across the organization. He has designed hybrid multi-tenant infrastructure handling millions of requests per second, developed agentic AI solutions built on MCP servers and RAG, and delivered a 300% improvement in release management through automation. He also designed a BDD testing framework that reduced test creation from days to under one hour, and contributes to industry standards through IAB Tech Lab working groups.
+
+Previously, Vasu spent nearly four years on Amazon's Video & AI Platform and Prime Video teams, where he built the authoritative data store powering personalization models, an embedding generation service for video-to-vector inference, a copyright protection service for Prime Video, and the encoding and sampling services underpinning Amazon's video understanding platform.
+
+Earlier, he was a Software Engineer at Barclays Investment Bank in New York, developing nodes of a fixed-income price engine and the middleware messaging layer connecting it to the electronic trading portal.
+
+Vasu is a member of the Forbes Technology Council, certified in Agentic Economy (Arc Judge), and was awarded the Google × Tata Trust Scholarship. As Chief of AI in Advertising & Media at Humanity + AI, Inc., he focuses on ensuring the next generation of advertising and media AI is built responsibly - with strong governance, transparent measurement, and a clear-eyed view of how it shapes the open internet.
+
+He holds a Master's in Computer Science from the University of Florida and a Bachelor of Technology from Jaypee University of Engineering and Technology. He is the founder of Streetingo, a hyper-local street food discovery app, and shares his work at https://www.linkedin.com/in/vasujain00/.

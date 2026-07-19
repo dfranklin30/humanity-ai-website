@@ -1,0 +1,143 @@
+Build a full blog publishing system and add it to the existing site under the navigation item “Blog.”
+
+The blog should allow people to create an account, sign in, create a profile, upload a profile icon/avatar, write articles, save drafts, publish posts, and display published posts publicly with the author’s registered name and profile icon.
+
+Core requirements:
+
+1. Blog location
+- Add a “Blog” section to the existing website navigation.
+- Blog URL should be /blog.
+- Individual article pages should be /blog/[slug].
+- Author profile pages should be /blog/authors/[username] or /profile/[username].
+
+2. User registration and login
+- Create a sign-up page.
+- Create a login page.
+- Users should register with:
+  - Full name
+  - Display name
+  - Email
+  - Username
+  - Password
+  - Optional short bio
+  - Optional organization/title
+  - Profile icon/avatar upload
+- After registration, automatically create a user profile page.
+- Users must be signed in to write, edit, save, or publish posts.
+
+3. User profile system
+- Each registered user should have a public profile page showing:
+  - Name/display name
+  - Profile icon/avatar
+  - Bio
+  - Title/organization if provided
+  - List of their published blog posts
+- Allow users to edit their profile information and replace their avatar.
+
+4. Blog post creation
+- Create an authenticated author dashboard.
+- Authors should be able to:
+  - Create a new article
+  - Edit existing articles
+  - Save as draft
+  - Publish article
+  - Unpublish article
+  - Delete article
+- Blog editor fields:
+  - Title
+  - Subtitle/summary
+  - Body content
+  - Featured image upload
+  - Category
+  - Tags
+  - Author attribution
+  - Draft/published status
+  - SEO title
+  - SEO description
+  - Slug generated from the title but editable
+
+5. Public blog display
+- Blog homepage should show published articles only.
+- Each article card should show:
+  - Featured image
+  - Title
+  - Summary
+  - Author name
+  - Author avatar
+  - Publish date
+  - Category/tags
+- Article page should show:
+  - Full article
+  - Author name and avatar
+  - Author bio
+  - Publish date
+  - Social sharing buttons
+  - Related posts if possible
+
+6. Permissions
+- Users can edit only their own posts.
+- Admins can edit, publish, unpublish, or delete any post.
+- Add an admin role if the existing site does not already have one.
+- New users should default to “author” or “pending author,” depending on what is easiest and safest.
+- Optional: require admin approval before first publication.
+
+7. Database/backend
+Create database tables or models for:
+- Users
+- Profiles
+- Blog posts
+- Categories
+- Tags
+- Uploaded media/images
+
+Each blog post should store:
+- id
+- title
+- slug
+- summary
+- body
+- featured_image_url
+- author_id
+- status: draft/published/unpublished
+- category
+- tags
+- created_at
+- updated_at
+- published_at
+- seo_title
+- seo_description
+
+8. Image upload
+- Allow avatar uploads and featured image uploads.
+- Store images securely.
+- Validate file type and size.
+- Display fallback default avatar if no image is uploaded.
+
+9. Design
+- Match the current Humanity + AI site branding.
+- Use a clean, professional nonprofit/technology publication style.
+- Make the blog feel like a thought-leadership journal.
+- Article pages should be elegant, readable, and mobile responsive.
+- Use clear cards, strong typography, and simple navigation.
+
+10. Security
+- Protect all write/edit/publish routes behind authentication.
+- Hash passwords securely.
+- Validate all inputs.
+- Sanitize article content to prevent script injection.
+- Prevent users from editing posts they do not own.
+- Add error handling and loading states.
+
+11. Deliverables
+- Add all required frontend pages/components.
+- Add backend API routes.
+- Add database schema/models.
+- Add authentication.
+- Add profile creation pipeline.
+- Add author dashboard.
+- Add blog homepage and article pages.
+- Add admin controls if feasible.
+- Make sure the system works end-to-end.
+
+Goal:
+Create a complete blog pipeline where a visitor can register, create a profile with their name and icon, write an article, publish it, and have it appear on the public Blog page under their name.

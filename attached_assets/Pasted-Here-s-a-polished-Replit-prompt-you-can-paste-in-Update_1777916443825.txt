@@ -1,0 +1,57 @@
+Here’s a polished Replit prompt you can paste in:
+
+Update the Blog system so every post has flexible image handling.
+Requirements:
+1. Blog post image options
+Add a checkbox in the post editor labeled:
+“Do not use an image for this post.”
+If checked:
+- Do not display a featured image.
+- Replace the image area with an attractive author-focused header/card.
+- Show the author’s name prominently.
+- Use clean typography, subtle gradients, and a polished layout so the post still looks professional without an image.
+2. AI-generated image support
+For posts that do not have an uploaded image and the checkbox is NOT checked:
+- Automatically generate or suggest an AI-created visual based on the blog post content.
+- The image should be symbolic, professional, and relevant to the post topic.
+- The generated image must NOT contain words, letters, logos, or text inside the image.
+- The image should be purely visual: abstract concepts, people, technology, nature, education, community, AI, ethics, or other imagery that matches the article.
+3. Existing posts
+Update existing blog posts:
+- If a post already has an uploaded image, keep it unless the author chooses to replace it.
+- If a post has no image, either:
+  a) generate a relevant AI image based on the content, or
+  b) allow the author/admin to mark “Do not use an image.”
+- If “Do not use an image” is selected, display the author-focused no-image design instead.
+4. Admin controls
+In the blog editor/admin panel, include:
+- Upload image
+- Generate AI image from post content
+- Regenerate AI image
+- Remove image
+- Checkbox: “Do not use an image for this post”
+5. Display behavior
+On blog listing pages:
+- Posts with images should show the image.
+- Posts without images should show the author-focused card instead.
+- The no-image card should include author name, post title, date, and a clean visual background.
+On individual blog post pages:
+- Show the featured image if available.
+- If no image is used, show a polished title/author header instead.
+6. Styling
+Keep the Humanity + AI brand look:
+- Modern
+- Clean
+- Human-centered
+- Technology-forward
+- Professional nonprofit aesthetic
+- No clutter
+- Mobile responsive
+7. Safety and quality
+AI-generated images must:
+- Be appropriate for a nonprofit public website.
+- Avoid text, captions, fake logos, or unreadable symbols.
+- Avoid using real people unless uploaded by the author.
+- Match the tone and content of the article.
+Goal:
+Make every blog post look beautiful whether or not the author uploads an image, while giving authors control over whether a post uses an image at all.

@@ -1,0 +1,32 @@
+# Humanity + AI, Inc.
+
+> Humanity + AI, Inc. is a nonprofit organization dedicated to responsible AI adoption, human-centered technology leadership, and AI literacy for underserved communities.
+
+## Key Public Pages
+
+- [Home](https://humanityplusai.org/): Mission overview, featured programs, and community stats.
+- [About](https://humanityplusai.org/about): Founder Danielle A. Franklin, organizational mission, values, and timeline.
+- [Programs](https://humanityplusai.org/programs): Core initiatives including Project ROSIE, Tech Leadership, AI Ethics, Book Series, Community AI Literacy, AI Training Hub, and Animal Welfare.
+- [Training / AI Learning Hub](https://humanityplusai.org/training): PJMF AI Journey framework, foundational AI layers, case studies, AI & Philanthropy resources, video courses, open-source tools, and learning paths.
+- [Blog](https://humanityplusai.org/blog): Thought leadership articles and AI/ML resource books authored by board members and community contributors.
+- [Events](https://humanityplusai.org/events): Upcoming workshops, seminars, and networking events.
+- [AI Hub](https://humanityplusai.org/ai-hub): Community Q&A chatbot powered by OpenAI.
+- [Contact](https://humanityplusai.org/contact): Contact form and organizational contact information.
+- [Donate](https://humanityplusai.org/donate): Donation page supporting nonprofit programs and initiatives.
+- [Board of Directors](https://humanityplusai.org/about): Profiles for board members including Danielle A. Franklin, Jofia, and William.
+
+## Content Hubs
+
+- Blog articles and books are accessible at `/blog/:slug`.
+- Board member profiles are accessible at `/about/board/:slug`.
+- Author profiles are accessible at `/profile/:username`.
+- The full sitemap is available at [/sitemap.xml](https://humanityplusai.org/sitemap.xml).
+
+## Organization
+
+- **Name**: Humanity + AI, Inc.
+- **Type**: 501(c)(3) Nonprofit
+- **Email**: danielle@humanityplusai.org
+- **Phone**: (808) 652-2090
+- **Instagram**: @humanity_ai_inc
+- **LinkedIn**: /company/humanity-plus-ai-inc/
