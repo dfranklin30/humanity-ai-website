@@ -53,7 +53,13 @@ export function EventSignupDialog({ event, open, onOpenChange }: Props) {
 
   const mutation = useMutation({
     mutationFn: async (values: FormValues) => {
-      const res = await apiRequest("POST", `/api/events/${event.id}/signup`, values);
+      // The natural key rides along so the server can still find the event
+      // if this page has been open long enough for its id to go stale.
+      const res = await apiRequest("POST", `/api/events/${event.id}/signup`, {
+        ...values,
+        eventTitle: event.title,
+        eventDate: event.date,
+      });
       return res.json() as Promise<{ message: string; emailSent: boolean }>;
     },
     onSuccess: (data) => {

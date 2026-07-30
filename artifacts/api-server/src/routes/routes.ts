@@ -837,10 +837,27 @@ export async function registerRoutes(
   app.post("/api/events/:id/signup", async (req, res) => {
     try {
       const eventId = parseInt(req.params.id);
-      const event = await storage.getEventById(eventId);
+      const { eventTitle, eventDate, ...body } = (req.body ?? {}) as Record<string, unknown>;
+
+      let event = Number.isFinite(eventId)
+        ? await storage.getEventById(eventId)
+        : undefined;
+
+      // Belt and braces. Ids should now be stable, but a page that was already
+      // open before this fix shipped is still holding an id from the old
+      // wipe-and-reseed scheme. The client sends the event's natural key too, so
+      // a stale id resolves instead of turning into a 404 in someone's face.
+      if (!event && typeof eventTitle === "string" && typeof eventDate === "string") {
+        event = await storage.getEventByTitleAndDate(eventTitle, eventDate);
+        if (event) {
+          console.warn(`[events] stale id ${eventId} resolved by title/date to ${event.id}`);
+        }
+      }
+
       if (!event) return res.status(404).json({ error: "Event not found" });
 
-      const parsed = insertEventSignupSchema.parse({ ...req.body, eventId });
+      // Always the id we actually resolved, never the one off the wire.
+      const parsed = insertEventSignupSchema.parse({ ...body, eventId: event.id });
       const signup = await storage.createEventSignup(parsed);
       const emailResult = await sendEventSignupEmails(signup, event);
 

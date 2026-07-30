@@ -4,7 +4,20 @@ import type { Event, EventSignup } from "@workspace/db";
 export const GMAIL_USER = process.env.GMAIL_USER;
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
 export const FROM_EMAIL = "danielle@humanityplusai.org";
-export const ADMIN_EMAIL = process.env.EVENT_ADMIN_EMAIL || "danielle@techleadershipcommunity.com";
+// Organiser notifications go to EVERY address listed here.
+// EVENT_ADMIN_EMAIL accepts a comma-separated list.
+const ADMIN_EMAILS = (process.env.EVENT_ADMIN_EMAIL || "danielle@humanityplusai.org,danielle@techleadershipcommunity.com")
+  .split(",")
+  .map((a) => a.trim())
+  .filter(Boolean);
+
+// A SINGLE address. newsletter.ts feeds this to personalize(), which bakes
+// the recipient into an unsubscribe token, so it must never be a list.
+export const ADMIN_EMAIL = ADMIN_EMAILS[0] || "danielle@humanityplusai.org";
+
+// The full list, for `to:` fields. nodemailer accepts a comma-separated
+// string, so one constant fans a notification out to every organiser.
+export const ADMIN_NOTIFY = ADMIN_EMAILS.join(", ");
 
 let transporter: nodemailer.Transporter | null = null;
 
@@ -88,7 +101,7 @@ export async function sendEventSignupEmails(signup: EventSignup, event: Event): 
       transporter.sendMail({
         from: `"Humanity + AI Events" <${GMAIL_USER}>`,
         replyTo: signup.email,
-        to: ADMIN_EMAIL,
+        to: ADMIN_NOTIFY,
         subject: `New signup: ${signup.fullName} — ${event.title}`,
         html: adminHtml,
       }),
@@ -143,7 +156,7 @@ export async function sendNewsletterNotification(email: string): Promise<{ sent:
       transporter.sendMail({
         from: `"Humanity + AI Newsletter" <${GMAIL_USER}>`,
         replyTo: email,
-        to: ADMIN_EMAIL,
+        to: ADMIN_NOTIFY,
         subject: `New subscriber: ${email}`,
         html: adminHtml,
       }),
@@ -192,7 +205,7 @@ export async function sendNewAccountNotification(username: string, email: string
     const sends = [
       transporter.sendMail({
         from: `"Humanity + AI Accounts" <${GMAIL_USER}>`,
-        to: ADMIN_EMAIL,
+        to: ADMIN_NOTIFY,
         subject: `New account: ${fullName || username}`,
         html: adminHtml,
       }),
@@ -256,7 +269,7 @@ export async function sendDonationNotification(amount: number, donorName: string
     const sends = [
       transporter.sendMail({
         from: `"Humanity + AI Donations" <${GMAIL_USER}>`,
-        to: ADMIN_EMAIL,
+        to: ADMIN_NOTIFY,
         subject: `New donation: ${formattedAmount}${donorName ? ` from ${donorName}` : ""}`,
         html: adminHtml,
       }),

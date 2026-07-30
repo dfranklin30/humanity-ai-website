@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { blogPosts, events, users, campaigns } from "@workspace/db";
-import { sql, like, eq } from "drizzle-orm";
+import { sql, like, eq, and } from "drizzle-orm";
 
 export async function seedDatabase() {
   await db.update(users)
@@ -474,9 +474,18 @@ Read the full piece on JourneyBytes.`,
 
   await db.transaction(async (db) => {
     await db.execute(sql`SELECT pg_advisory_xact_lock(911001)`);
-  await db.delete(events);
-
-  await db.insert(events).values([
+  // The catalogue is matched on its natural key (title + date) and updated in
+  // place. This used to delete the whole table and re-insert it, which handed
+  // every event a brand-new serial id on EVERY server start. Two things broke
+  // because of that. Anyone whose browser had the events page open across a
+  // restart was holding ids that no longer existed, so pressing "Reserve my
+  // spot" POSTed to a dead id and came back 404 "Event not found" — which on
+  // Cloud Run, where instances come and go constantly, hit real people signing
+  // up. And event_signups.event_id is a foreign key with ON DELETE CASCADE, so
+  // each wipe silently took every registration ever recorded with it.
+  //
+  // Ids are now stable for the life of an event, and nothing here deletes.
+  const eventSeed: (typeof events.$inferInsert)[] = [
     {
       title: "Museum Discussion: Product Management in the Age of AI",
       description: "An AI Discussion Club in-person gathering built around a podcast conversation between Lenny Rachitsky and Nikhyl Singhal, founder of The Skip and former product executive at Meta, Google, and Credit Karma. The group meets inside the Smithsonian National Postal Museum for introductions, walks the galleries while discussing how AI is reshaping product management, then heads to an optional lunch at Cafe Fili.",
@@ -757,7 +766,20 @@ Read the full piece on JourneyBytes.`,
       speakerName: "William Zhu",
       speakerProfileUrl: "/about/board/william-zhu",
     },
-  ]);
+  ];
+
+  for (const seedEvent of eventSeed) {
+    const [existing] = await db
+      .select({ id: events.id })
+      .from(events)
+      .where(and(eq(events.title, seedEvent.title), eq(events.date, seedEvent.date)))
+      .limit(1);
+    if (existing) {
+      await db.update(events).set(seedEvent).where(eq(events.id, existing.id));
+    } else {
+      await db.insert(events).values(seedEvent);
+    }
+  }
   });
 
   // Fundraising campaigns: one per program/project plus the AI Training Fund.

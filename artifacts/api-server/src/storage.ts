@@ -51,6 +51,7 @@ export interface IStorage {
   createMessage(conversationId: number, role: string, content: string): Promise<Message>;
   getEvents(): Promise<Event[]>;
   getEventById(id: number): Promise<Event | undefined>;
+  getEventByTitleAndDate(title: string, date: string): Promise<Event | undefined>;
   createEvent(event: InsertEvent): Promise<Event>;
   createEventSignup(signup: InsertEventSignup): Promise<EventSignup>;
   getEventSignups(eventId: number): Promise<EventSignup[]>;
@@ -253,6 +254,16 @@ export class DatabaseStorage implements IStorage {
 
   async getEventById(id: number): Promise<Event | undefined> {
     const [e] = await db.select().from(events).where(eq(events.id, id));
+    return e;
+  }
+
+  /** Look an event up by its natural key, for clients holding a stale id. */
+  async getEventByTitleAndDate(title: string, date: string): Promise<Event | undefined> {
+    const [e] = await db
+      .select()
+      .from(events)
+      .where(and(eq(events.title, title), eq(events.date, date)))
+      .limit(1);
     return e;
   }
 

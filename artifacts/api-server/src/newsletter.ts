@@ -13,7 +13,7 @@ import crypto from "crypto";
 import { sql } from "drizzle-orm";
 import { db } from "./db";
 import { storage } from "./storage";
-import { getTransporter, GMAIL_USER, FROM_EMAIL, ADMIN_EMAIL } from "./email";
+import { getTransporter, GMAIL_USER, FROM_EMAIL, ADMIN_EMAIL, ADMIN_NOTIFY } from "./email";
 
 const SITE_URL = (process.env.APP_URL || "https://humanityplusai.org").replace(/\/$/, "");
 const AUTO_SEND = String(process.env.NEWSLETTER_AUTO_SEND || "").toLowerCase() === "true";
@@ -442,7 +442,7 @@ async function sendAdminReceipt(issue: NewsletterIssue, result: SendResult): Pro
   await transporter
     .sendMail({
       from: `"Humanity + AI Newsletter" <${GMAIL_USER}>`,
-      to: ADMIN_EMAIL,
+      to: ADMIN_NOTIFY,
       replyTo: FROM_EMAIL,
       subject: `[Sent] ${issue.subject} — ${result.sent} delivered`,
       html: banner + personalize(issue.html, ADMIN_EMAIL),
@@ -475,7 +475,7 @@ async function sendAdminPreview(
     </div>`;
   await transporter.sendMail({
     from: `"Humanity + AI Newsletter" <${GMAIL_USER}>`,
-    to: ADMIN_EMAIL,
+    to: ADMIN_NOTIFY,
     replyTo: FROM_EMAIL,
     subject: `[Approve] ${issue.subject} — ${recipients.length} recipients`,
     html: banner + personalize(issue.html, ADMIN_EMAIL),
