@@ -478,6 +478,20 @@ Read the full piece on JourneyBytes.`,
 
   await db.insert(events).values([
     {
+      title: "Museum Discussion: Product Management in the Age of AI",
+      description: "An AI Discussion Club in-person gathering built around a podcast conversation between Lenny Rachitsky and Nikhyl Singhal, founder of The Skip and former product executive at Meta, Google, and Credit Karma. The group meets inside the Smithsonian National Postal Museum for introductions, walks the galleries while discussing how AI is reshaping product management, then heads to an optional lunch at Cafe Fili.",
+      date: "2026-08-29",
+      time: "10:30 AM - 12:30 PM ET",
+      location: "Smithsonian National Postal Museum - Washington, DC",
+      type: "Networking",
+      imageUrl: "https://images.lumacdn.com/cdn-cgi/image/format=auto,fit=cover,dpr=1,anim=false,background=white,quality=75,width=800,height=420/event-social/rv/5c856dd2-efff-4f4e-8a5e-18d8b97f10d7.png",
+      secondaryImageUrl: null,
+      link: "https://luma.com/ai-8crf",
+      recordingUrl: null,
+      speakerName: "William Zhu",
+      speakerProfileUrl: "/about/board/william-zhu",
+    },
+    {
       title: "Build with Claude 101: From Idea to Working Prototype (No Coding Experience Needed)",
       description: "An AI Discussion Club workshop, hosted by board director William Zhu, that teaches non-technical professionals how to turn ideas into working web apps using AI. You will watch a live build-and-deploy demo, then spend an hour creating your own project with hands-on support. No coding experience needed.",
       date: "2026-08-08",
