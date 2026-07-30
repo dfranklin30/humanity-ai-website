@@ -51,6 +51,7 @@ keys = [
     "STRIPE_SECRET_KEY",
     "GMAIL_USER", "GMAIL_APP_PASSWORD", "EVENT_ADMIN_EMAIL",
     "SLACK_BOT_TOKEN", "SLACK_CHANNEL_ID",
+    "NEWSLETTER_AUTO_SEND", "NEWSLETTER_SEND_DAY", "NEWSLETTER_SEND_HOUR",
 ]
 out = {"NODE_ENV": "production", "APP_ENV": "production"}
 for k in keys:

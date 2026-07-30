@@ -7,6 +7,9 @@ import { storage } from "./storage";
 const KNOWN_ROUTES: RegExp[] = [
   /^\/$/,
   /^\/about$/,
+  /^\/privacy$/,
+  /^\/terms$/,
+  /^\/delete-account$/,
   /^\/about\/board\/[^/]+$/,
   /^\/programs$/,
   /^\/training$/,

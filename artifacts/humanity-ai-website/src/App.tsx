@@ -31,6 +31,7 @@ import ResetPasswordPage from "@/pages/reset-password";
 import AuthorDashboard from "@/pages/author-dashboard";
 import PostEditor from "@/pages/post-editor";
 import ProfilePage from "@/pages/profile";
+import DeleteAccount from "@/pages/delete-account";
 import Privacy from "@/pages/privacy";
 import Terms from "@/pages/terms";
 
@@ -58,6 +59,7 @@ function Router() {
       <Route path="/profile/:username" component={ProfilePage} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/terms" component={Terms} />
+      <Route path="/delete-account" component={DeleteAccount} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -1,6 +1,7 @@
 import { httpServer } from "./app";
 import { logger } from "./lib/logger";
 import { seedDatabase } from "./seed";
+import { startNewsletterScheduler } from "./newsletter";
 
 const rawPort = process.env["PORT"];
 
@@ -57,4 +58,10 @@ httpServer.listen(port, () => {
   initStripe().catch((err) => {
     logger.error({ err }, "initStripe error");
   });
+
+  try {
+    startNewsletterScheduler();
+  } catch (err) {
+    logger.error({ err }, "Newsletter scheduler failed to start");
+  }
 });

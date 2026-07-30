@@ -30,6 +30,7 @@ import vinaPhoto from "@assets/image_1780429062430.png";
 import williamZhuPhoto from "@assets/william_zhu_portrait_opt.webp";
 import teamCoverPhoto from "@assets/team_cover_opt.webp";
 import { AmbientBackground } from "@/components/ambient-bg";
+import { AINewsTicker, ArxivFeed } from "@/components/ai-news";
 import { VoicesShowcase } from "@/components/voices-showcase";
 import { SlackCommunity } from "@/components/slack-community";
 import { SLACK_INVITE_URL } from "@/lib/community";
@@ -253,6 +254,9 @@ export default function Home() {
         </div>
       </Link>
 
+      {/* Rolling AI News highlights — arXiv + AI news + markets, clickable to source */}
+      <AINewsTicker />
+
       {/* Dark AI Hero — deep field where humanity meets AI */}
       <section
         className="relative isolate overflow-hidden bg-[#0a2117]/55 backdrop-blur-[2px] text-[#FAF9F6]"
@@ -361,6 +365,9 @@ export default function Home() {
       </section>
 
       <VoicesShowcase />
+
+      {/* Latest AI research & models streamed from arXiv */}
+      <ArxivFeed />
 
       <main className="max-w-[1400px] mx-auto px-4 md:px-8 py-8 relative isolate bg-[#FAF9F6] dark:bg-[#0a2117] rounded-t-[2.5rem] shadow-[0_-24px_70px_rgba(3,2,12,0.55)]">
         <AmbientBackground className="-z-10" />

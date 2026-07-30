@@ -1,10 +1,10 @@
 import nodemailer from "nodemailer";
 import type { Event, EventSignup } from "@workspace/db";
 
-const GMAIL_USER = process.env.GMAIL_USER;
+export const GMAIL_USER = process.env.GMAIL_USER;
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
-const FROM_EMAIL = "danielle@humanityplusai.org";
-const ADMIN_EMAIL = process.env.EVENT_ADMIN_EMAIL || "danielle@techleadershipcommunity.com";
+export const FROM_EMAIL = "danielle@humanityplusai.org";
+export const ADMIN_EMAIL = process.env.EVENT_ADMIN_EMAIL || "danielle@techleadershipcommunity.com";
 
 let transporter: nodemailer.Transporter | null = null;
 
@@ -23,6 +23,11 @@ if (GMAIL_USER && GMAIL_APP_PASSWORD) {
 
 export function isEmailConfigured(): boolean {
   return transporter !== null;
+}
+
+/** Shared Gmail transporter, or null when credentials aren't configured. */
+export function getTransporter(): nodemailer.Transporter | null {
+  return transporter;
 }
 
 export async function sendEventSignupEmails(signup: EventSignup, event: Event): Promise<{ sent: boolean; reason?: string }> {

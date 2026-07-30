@@ -4,7 +4,7 @@ import { createServer, type Server } from "http";
 import path from "path";
 import fs from "fs";
 import { storage } from "../storage";
-import { requireAuth } from "../auth";
+import { requireAuth, requireAdmin } from "../auth";
 import { avatarUpload, postImageUpload, publicUrlForUpload, processAndSaveImage } from "../upload";
 import {
   insertContactSchema,
@@ -18,6 +18,20 @@ import { sendEventSignupEmails, sendNewsletterNotification, sendDonationNotifica
 import { getUncachableStripeClient } from "../stripeClient";
 import { recordDonation } from "../donationFulfillment";
 import { getCommunityFeed } from "../slack";
+import { getAggregatedNews } from "../news";
+import {
+  buildIssue,
+  sendIssue,
+  runMonthlyCycle,
+  getRecipients,
+  listIssues,
+  findIssueByToken,
+  addOptOut,
+  unsubscribeToken,
+  previousPeriod,
+  currentPeriod,
+  newsletterConfig,
+} from "../newsletter";
 import OpenAI from "openai";
 
 function getOpenAIClient() {
@@ -411,12 +425,139 @@ export async function registerRoutes(
     }
   });
 
+  // ---------------------------------------------------------------- newsletter
+  // The monthly issue builds itself on a schedule; these endpoints let an admin
+  // preview it, release it, and let any recipient opt out.
+
+  const periodParam = (req: any): string => {
+    const p = String(req.query.period || "");
+    return /^\d{4}-\d{2}$/.test(p) ? p : previousPeriod();
+  };
+
+  const notice = (title: string, body: string) => `<!doctype html><html><head><meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/><title>${title}</title></head>
+    <body style="margin:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+    <div style="max-width:520px;margin:60px auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:32px;text-align:center;">
+      <h1 style="font-size:22px;color:#1e3a8a;margin:0 0 12px 0;">${title}</h1>
+      <p style="font-size:15px;line-height:1.6;color:#374151;margin:0 0 22px 0;">${body}</p>
+      <a href="/" style="background:#3b82f6;color:#fff;padding:11px 22px;border-radius:7px;text-decoration:none;font-weight:600;">Back to humanityplusai.org</a>
+    </div></body></html>`;
+
+  // Admin: render the issue exactly as subscribers would see it.
+  app.get("/api/newsletter/preview", requireAdmin, async (req, res) => {
+    try {
+      const issue = await buildIssue(periodParam(req));
+      res.set("Content-Type", "text/html; charset=utf-8");
+      res.send(issue.html.split("{{UNSUBSCRIBE_URL}}").join("#"));
+    } catch (error: any) {
+      res.status(500).json({ error: error?.message || "Failed to build newsletter" });
+    }
+  });
+
+  // Admin: schedule config, list size, and the history of issues.
+  app.get("/api/newsletter/status", requireAdmin, async (_req, res) => {
+    try {
+      const [recipients, issues] = await Promise.all([getRecipients(), listIssues()]);
+      res.json({
+        config: newsletterConfig,
+        mode: newsletterConfig.AUTO_SEND ? "auto-send" : "admin-approval",
+        recipientCount: recipients.length,
+        nextPeriod: previousPeriod(),
+        thisMonth: currentPeriod(),
+        issues,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error?.message || "Failed to load newsletter status" });
+    }
+  });
+
+  // Admin: build the issue now (sends or routes to approval per config).
+  app.post("/api/newsletter/run", requireAdmin, async (req, res) => {
+    try {
+      const period = /^\d{4}-\d{2}$/.test(String(req.body?.period || ""))
+        ? String(req.body.period)
+        : previousPeriod();
+      const result = await runMonthlyCycle(period, { force: Boolean(req.body?.force) });
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error?.message || "Failed to run newsletter cycle" });
+    }
+  });
+
+  // Admin: send immediately to the whole list, skipping the approval step.
+  app.post("/api/newsletter/send", requireAdmin, async (req, res) => {
+    try {
+      const period = /^\d{4}-\d{2}$/.test(String(req.body?.period || ""))
+        ? String(req.body.period)
+        : previousPeriod();
+      const issue = await buildIssue(period);
+      const result = await sendIssue(issue);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error?.message || "Failed to send newsletter" });
+    }
+  });
+
+  // One-click release from the admin preview email.
+  app.get("/api/newsletter/approve/:token", async (req, res) => {
+    try {
+      const record = await findIssueByToken(String(req.params.token || ""));
+      if (!record) {
+        return res.status(404).send(notice("Link not recognized", "This approval link is no longer valid."));
+      }
+      if (record.sent_at) {
+        return res.send(
+          notice(
+            "Already sent",
+            `The ${record.period} issue went out to ${record.recipient_count} recipients.`,
+          ),
+        );
+      }
+      const issue = await buildIssue(String(record.period));
+      const result = await sendIssue(issue);
+      res.send(
+        notice(
+          "Newsletter sent",
+          `${issue.subject} went out to ${result.sent} of ${result.recipients} recipients${result.failed ? ` (${result.failed} failed)` : ""}.`,
+        ),
+      );
+    } catch (error: any) {
+      res.status(500).send(notice("Something went wrong", error?.message || "The newsletter could not be sent."));
+    }
+  });
+
+  app.get("/api/newsletter/unsubscribe", async (req, res) => {
+    try {
+      const email = String(req.query.email || "").trim().toLowerCase();
+      const token = String(req.query.t || "");
+      if (!email || token !== unsubscribeToken(email)) {
+        return res.status(400).send(notice("Link not recognized", "This unsubscribe link is not valid."));
+      }
+      await addOptOut(email);
+      res.send(notice("You're unsubscribed", `${email} will no longer receive the Humanity + AI newsletter.`));
+    } catch (error: any) {
+      res.status(500).send(notice("Something went wrong", "We couldn't update your preferences. Please email us."));
+    }
+  });
+
   app.get("/api/blog", async (_req, res) => {
     try {
       const posts = await storage.getBlogPosts();
       res.json(posts);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch blog posts" });
+    }
+  });
+
+  // Aggregated AI news + arXiv research for the homepage "AI News" ticker and the
+  // "Latest AI Research & Models" feed. Cached server-side; free sources only.
+  app.get("/api/news", async (_req, res) => {
+    try {
+      const data = await getAggregatedNews();
+      res.set("Cache-Control", "public, max-age=300");
+      res.json(data);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch news", ticker: [], arxiv: [] });
     }
   });
 
