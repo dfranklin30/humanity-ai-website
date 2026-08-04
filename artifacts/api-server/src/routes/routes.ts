@@ -167,6 +167,17 @@ export async function registerRoutes(
         { url: "/ai-hub", priority: "0.7", changefreq: "monthly" },
         { url: "/contact", priority: "0.6", changefreq: "yearly" },
         { url: "/donate", priority: "0.7", changefreq: "monthly" },
+        { url: "/aiforkids", priority: "0.9", changefreq: "weekly" },
+        { url: "/aiforkids/program", priority: "0.8", changefreq: "monthly" },
+        { url: "/aiforkids/curriculum", priority: "0.8", changefreq: "monthly" },
+        { url: "/aiforkids/pricing", priority: "0.8", changefreq: "monthly" },
+        { url: "/aiforkids/parents", priority: "0.8", changefreq: "monthly" },
+        { url: "/aiforkids/schools", priority: "0.9", changefreq: "monthly" },
+        { url: "/aiforkids/scholarships", priority: "0.7", changefreq: "monthly" },
+        { url: "/aiforkids/about", priority: "0.6", changefreq: "monthly" },
+        { url: "/aiforkids/faq", priority: "0.6", changefreq: "monthly" },
+        { url: "/aiforkids/contact", priority: "0.6", changefreq: "monthly" },
+        { url: "/aiforkids/enroll", priority: "0.9", changefreq: "weekly" },
       ];
 
       const boardUrls = BOARD_MEMBER_SLUGS.map(slug => ({

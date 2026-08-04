@@ -5,6 +5,7 @@ import { injectSeoMeta } from "./seo";
 import { storage } from "./storage";
 
 const KNOWN_ROUTES: RegExp[] = [
+  /^\/aiforkids(?:\/.*)?$/,
   /^\/$/,
   /^\/about$/,
   /^\/privacy$/,

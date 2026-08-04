@@ -7,6 +7,7 @@ import { setupAuth } from "./auth";
 import { registerRoutes } from "./routes/routes";
 import { serveStatic } from "./static";
 import healthRouter from "./routes/health";
+import { registerAiForKidsRoutes } from "./routes/aiforkids";
 import { WebhookHandlers } from "./webhookHandlers";
 import { handleStripeDonationEvent } from "./donationFulfillment";
 
@@ -78,6 +79,10 @@ app.use(express.urlencoded({ extended: true }));
 
 // Setup auth middleware (sessions, passport)
 setupAuth(app);
+
+// AI Builders Academy (/aiforkids) API. Registered before the SPA
+// catch-all in serveStatic so it is never shadowed.
+registerAiForKidsRoutes(app);
 
 // Create http server and register all legacy routes
 export const httpServer: Server = createServer(app);

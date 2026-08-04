@@ -1,4 +1,4 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -12,6 +12,7 @@ import { RainbowRoadBg } from "@/components/rainbow-road-bg";
 import { AuthProvider } from "@/lib/auth";
 import { ScrollToTop } from "@/components/scroll-to-top";
 import { HelmetProvider } from "react-helmet-async";
+import AiForKidsApp from "@/aiforkids/AiForKidsApp";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import About from "@/pages/about";
@@ -65,6 +66,35 @@ function Router() {
   );
 }
 
+/**
+ * AI Builders Academy (/aiforkids) is a self-contained site that shares this
+ * deployment and DNS but not the parent site's chrome. Anything under
+ * /aiforkids renders its own layout, nav, footer and theme; everything else
+ * renders the Humanity + AI site exactly as before.
+ */
+function Shell() {
+  const [location] = useLocation();
+
+  if (location.startsWith("/aiforkids")) {
+    return <AiForKidsApp />;
+  }
+
+  return (
+    <>
+      <RainbowRoadBg />
+      <div className="min-h-screen flex flex-col bg-transparent">
+        <FundraisingBanner />
+        <Navbar />
+        <main className="flex-1">
+          <Router />
+        </main>
+        <Footer />
+        <AiChatWidget />
+      </div>
+    </>
+  );
+}
+
 function App() {
   return (
     <HelmetProvider>
@@ -74,16 +104,7 @@ function App() {
           <AuthProvider>
             <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
               <ScrollToTop />
-              <RainbowRoadBg />
-              <div className="min-h-screen flex flex-col bg-transparent">
-                <FundraisingBanner />
-                <Navbar />
-                <main className="flex-1">
-                  <Router />
-                </main>
-                <Footer />
-                <AiChatWidget />
-              </div>
+              <Shell />
               <Toaster />
             </WouterRouter>
           </AuthProvider>
