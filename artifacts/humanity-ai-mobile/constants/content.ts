@@ -64,9 +64,9 @@ export const programs: Program[] = [
     image: require("@/assets/images/programs/initiative-rosie.png") as number,
     title: "Project ROSIE",
     subtitle: "Research On Species Intelligence and Empathy",
-    desc: "Our flagship research initiative integrating AI, frequency analysis, and behavioral science to pioneer interspecies communication. Commercialized through founder Danielle A. Franklin's Doolittle Corporation, ROSIE powers TalkingDOG — a multi-sensor smart collar that streams a dog's physiological and behavioral signals into the ROSIE engine and its 40-state Canine Emotional Resonance (CER) taxonomy, translating them into plain, first-person language in real time. Hardware-agnostic by design, ROSIE licenses as a platform to any wearable, robot, or telehealth product — reaching across the tree of life to give a voice to beings who cannot speak for themselves.",
+    desc: "Our flagship research initiative integrating AI, frequency analysis, and behavioral science to pioneer interspecies communication. Commercialized through founder Danielle A. Franklin's Doolittle Corporation, ROSIE powers TalkingDOG — a multi-sensor wearable harness that streams a dog's physiological and behavioral signals into the ROSIE engine and its 40-state Canine Emotional Resonance (CER) taxonomy, translating them into plain, first-person language in real time. Hardware-agnostic by design, ROSIE licenses as a platform to any wearable, robot, or telehealth product — reaching across the tree of life to give a voice to beings who cannot speak for themselves.",
     highlights: [
-      "TalkingDOG multi-sensor smart collar",
+      "TalkingDOG multi-sensor wearable harness",
       "ROSIE engine & 40-state CER taxonomy",
       "Real-time signal-to-language translation",
       "Hardware-agnostic SaaS / API platform",

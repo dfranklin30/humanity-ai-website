@@ -551,9 +551,71 @@ export type Download = {
   /** Generated on the fly from program content — no static PDF to maintain. */
   href: string;
   kind: "print" | "file";
+  /** Small caption on the card, e.g. "PDF · 278 KB". Files only. */
+  format?: string;
 };
 
 export const DOWNLOADS: Download[] = [
+  {
+    id: "school-presentation-pptx",
+    title: "School presentation (PowerPoint)",
+    description:
+      "A 12-slide deck covering the program, the three grade bands, what we provide your school, instructor credentials, tuition and next steps. Editable, with speaker notes on every slide.",
+    audience: "schools",
+    href: "/aiforkids/AI-Builders-Academy-School-Presentation.pptx",
+    kind: "file",
+    format: "PPTX \u00b7 526 KB",
+  },
+  {
+    id: "school-presentation-pdf",
+    title: "School presentation (PDF)",
+    description:
+      "The same 12-slide deck as a PDF \u2014 for forwarding to anyone who does not have PowerPoint.",
+    audience: "schools",
+    href: "/aiforkids/AI-Builders-Academy-School-Presentation.pdf",
+    kind: "file",
+    format: "PDF \u00b7 877 KB",
+  },
+  {
+    id: "flyer-elementary",
+    title: "Elementary flyer \u2014 grades 3\u20135",
+    description:
+      "One-page family flyer for the AI Explorers band. Print for backpacks or attach to a family newsletter.",
+    audience: "schools",
+    href: "/aiforkids/AI-Builders-Academy-Elementary-Grades-3-5.pdf",
+    kind: "file",
+    format: "PDF \u00b7 354 KB",
+  },
+  {
+    id: "flyer-middle",
+    title: "Middle school flyer \u2014 grades 6\u20138",
+    description:
+      "One-page family flyer for the middle school band, with the projects students take home.",
+    audience: "schools",
+    href: "/aiforkids/AI-Builders-Academy-Middle-School-Grades-6-8.pdf",
+    kind: "file",
+    format: "PDF \u00b7 390 KB",
+  },
+  {
+    id: "flyer-high",
+    title: "High school flyer \u2014 grades 9\u201312",
+    description:
+      "One-page family flyer for the high school band, including the capstone project and portfolio work.",
+    audience: "schools",
+    href: "/aiforkids/AI-Builders-Academy-High-School-Grades-9-12.pdf",
+    kind: "file",
+    format: "PDF \u00b7 394 KB",
+  },
+  {
+    id: "flyer-partnership",
+    title: "School partnership flyer",
+    description:
+      "The general one-pager for principals and district staff \u2014 what the program is, what we provide, and how to start a conversation.",
+    audience: "schools",
+    href: "/aiforkids/AI-Builders-Academy-School-Partnership.pdf",
+    kind: "file",
+    format: "PDF \u00b7 354 KB",
+  },
   {
     id: "school-brochure",
     title: "School Partner Brochure",

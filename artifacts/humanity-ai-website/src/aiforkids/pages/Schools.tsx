@@ -86,7 +86,7 @@ export default function Schools() {
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                 <ScheduleButton />
                 <Button href="#brochures" size="lg" variant="secondary">
-                  <Download className="h-4 w-4" aria-hidden="true" /> Download the brochure
+                  <Download className="h-4 w-4" aria-hidden="true" /> Download the brochures
                 </Button>
               </div>
               <p className="mt-5 text-sm text-slate-600">
@@ -297,19 +297,41 @@ export default function Schools() {
         <Eyebrow>Take it to your team</Eyebrow>
         <H2>Downloadable brochures</H2>
         <Lede>
-          Each of these opens a clean, print-ready page — use your browser's print dialog and choose
+          The deck and the flyers download as ready-to-send files. The pages below them open in your browser — use your print dialog and choose
           "Save as PDF" to forward it to a principal, PTA board or district office.
         </Lede>
         <ul className="mt-10 grid gap-5 md:grid-cols-3">
           {schoolDownloads.map((d) => (
             <Card as="li" key={d.id} className="flex flex-col">
               <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-orange-100 text-orange-700">
-                <Printer className="h-5 w-5" aria-hidden="true" />
+                {d.kind === "file" ? (
+                  <Download className="h-5 w-5" aria-hidden="true" />
+                ) : (
+                  <Printer className="h-5 w-5" aria-hidden="true" />
+                )}
               </span>
               <h3 className="mt-4 text-lg font-bold text-slate-900">{d.title}</h3>
               <p className="mt-2 flex-1 text-sm leading-relaxed text-slate-600">{d.description}</p>
-              <Button href={d.href} variant="secondary" className="mt-5 self-start">
-                Open <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              {d.format ? (
+                <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  {d.format}
+                </p>
+              ) : null}
+              <Button
+                href={d.href}
+                download={d.kind === "file"}
+                variant="secondary"
+                className="mt-5 self-start"
+              >
+                {d.kind === "file" ? (
+                  <>
+                    Download <Download className="h-4 w-4" aria-hidden="true" />
+                  </>
+                ) : (
+                  <>
+                    Open <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  </>
+                )}
               </Button>
             </Card>
           ))}

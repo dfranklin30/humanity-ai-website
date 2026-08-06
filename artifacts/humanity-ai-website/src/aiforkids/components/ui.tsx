@@ -92,6 +92,8 @@ type BtnProps = {
   className?: string;
   disabled?: boolean;
   external?: boolean;
+  /** Render a plain anchor with the download attribute (for static files). */
+  download?: boolean;
 };
 
 const VARIANTS = {
@@ -113,6 +115,7 @@ export function Button({
   className,
   disabled,
   external,
+  download,
 }: BtnProps) {
   const cls = cx(
     "inline-flex items-center justify-center gap-2 rounded-full font-semibold transition focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-300 disabled:cursor-not-allowed disabled:opacity-50",
@@ -120,9 +123,17 @@ export function Button({
     VARIANTS[variant],
     className,
   );
-  if (href && external) {
+  // Plain anchors for: off-site links, static file downloads, and in-page
+  // hash targets. A wouter <Link> would treat "#brochures" as a route and
+  // swallow the jump, and would client-side-route a .pdf instead of saving it.
+  if (href && (external || download || href.startsWith("#"))) {
     return (
-      <a className={cls} href={href} rel="noopener noreferrer">
+      <a
+        className={cls}
+        href={href}
+        rel="noopener noreferrer"
+        download={download ? "" : undefined}
+      >
         {children}
       </a>
     );

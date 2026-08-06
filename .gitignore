@@ -52,3 +52,11 @@ deploy/env.deploy
 node_modules/
 dist/
 .cache/
+
+# --- secrets and local backups (never commit) ---
+deploy/env.deploy.*
+!deploy/env.deploy.example
+*.bak
+*.bak.*
+.env.local
+.env.*.local
