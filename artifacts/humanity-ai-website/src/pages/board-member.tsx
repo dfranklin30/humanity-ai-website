@@ -75,6 +75,7 @@ const boardMembers: Record<string, {
       { label: "LinkedIn", url: "https://www.linkedin.com/in/danielle-franklin-53318269/", icon: "linkedin" },
       { label: "Medium", url: "https://medium.com/@daniellefranklin808", icon: "medium" }
     ],
+  },
   "jofia-jose-prakash": {
     name: "Jofiah Jose Prakash",
     slug: "jofia-jose-prakash",
