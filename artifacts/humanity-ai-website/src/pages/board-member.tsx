@@ -35,7 +35,6 @@ const boardMembers: Record<string, {
   links: { label: string; url: string; icon: string }[];
   articleHighlights?: { title: string; source: string; url: string }[];
   videoHighlight?: { title: string; embedId: string; source?: string; description?: string };
-  featuredVenture?: { name: string; url: string; description: string; tagline?: string };
   tagline?: string;
   subtitle?: string;
   stats?: { value: string; label: string }[];
@@ -55,7 +54,7 @@ const boardMembers: Record<string, {
     fullBio: [
       "Danielle A. Franklin is a defense technology executive and AI innovator with 20+ years driving mission-impact across the Office of the Secretary of Defense (OSD), Space Development Agency (SDA), U.S. Navy, Missile Defense Agency (MDA), and U.S. Space Force (USSF).",
       "As Chief Architect of SDA's $1.8B+ Proliferated Warfighter Space Architecture, she designed the technical backbone of next-generation space defense systems. She authored the DoD Digital Engineering Body of Knowledge and served as NVIDIA's DoD AI strategist for MDA, Space Force, and DIU.",
-      "Danielle is President of N Systems LLC, a WOSB/SBA-certified defense contractor, and Founder of Doolittle Corporation, which commercializes patent-pending AI technologies including ROSIE, TalkingDOG, BEN Logic, and F2FTX.",
+      "Danielle is President of N Systems LLC and Founder of Doolittle Corporation.",
       "She founded Humanity + AI, Inc. to ensure that the transformative power of artificial intelligence serves all of humanity — not just those with access to resources and expertise. Through HAVI, she has launched 6 major initiatives focused on AI ethics, education, and community empowerment.",
       "Danielle holds three degrees from the University of Maryland: M.S. in Cybersecurity Policy, M.S. in IT & Software Engineering, and B.S. in Aerospace Engineering. She is a certified NVIDIA GPU Genius and has been recognized in Marquis Who's Who in 2025 and 2026."
     ],
@@ -76,13 +75,6 @@ const boardMembers: Record<string, {
       { label: "LinkedIn", url: "https://www.linkedin.com/in/danielle-franklin-53318269/", icon: "linkedin" },
       { label: "Medium", url: "https://medium.com/@daniellefranklin808", icon: "medium" }
     ],
-    featuredVenture: {
-      name: "Doolittle Corporation",
-      url: "https://doolittlecorp.replit.app",
-      tagline: "Proudly supporting Humanity + AI, Inc.",
-      description: "Founded by Danielle A. Franklin, Doolittle Corporation commercializes patent-pending AI technologies — including ROSIE, TalkingDOG, BEN Logic, and F2FTX — and proudly supports the mission of Humanity + AI, Inc."
-    }
-  },
   "jofia-jose-prakash": {
     name: "Jofiah Jose Prakash",
     slug: "jofia-jose-prakash",
@@ -364,7 +356,6 @@ const boardMembers: Record<string, {
     ],
     links: [
       { label: "LinkedIn", url: "https://www.linkedin.com/in/vasujain00", icon: "linkedin" },
-      { label: "Personal Site", url: "https://www.vasurajjain.com", icon: "external" },
       { label: "Forbes Council Profile", url: "https://councils.forbes.com/profile/Vasu-Raj-Jain-Impact-Focused-Engineering-Lead-Amazon-Ads/b376d852-61fd-442e-977c-8552e9f06766", icon: "external" }
     ],
     perspectives: [
@@ -535,7 +526,7 @@ export default function BoardMember() {
 
   const otherMembers = Object.values(boardMembers).filter(m => m.slug !== member.slug);
 
-  const siteBase = "https://www.techleadershipcommunity.com";
+  const siteBase = "https://humanityplusai.org";
   const memberUrl = `${siteBase}/about/board/${member.slug}`;
   const sameAsLinks = member.links.map((l) => l.url);
   if (member.linkedin && !sameAsLinks.includes(member.linkedin)) {
@@ -636,35 +627,6 @@ export default function BoardMember() {
                 </div>
               )}
 
-              {member.featuredVenture && (
-                <Card
-                  className="mb-8 p-6 border-l-4 border-l-primary bg-primary/5"
-                  data-testid="section-featured-venture"
-                >
-                  <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary mb-2 flex items-center gap-2">
-                    <Briefcase className="h-3.5 w-3.5" />
-                    Founder's Venture
-                  </div>
-                  <h3 className="font-serif text-2xl font-bold leading-tight mb-1" data-testid="text-featured-venture-name">
-                    {member.featuredVenture.name}
-                  </h3>
-                  {member.featuredVenture.tagline && (
-                    <p className="text-sm font-semibold text-primary italic mb-3" data-testid="text-featured-venture-tagline">
-                      {member.featuredVenture.tagline}
-                    </p>
-                  )}
-                  <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-                    {member.featuredVenture.description}
-                  </p>
-                  <a href={member.featuredVenture.url} target="_blank" rel="noopener noreferrer">
-                    <Button className="gap-2" data-testid="link-featured-venture">
-                      <Globe className="h-4 w-4" />
-                      Visit {member.featuredVenture.name}
-                      <ArrowRight className="h-4 w-4" />
-                    </Button>
-                  </a>
-                </Card>
-              )}
 
               <div className="space-y-4 mb-10">
                 {member.fullBio.map((paragraph, i) => (

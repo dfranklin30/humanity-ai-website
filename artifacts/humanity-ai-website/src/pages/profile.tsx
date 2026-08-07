@@ -52,7 +52,7 @@ export default function ProfilePage() {
     ? `${profileName} — ${profile.bio}`
     : `Author profile for ${profileName} on Humanity + AI, Inc. Read their articles and insights on AI, ethics, and technology.`;
 
-  const siteBase = "https://www.techleadershipcommunity.com";
+  const siteBase = "https://humanityplusai.org";
   const profileUrl = `${siteBase}/profile/${profile.username}`;
   const displayName = profile.displayName || profile.username;
   const avatarUrl = profile.avatarUrl

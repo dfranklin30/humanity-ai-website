@@ -252,7 +252,7 @@ export const HERITAGE = {
     "AI Builders Academy is not a franchise curriculum bought off a shelf. It grew out of one engineer's work and one organization's mission.",
   paragraphs: [
     "Humanity + AI, Inc. was founded on a single conviction: artificial intelligence is going to reshape every career our children will ever hold, and access to it should not depend on a family's zip code or income. That conviction is the whole mission — making artificial intelligence accessible to everyone — and the academy is what that mission looks like when it is pointed at a nine-year-old.",
-    "The program was built by Danielle Franklin, who spent two decades supporting the Department of Defense and worked at NVIDIA as AI moved from research curiosity to national infrastructure. She founded Doolittle Corporation and developed ROSIE, an AI system that reads an animal's health signals and translates them into something a person can act on. Week 5 of the academy is not a slideshow about robotics — students meet ROSIE and TalkingDOG directly, because a child who has watched an AI interpret a living creature understands the field differently than one who has only read about it.",
+    "The program was built by Danielle Franklin, who spent two decades supporting the Department of Defense and worked at NVIDIA as AI moved from research curiosity to national infrastructure. She developed ROSIE, an AI system that reads an animal's health signals and translates them into something a person can act on. Week 5 of the academy is not a slideshow about robotics — students meet ROSIE and TalkingDOG directly, because a child who has watched an AI interpret a living creature understands the field differently than one who has only read about it.",
     "The academy carries the Humanity + AI mark for a reason. Every seat, every scholarship and every school partnership sits inside the nonprofit's work, which means tuition funds the program rather than a shareholder, and sponsors fund students rather than marketing.",
   ],
   communities: {
@@ -286,7 +286,6 @@ export const FOUNDER = {
   credentials: [
     "Former NVIDIA",
     "20 years supporting the Department of Defense",
-    "Founder, Doolittle Corporation",
     "Developer of ROSIE",
     "AI educator and speaker",
   ],
@@ -527,7 +526,7 @@ export const INSTRUCTORS: Instructor[] = [
   {
     name: FOUNDER.name,
     role: FOUNDER.role,
-    bio: "Danielle spent two decades supporting the Department of Defense and worked at NVIDIA before founding Humanity + AI and Doolittle Corporation. She developed ROSIE, the AI system students meet in Week 5, and teaches the academy's instructor cohort herself.",
+    bio: "Danielle spent two decades supporting the Department of Defense and worked at NVIDIA before founding Humanity + AI. She developed ROSIE, the AI system students meet in Week 5, and teaches the academy's instructor cohort herself.",
     credentials: [...FOUNDER.credentials],
   },
 ];
