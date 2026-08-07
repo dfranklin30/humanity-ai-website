@@ -1,3 +1,4 @@
+import { trackConversion } from "../../lib/analytics";
 import { useEffect, useState } from "react";
 import { useSearch } from "wouter";
 import { CheckCircle2, Loader2, Mail } from "lucide-react";
@@ -29,6 +30,7 @@ export default function EnrollReceived() {
         if (res.ok && body?.paid) {
           setReference(body.reference ?? null);
           setState("paid");
+          trackConversion("academy_enrollment", { id: body.reference ?? undefined });
         } else {
           setState("failed");
         }

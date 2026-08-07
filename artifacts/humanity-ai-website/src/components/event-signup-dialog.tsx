@@ -1,3 +1,4 @@
+import { trackConversion } from "../lib/analytics";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -64,6 +65,7 @@ export function EventSignupDialog({ event, open, onOpenChange }: Props) {
     },
     onSuccess: (data) => {
       setSubmittedMessage(data.message);
+      trackConversion("event_registration");
       form.reset();
     },
     onError: (err: any) => {

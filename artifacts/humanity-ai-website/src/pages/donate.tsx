@@ -1,3 +1,4 @@
+import { trackConversion } from "../lib/analytics";
 import { PageMeta } from "@/components/page-meta";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -178,6 +179,7 @@ export default function Donate() {
     const sessionId = params.get("session_id");
     if (params.get("success") && sessionId) {
       setSuccess(true);
+      trackConversion("donation");
       window.history.replaceState({}, "", "/donate");
       apiRequest("GET", `/api/donations/verify?session_id=${encodeURIComponent(sessionId)}`)
         .then(() => queryClient.invalidateQueries({ queryKey: ["/api/donations/stats"] }))

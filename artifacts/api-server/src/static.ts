@@ -1,3 +1,4 @@
+import { injectAnalytics } from "./analytics-tag";
 import express, { type Express } from "express";
 import fs from "fs";
 import path from "path";
@@ -54,6 +55,7 @@ export function serveStatic(app: Express) {
       const indexPath = path.resolve(distPath, "index.html");
       let html = await fs.promises.readFile(indexPath, "utf-8");
       html = await injectSeoMeta(req.originalUrl, html, storage);
+      html = injectAnalytics(html);
       const status = isKnownRoute(req.originalUrl) ? 200 : 404;
       res.status(status).set({ "Content-Type": "text/html" }).end(html);
     } catch {
