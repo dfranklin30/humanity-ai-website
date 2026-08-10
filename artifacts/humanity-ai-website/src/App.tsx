@@ -48,7 +48,6 @@ function Router() {
       <Route path="/blog" component={Blog} />
       <Route path="/blog/:slug" component={BlogPostPage} />
       <Route path="/events" component={Events} />
-      <Route path="/aiforkids" component={AiForKidsEvent} />
       <Route path="/aiforkids/bereadyforai" component={AiForKidsEvent} />
       <Route path="/ai-hub" component={AiHub} />
       <Route path="/contact" component={Contact} />
@@ -78,7 +77,10 @@ function Router() {
 function Shell() {
   const [location] = useLocation();
 
-  if (location.startsWith("/aiforkids")) {
+  if (
+    location.startsWith("/aiforkids") &&
+    !location.startsWith("/aiforkids/bereadyforai")
+  ) {
     return <AiForKidsApp />;
   }
 
