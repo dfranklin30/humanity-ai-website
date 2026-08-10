@@ -20,6 +20,7 @@ import Programs from "@/pages/programs";
 import Blog from "@/pages/blog";
 import BlogPostPage from "@/pages/blog-post";
 import Events from "@/pages/events";
+import AiForKidsEvent from "@/pages/ai-for-kids-event";
 import AiHub from "@/pages/ai-hub";
 import Contact from "@/pages/contact";
 import Donate from "@/pages/donate";
@@ -47,6 +48,8 @@ function Router() {
       <Route path="/blog" component={Blog} />
       <Route path="/blog/:slug" component={BlogPostPage} />
       <Route path="/events" component={Events} />
+      <Route path="/aiforkids" component={AiForKidsEvent} />
+      <Route path="/aiforkids/bereadyforai" component={AiForKidsEvent} />
       <Route path="/ai-hub" component={AiHub} />
       <Route path="/contact" component={Contact} />
       <Route path="/donate" component={Donate} />
