@@ -45,16 +45,22 @@ export default function HomeScreen() {
         </Text>
         <View style={styles.ctaColumn}>
           <GoldButton
-            label="Become a Member"
-            icon="star"
-            onPress={() => router.push("/(tabs)/donate")}
-            testID="button-hero-membership"
+            label="Ask Our AI Companion"
+            icon="message-circle"
+            onPress={() => router.push("/(tabs)/ask")}
+            testID="button-hero-ask"
           />
           <OutlineButton
             label="Explore Our Programs"
             icon="arrow-right"
             onPress={() => router.push("/(tabs)/programs")}
             testID="button-hero-programs"
+          />
+          <OutlineButton
+            label="Saved for Later"
+            icon="bookmark"
+            onPress={() => router.push("/saved")}
+            testID="button-hero-saved"
           />
         </View>
       </View>

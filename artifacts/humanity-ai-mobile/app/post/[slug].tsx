@@ -8,6 +8,7 @@ import { Badge, ErrorState, GradientBar, Loading, Screen } from "@/components/ui
 import colors from "@/constants/colors";
 import { fonts } from "@/constants/typography";
 import { absoluteUrl, formatPostDate, useBlogPosts } from "@/lib/api";
+import { useBookmark } from "@/services/bookmarks";
 
 const c = colors.light;
 
@@ -25,6 +26,17 @@ export default function PostDetailScreen() {
         .filter(Boolean)
     : [];
 
+  const { saved, toggle } = useBookmark(
+    post
+      ? {
+          type: "post",
+          ref: post.slug,
+          title: post.title,
+          subtitle: post.author,
+        }
+      : null,
+  );
+
   return (
     <>
       <Stack.Screen options={{ title: "Update" }} />
@@ -39,7 +51,20 @@ export default function PostDetailScreen() {
 
         {post ? (
           <View>
-            <Badge label={post.category} color={c.gold} />
+            <View style={styles.topRow}>
+              <Badge label={post.category} color={c.gold} />
+              <Pressable
+                onPress={toggle}
+                hitSlop={10}
+                style={({ pressed }) => [styles.saveButton, pressed && { opacity: 0.7 }]}
+                testID="button-post-save"
+              >
+                <Feather name="bookmark" size={18} color={saved ? c.gold : c.mutedForeground} />
+                <Text style={[styles.saveText, saved && { color: c.gold }]}>
+                  {saved ? "Saved" : "Save"}
+                </Text>
+              </Pressable>
+            </View>
             <Text style={styles.title} testID="text-post-title">
               {post.title}
             </Text>
@@ -80,6 +105,22 @@ export default function PostDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  topRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  saveButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  saveText: {
+    color: c.mutedForeground,
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 12.5,
+  },
   title: {
     color: c.cream,
     fontFamily: fonts.display,

@@ -20,6 +20,10 @@ function NativeTabLayout() {
         <Icon sf={{ default: "house", selected: "house.fill" }} />
         <Label>Home</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="ask">
+        <Icon sf={{ default: "bubble.left.and.text.bubble.right", selected: "bubble.left.and.text.bubble.right.fill" }} />
+        <Label>Ask</Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="programs">
         <Icon sf={{ default: "graduationcap", selected: "graduationcap.fill" }} />
         <Label>Programs</Label>
@@ -81,6 +85,18 @@ function ClassicTabLayout() {
               <SymbolView name="house" tintColor={color} size={24} />
             ) : (
               <Feather name="home" size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="ask"
+        options={{
+          title: "Ask",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="bubble.left.and.text.bubble.right" tintColor={color} size={24} />
+            ) : (
+              <Feather name="message-circle" size={22} color={color} />
             ),
         }}
       />

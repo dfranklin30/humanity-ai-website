@@ -49,6 +49,7 @@ function RootLayoutNav() {
       <Stack.Screen name="post/[slug]" options={{ title: "Update" }} />
       <Stack.Screen name="event/[id]" options={{ title: "Event" }} />
       <Stack.Screen name="program/[id]" options={{ title: "Program" }} />
+      <Stack.Screen name="saved" options={{ title: "Saved" }} />
     </Stack>
   );
 }

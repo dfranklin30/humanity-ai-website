@@ -16,19 +16,15 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "org.humanityplusai.app"
+      "bundleIdentifier": "org.humanityplusai.app",
+      "buildNumber": "3"
     },
     "android": {},
     "web": {
       "favicon": "./assets/images/icon.png"
     },
     "plugins": [
-      [
-        "expo-router",
-        {
-          "origin": "https://replit.com/"
-        }
-      ],
+      "expo-router",
       "expo-font",
       "expo-notifications"
     ],
