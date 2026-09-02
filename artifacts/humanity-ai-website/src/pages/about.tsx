@@ -330,9 +330,6 @@ export default function About() {
                     loading="lazy"
                     decoding="async"
                   />
-                  <div className="absolute top-3 right-3 bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-widest px-2 py-1 shadow-md" data-testid="badge-new-board-david-wood">
-                    Newly Appointed
-                  </div>
                 </div>
                 <div className="p-6">
                   <Badge variant="outline" className="text-[10px] mb-3 bg-indigo-500/5 text-indigo-700 dark:text-indigo-400 border-indigo-500/20">Seat 6 — Strategic Partnerships & Human-Centered AI</Badge>
@@ -367,9 +364,6 @@ export default function About() {
                     loading="lazy"
                     decoding="async"
                   />
-                  <div className="absolute top-3 right-3 bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-widest px-2 py-1 shadow-md" data-testid="badge-new-board-vasu">
-                    Newly Appointed
-                  </div>
                 </div>
                 <div className="p-6">
                   <Badge variant="outline" className="text-[10px] mb-3 bg-teal-500/5 text-teal-700 dark:text-teal-400 border-teal-500/20">Seat 7 — Chief of AI in Advertising & Media</Badge>
@@ -404,9 +398,6 @@ export default function About() {
                     loading="lazy"
                     decoding="async"
                   />
-                  <div className="absolute top-3 right-3 bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-widest px-2 py-1 shadow-md" data-testid="badge-new-board-vina">
-                    Newly Appointed
-                  </div>
                 </div>
                 <div className="p-6">
                   <Badge variant="outline" className="text-[10px] mb-3 bg-fuchsia-500/5 text-fuchsia-700 dark:text-fuchsia-400 border-fuchsia-500/20">Seat 8 — Director, Human Authenticity, Leadership, Consciousness &amp; AI, and Board Treasurer</Badge>
