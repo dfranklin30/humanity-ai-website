@@ -148,6 +148,7 @@ export async function registerRoutes(
     "vasu-raj-jain",
     "vina-torossian",
     "william-zhu",
+    "alexis-ramsey-tobienne",
   ];
 
   app.get("/sitemap.xml", async (_req, res) => {

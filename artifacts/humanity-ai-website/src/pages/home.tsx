@@ -28,6 +28,7 @@ import davidWoodPhoto from "@assets/David_Wood212_-_edit_may_2026_1779893283704.
 import vasuPhoto from "@assets/headshot_Vasu_AI_Advertisting_1779900210920.jpeg";
 import vinaPhoto from "@assets/image_1780429062430.png";
 import williamZhuPhoto from "@assets/william_zhu_portrait_opt.webp";
+import alexisPhoto from "@assets/alexis_portrait_opt.webp";
 import teamCoverPhoto from "@assets/team_cover_opt.webp";
 import { AmbientBackground } from "@/components/ambient-bg";
 import { AINewsTicker, ArxivFeed } from "@/components/ai-news";
@@ -137,6 +138,16 @@ const board: Array<{
     photo: williamZhuPhoto,
     highlight: "Choice Hotels · AI Discussion Club DC",
     bio: "Senior Data Scientist & Applied AI Engineer at Choice Hotels International, shipping ML and AI products across thousands of properties. Founding organizer of Washington, DC's AI Discussion Club (900+ builders) and a 2026 Technical.ly RealLIST Connector. M.A. Computational Social Science, University of Chicago.",
+    isNew: true,
+  },
+  {
+    name: "Alexis Ramsey-Tobienne, PhD",
+    title: "Director, AI Literacy & Academic Integrity",
+    seat: "Seat 10",
+    slug: "alexis-ramsey-tobienne",
+    photo: alexisPhoto,
+    highlight: "Eckerd College · Assistant Dean for AI",
+    bio: "Assistant Dean for Artificial Intelligence and Learning Integrity at Eckerd College, advancing critical AI literacy and the ethical integration of AI in liberal arts education. Chair of the Academic Honor Council and of the Southeastern Region Consortia for the International Center for Academic Integrity. PhD in Rhetoric and Composition, Purdue University.",
     isNew: true,
   },
 ];

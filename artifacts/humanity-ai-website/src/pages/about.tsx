@@ -19,6 +19,7 @@ import mikePhoto from "@assets/mike_portrait_opt.webp";
 import davidWoodPhoto from "@assets/David_Wood212_-_edit_may_2026_1779893283704.jpg";
 import vasuPhoto from "@assets/headshot_Vasu_AI_Advertisting_1779900210920.jpeg";
 import vinaPhoto from "@assets/image_1780429062430.png";
+import alexisPhoto from "@assets/alexis_portrait_opt.webp";
 
 const fadeIn = {
   initial: { opacity: 0, y: 20 },
@@ -465,6 +466,43 @@ export default function About() {
                     <ExternalLink className="h-3.5 w-3.5" />
                     williamzhu.ai
                   </a>
+                  <div className="flex items-center gap-2 text-primary text-xs font-medium">
+                    <ArrowRight className="h-3.5 w-3.5" />
+                    View Full Profile
+                  </div>
+                </div>
+              </BoardCard>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 1.5, duration: 0.5 }}
+            >
+              <BoardCard slug="alexis-ramsey-tobienne" testId="card-board-alexis">
+                <div className="h-64 overflow-hidden relative">
+                  <img
+                    src={alexisPhoto}
+                    alt="Alexis Ramsey-Tobienne"
+                    className="w-full h-full object-cover object-top"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <div className="absolute top-3 right-3 bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-widest px-2 py-1 shadow-md" data-testid="badge-new-board-alexis">
+                    Newly Appointed
+                  </div>
+                </div>
+                <div className="p-6">
+                  <Badge variant="outline" className="text-[10px] mb-3 bg-amber-500/5 text-amber-700 dark:text-amber-400 border-amber-500/20">Seat 10 — AI Literacy &amp; Academic Integrity</Badge>
+                  <h3 className="font-semibold text-lg" data-testid="text-board-alexis">Alexis Ramsey-Tobienne, PhD</h3>
+                  <p className="text-sm text-primary font-medium mb-3">Director, AI Literacy &amp; Academic Integrity</p>
+                  <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                    Assistant Dean for Artificial Intelligence and Learning Integrity at Eckerd College, where 18 years of teaching and academic leadership now focus on critical AI literacy and the ethical integration of AI in liberal arts education. Chair of the Academic Honor Council and of the Southeastern Region Consortia for the International Center for Academic Integrity. PhD in Rhetoric and Composition, Purdue University.
+                  </p>
+                  <p className="text-xs text-muted-foreground italic mb-4">
+                    AI Literacy &amp; Curriculum Design · Academic Integrity · Faculty Development · Higher-Ed AI Policy
+                  </p>
                   <div className="flex items-center gap-2 text-primary text-xs font-medium">
                     <ArrowRight className="h-3.5 w-3.5" />
                     View Full Profile

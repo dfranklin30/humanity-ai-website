@@ -18,6 +18,7 @@ import mikePhoto from "@assets/mike_portrait_opt.webp";
 import davidWoodPhoto from "@assets/David_Wood212_-_edit_may_2026_1779893283704.jpg";
 import vasuPhoto from "@assets/headshot_Vasu_AI_Advertisting_1779900210920.jpeg";
 import vinaPhoto from "@assets/image_1780429062430.png";
+import alexisPhoto from "@assets/alexis_portrait_opt.webp";
 
 const boardMembers: Record<string, {
   name: string;
@@ -464,6 +465,58 @@ const boardMembers: Record<string, {
       "The point of AI is to help people make better decisions, build stronger organizations, and connect more meaningfully — not to replace the human judgment at the center of it all.",
       "Communities aren't an afterthought to technology; convening the builders and innovators who move a field forward is how responsible AI actually gets built.",
       "A data scientist by training and a social scientist at heart — what matters most is how technology shapes human behavior, organizations, and collective decision-making."
+    ]
+  },
+  "alexis-ramsey-tobienne": {
+    name: "Alexis Ramsey-Tobienne, PhD",
+    slug: "alexis-ramsey-tobienne",
+    title: "Director, AI Literacy & Academic Integrity",
+    seat: "Seat 10",
+    seatLabel: "AI Literacy & Academic Integrity",
+    photo: alexisPhoto,
+    badgeColor: "bg-amber-500/5 text-amber-300 border-amber-500/20",
+    linkedin: "https://www.linkedin.com/in/alexis-ramsey-tobienne",
+    tagline: "Assistant Dean · Rhetorician · Academic Integrity Leader",
+    subtitle: "Bringing critical AI literacy — and academic integrity — into the classroom, where AI policy stops being theoretical.",
+    stats: [
+      { value: "18+", label: "Years in Higher Education" },
+      { value: "12+", label: "Years Chairing Honor Council" },
+      { value: "PhD", label: "Rhetoric — Purdue" }
+    ],
+    shortBio: "Assistant Dean for Artificial Intelligence and Learning Integrity at Eckerd College, focused on critical AI literacy and the ethical integration of AI in liberal arts education. Chair of the Academic Honor Council and of the Southeastern Region Consortia for the International Center for Academic Integrity. PhD in Rhetoric and Composition, Purdue University.",
+    fullBio: [
+      "Alexis Ramsey-Tobienne joins the Humanity + AI board as Director of AI Literacy and Academic Integrity, bringing the perspective the board has been missing: the educator's. As Assistant Dean for Artificial Intelligence and Learning Integrity at Eckerd College, she works where AI policy stops being theoretical — in course design, in faculty training, and in honor council hearings where a student's work and a machine's output have to be told apart.",
+      "With over 18 years at Eckerd College, Alexis has built a career at the intersection of rhetoric, writing studies, and academic integrity. She was appointed Assistant Dean for Artificial Intelligence and Learning Integrity in 2025, a role created to help faculty and students navigate generative AI without abandoning the values a liberal arts education is built on — equity, curiosity, and integrity.",
+      "She has chaired Eckerd's Academic Honor Council since 2014, overseeing the adjudication of academic dishonesty cases while working to build a culture of integrity through education and outreach rather than enforcement alone. As Director of Writing Excellence, she administers campus-wide writing assessment and leads faculty development workshops — including \"Writing and Generative AI,\" which helps instructors rethink assignment design for a world where the first draft can be machine-made.",
+      "Her leadership extends beyond her campus. She chairs the Southeastern Region Consortia for the International Center for Academic Integrity, convening colleagues across the region through conferences, monthly discussions, and joint presentations. As Director of Imagining Justice she led the development of Eckerd's senior general education core course, and as Co-Director of the Inspired Network for Teaching, Learning, and Faculty Development she designed new faculty orientations, tenure and promotion workshops, writing retreats, and sessions on trauma-informed teaching and teaching through crisis.",
+      "Alexis holds a PhD in Rhetoric and Composition/Writing Studies from Purdue University and a BA in History and English from Kalamazoo College. She brings expertise in project management, team leadership, and interpersonal communication to the board — and a mission she states plainly: to empower educators and learners to navigate the evolving landscape of AI while upholding the values that make learning worth doing."
+    ],
+    credentials: [
+      "Assistant Dean for AI and Learning Integrity — Eckerd College",
+      "Associate Professor of Rhetoric — Eckerd College",
+      "Chair, Academic Honor Council — Eckerd College",
+      "Director of Writing Excellence — Eckerd College",
+      "Chair, Southeastern Region Consortia — International Center for Academic Integrity",
+      "Former Director of Imagining Justice — Eckerd College",
+      "Former Co-Director, Inspired Network for Teaching, Learning & Faculty Development",
+      "PhD, Rhetoric and Composition/Writing Studies — Purdue University",
+      "B.A. History and English — Kalamazoo College"
+    ],
+    focus: [
+      "Critical AI Literacy",
+      "Academic Integrity & Honor Systems",
+      "Faculty Development & Curriculum Design",
+      "Rhetoric & Writing Studies",
+      "Higher-Education AI Policy"
+    ],
+    links: [
+      { label: "LinkedIn", url: "https://www.linkedin.com/in/alexis-ramsey-tobienne", icon: "linkedin" },
+      { label: "Email", url: "mailto:alexis@humanityplusai.org", icon: "mail" }
+    ],
+    perspectives: [
+      "My mission is to empower educators and learners to navigate the evolving landscape of AI while upholding values like equity, curiosity, and integrity.",
+      "Academic integrity is built through education and outreach, not enforcement alone — a culture, not a checkpoint.",
+      "AI literacy is not a technical add-on to a liberal arts education; it is a rhetorical skill, and rhetoric is what a liberal arts education has always taught."
     ]
   }
 };
