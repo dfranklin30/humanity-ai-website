@@ -189,7 +189,7 @@ const BOARD_MEMBERS: Record<string, { name: string; title: string; shortBio: str
     name: "Alexis Ramsey-Tobienne, PhD",
     title: "Director, AI Literacy & Academic Integrity",
     shortBio:
-      "Assistant Dean for Artificial Intelligence and Learning Integrity at Eckerd College, focused on critical AI literacy and the ethical integration of AI in liberal arts education. Chair of the Academic Honor Council and of the Southeastern Region Consortia for the International Center for Academic Integrity. PhD in Rhetoric and Composition, Purdue University.",
+      "Assistant Dean for Artificial Intelligence and Learning Integrity at Eckerd College, focused on critical AI literacy and the ethical integration of AI in liberal arts education. Chair of the Academic Honor Council and Director of Writing Excellence. PhD in Rhetoric and Composition, Purdue University.",
   },
   "mike-klyce": {
     name: "Mike Klyce",

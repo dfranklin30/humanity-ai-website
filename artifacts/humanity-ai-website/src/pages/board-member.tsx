@@ -483,12 +483,12 @@ const boardMembers: Record<string, {
       { value: "12+", label: "Years Chairing Honor Council" },
       { value: "PhD", label: "Rhetoric — Purdue" }
     ],
-    shortBio: "Assistant Dean for Artificial Intelligence and Learning Integrity at Eckerd College, focused on critical AI literacy and the ethical integration of AI in liberal arts education. Chair of the Academic Honor Council and of the Southeastern Region Consortia for the International Center for Academic Integrity. PhD in Rhetoric and Composition, Purdue University.",
+    shortBio: "Assistant Dean for Artificial Intelligence and Learning Integrity at Eckerd College, focused on critical AI literacy and the ethical integration of AI in liberal arts education. Chair of the Academic Honor Council and Director of Writing Excellence. PhD in Rhetoric and Composition, Purdue University.",
     fullBio: [
       "Alexis Ramsey-Tobienne joins the Humanity + AI board as Director of AI Literacy and Academic Integrity, bringing the perspective the board has been missing: the educator's. As Assistant Dean for Artificial Intelligence and Learning Integrity at Eckerd College, she works where AI policy stops being theoretical — in course design, in faculty training, and in honor council hearings where a student's work and a machine's output have to be told apart.",
       "With over 18 years at Eckerd College, Alexis has built a career at the intersection of rhetoric, writing studies, and academic integrity. She was appointed Assistant Dean for Artificial Intelligence and Learning Integrity in 2025, a role created to help faculty and students navigate generative AI without abandoning the values a liberal arts education is built on — equity, curiosity, and integrity.",
       "She has chaired Eckerd's Academic Honor Council since 2014, overseeing the adjudication of academic dishonesty cases while working to build a culture of integrity through education and outreach rather than enforcement alone. As Director of Writing Excellence, she administers campus-wide writing assessment and leads faculty development workshops — including \"Writing and Generative AI,\" which helps instructors rethink assignment design for a world where the first draft can be machine-made.",
-      "Her leadership extends beyond her campus. She chairs the Southeastern Region Consortia for the International Center for Academic Integrity, convening colleagues across the region through conferences, monthly discussions, and joint presentations. As Director of Imagining Justice she led the development of Eckerd's senior general education core course, and as Co-Director of the Inspired Network for Teaching, Learning, and Faculty Development she designed new faculty orientations, tenure and promotion workshops, writing retreats, and sessions on trauma-informed teaching and teaching through crisis.",
+      "Her leadership extends beyond her own classroom. As Co-Director of the Inspired Network for Teaching, Learning, and Faculty Development, she designed new faculty orientations, tenure and promotion workshops, writing retreats, and sessions on trauma-informed teaching and on teaching through crisis — building the kind of faculty support structure that makes institution-wide change in teaching practice possible.",
       "Alexis holds a PhD in Rhetoric and Composition/Writing Studies from Purdue University and a BA in History and English from Kalamazoo College. She brings expertise in project management, team leadership, and interpersonal communication to the board — and a mission she states plainly: to empower educators and learners to navigate the evolving landscape of AI while upholding the values that make learning worth doing."
     ],
     credentials: [
@@ -496,8 +496,6 @@ const boardMembers: Record<string, {
       "Associate Professor of Rhetoric — Eckerd College",
       "Chair, Academic Honor Council — Eckerd College",
       "Director of Writing Excellence — Eckerd College",
-      "Chair, Southeastern Region Consortia — International Center for Academic Integrity",
-      "Former Director of Imagining Justice — Eckerd College",
       "Former Co-Director, Inspired Network for Teaching, Learning & Faculty Development",
       "PhD, Rhetoric and Composition/Writing Studies — Purdue University",
       "B.A. History and English — Kalamazoo College"

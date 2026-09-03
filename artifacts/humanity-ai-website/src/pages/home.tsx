@@ -147,7 +147,7 @@ const board: Array<{
     slug: "alexis-ramsey-tobienne",
     photo: alexisPhoto,
     highlight: "Eckerd College · Assistant Dean for AI",
-    bio: "Assistant Dean for Artificial Intelligence and Learning Integrity at Eckerd College, advancing critical AI literacy and the ethical integration of AI in liberal arts education. Chair of the Academic Honor Council and of the Southeastern Region Consortia for the International Center for Academic Integrity. PhD in Rhetoric and Composition, Purdue University.",
+    bio: "Assistant Dean for Artificial Intelligence and Learning Integrity at Eckerd College, advancing critical AI literacy and the ethical integration of AI in liberal arts education. Chair of the Academic Honor Council and Director of Writing Excellence. PhD in Rhetoric and Composition, Purdue University.",
     isNew: true,
   },
 ];

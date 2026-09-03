@@ -489,7 +489,7 @@ export default function About() {
                   <h3 className="font-semibold text-lg" data-testid="text-board-alexis">Alexis Ramsey-Tobienne, PhD</h3>
                   <p className="text-sm text-primary font-medium mb-3">Director, AI Literacy &amp; Academic Integrity</p>
                   <p className="text-sm text-muted-foreground leading-relaxed mb-3">
-                    Assistant Dean for Artificial Intelligence and Learning Integrity at Eckerd College, where 18 years of teaching and academic leadership now focus on critical AI literacy and the ethical integration of AI in liberal arts education. Chair of the Academic Honor Council and of the Southeastern Region Consortia for the International Center for Academic Integrity. PhD in Rhetoric and Composition, Purdue University.
+                    Assistant Dean for Artificial Intelligence and Learning Integrity at Eckerd College, where 18 years of teaching and academic leadership now focus on critical AI literacy and the ethical integration of AI in liberal arts education. Chair of the Academic Honor Council and Director of Writing Excellence. PhD in Rhetoric and Composition, Purdue University.
                   </p>
                   <p className="text-xs text-muted-foreground italic mb-4">
                     AI Literacy &amp; Curriculum Design · Academic Integrity · Faculty Development · Higher-Ed AI Policy
