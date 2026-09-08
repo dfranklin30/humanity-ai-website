@@ -60,3 +60,6 @@ deploy/env.deploy.*
 *.bak.*
 .env.local
 .env.*.local
+
+# Cowork/Claude session output folder (local only)
+Claude outputs/
