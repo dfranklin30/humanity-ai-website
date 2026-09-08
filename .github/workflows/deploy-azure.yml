@@ -1,0 +1,125 @@
+# ============================================================
+# Deploy humanityplusai.org to Azure Container Apps
+#
+# Trigger: every push to `main` (or run manually from the Actions tab).
+# Steps:  sync media/training-videos → Blob Storage
+#         → build the Docker image → push to Azure Container Registry
+#         → point the `humanity-ai` Container App at the new image.
+#
+# One-time setup (see deploy/AZURE_RUNBOOK.md):
+#   Repo secret AZURE_CREDENTIALS = output of
+#   `az ad sp create-for-rbac ... --json-auth`, plus the
+#   "Storage Blob Data Contributor" role on sthumanityplusai.
+# ============================================================
+name: Deploy to Azure Container Apps
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "deploy/**"
+      - "artifacts/humanity-ai-mobile/**"
+      - "artifacts/mockup-sandbox/**"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  AZURE_RESOURCE_GROUP: rg-humanityplusai
+  ACR_NAME: acrhumanityplusai
+  IMAGE_NAME: humanity-ai
+  CONTAINER_APP: humanity-ai
+  STORAGE_ACCOUNT: sthumanityplusai
+  VIDEO_CONTAINER: training-videos
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-deploy:
+    name: Build image & deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Sync video clips to Blob Storage
+        # media/training-videos → public container `training-videos` (streamed by the site)
+        run: |
+          az storage account update -n "$STORAGE_ACCOUNT" -g "$AZURE_RESOURCE_GROUP" \
+            --allow-blob-public-access true --output none
+          az storage container create --name "$VIDEO_CONTAINER" --account-name "$STORAGE_ACCOUNT" \
+            --public-access blob --auth-mode login --output none
+          az storage blob upload-batch --account-name "$STORAGE_ACCOUNT" --auth-mode login \
+            --destination "$VIDEO_CONTAINER" --source media/training-videos \
+            --overwrite --output table
+          # Correct content types so browsers stream instead of download
+          for f in media/training-videos/*.mp4; do [ -e "$f" ] || continue
+            az storage blob update --account-name "$STORAGE_ACCOUNT" --auth-mode login \
+              -c "$VIDEO_CONTAINER" -n "$(basename "$f")" --content-type video/mp4 --output none; done
+          for f in media/training-videos/*.jpg; do [ -e "$f" ] || continue
+            az storage blob update --account-name "$STORAGE_ACCOUNT" --auth-mode login \
+              -c "$VIDEO_CONTAINER" -n "$(basename "$f")" --content-type image/jpeg --output none; done
+
+      - name: Log in to Azure Container Registry
+        run: az acr login --name "$ACR_NAME"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Compute image tags
+        id: meta
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          STAMP="$(date -u +%Y%m%d-%H%M)"
+          TAG="${STAMP}-${SHORT_SHA}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "image=${ACR_NAME}.azurecr.io/${IMAGE_NAME}:${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Deploying ${ACR_NAME}.azurecr.io/${IMAGE_NAME}:${TAG}"
+
+      - name: Build & push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ${{ steps.meta.outputs.image }}
+            ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:latest
+          cache-from: type=registry,ref=${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:buildcache
+          cache-to: type=registry,ref=${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:buildcache,mode=max
+
+      - name: Update Container App
+        run: |
+          az containerapp update \
+            --name "$CONTAINER_APP" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --image "${{ steps.meta.outputs.image }}" \
+            --revision-suffix "r${{ steps.meta.outputs.tag }}" \
+            --output none
+          FQDN=$(az containerapp show -n "$CONTAINER_APP" -g "$AZURE_RESOURCE_GROUP" \
+                  --query properties.configuration.ingress.fqdn -o tsv)
+          echo "Deployed → https://$FQDN"
+
+      - name: Smoke test
+        run: |
+          FQDN=$(az containerapp show -n "$CONTAINER_APP" -g "$AZURE_RESOURCE_GROUP" \
+                  --query properties.configuration.ingress.fqdn -o tsv)
+          for i in $(seq 1 12); do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://$FQDN/training" || true)
+            if [ "$CODE" = "200" ]; then echo "OK: /training returned 200"; exit 0; fi
+            echo "Attempt $i: got $CODE, waiting..."; sleep 10
+          done
+          echo "Site did not return 200 after deploy"; exit 1

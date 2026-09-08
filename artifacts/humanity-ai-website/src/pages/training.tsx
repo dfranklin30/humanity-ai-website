@@ -13,13 +13,16 @@ import {
   BarChart3, Bot, Shield, Layers, Heart, Lightbulb,
   Target, Compass, Rocket, TrendingUp, Database,
   FileText, Building2, Scale, Eye, Leaf, HandHeart, Award,
-  MessageSquare, ShieldCheck, CheckCircle2
+  MessageSquare, ShieldCheck, CheckCircle2,
+  Video,
 } from "lucide-react";
 import { SiYoutube, SiGithub, SiLinkedin } from "react-icons/si";
 import { EditorialMasthead } from "@/components/editorial-masthead";
 import { useQuery } from "@tanstack/react-query";
 import { CampaignMeter, type CampaignProgress } from "@/components/campaign-meter";
 import jofiaPhoto from "@assets/image_1775903668936.png";
+import { VideoClipCard } from "@/components/video-clip";
+import { claudeHacksClips, type VideoClip } from "@/data/claude-hacks";
 
 const fadeIn = {
   initial: { opacity: 0, y: 20 },
@@ -647,6 +650,80 @@ const buildResponsiblyCheckpoints = [
   },
 ];
 
+interface LearningModule {
+  slug: string;
+  title: string;
+  subtitle: string;
+  provider: string;
+  description: string;
+  format: string;
+  duration: string;
+  level: "Beginner" | "Intermediate" | "Advanced";
+  steps?: number;
+  price: string;
+  /** External "Start the Module" link. Omit for modules whose content is embedded (e.g. video series). */
+  url?: string;
+  tags: string[];
+  outcomes: string[];
+  requirements?: string;
+  relatedEvent?: { label: string; date: string; url: string };
+  /** Embedded video clips rendered inside the module card (streamed from Azure Blob Storage). */
+  videos?: VideoClip[];
+  icon?: typeof Rocket;
+}
+
+// Self-paced learning modules. Add new entries here — the "Modules" section
+// on the Learning Hub renders this list in order.
+const learningModules: LearningModule[] = [
+  {
+    slug: "claude-hacks",
+    title: "Claude Hacks",
+    subtitle: "Short video hacks for getting real work done with Claude",
+    provider: "Video series · hosted by Danielle A. Franklin, Founder",
+    description:
+      "Bite-sized screen recordings from the Humanity + AI founder showing exactly how we use Claude to run a nonprofit — Projects, Cowork, and repeatable workflows. Watch a clip, copy the move, use it today. New episodes drop regularly; the newest are at the top.",
+    format: "Video series",
+    duration: `${claudeHacksClips.length} clips · ~${claudeHacksClips.reduce((n, c) => n + parseInt(c.duration, 10), 0)} min`,
+    level: "Beginner",
+    price: "Free",
+    tags: ["Claude", "Projects", "Cowork", "Nonprofit Ops"],
+    outcomes: [
+      "Set up a Claude Project so it remembers your organization's context",
+      "Kick off tasks in Cowork instead of re-explaining yourself every chat",
+      "Turn a recurring chore into a workflow you can rerun in minutes",
+    ],
+    requirements: "A Claude account (free tier works). No coding.",
+    videos: claudeHacksClips,
+    icon: Video,
+  },
+  {
+    slug: "build-your-first-website",
+    title: "Build Your First Website",
+    subtitle: "From idea to a live, secure web app with Claude",
+    provider: "Feedback Lab · guide by William Zhu",
+    description:
+      "A beginner-friendly, step-by-step guide for non-coders who want to turn an idea into a working website using AI. You describe the features you want, Claude generates the code, and by the end you have a real app at a public web address with a secure backup. No coding experience required.",
+    format: "Self-paced interactive guide",
+    duration: "~45 min",
+    level: "Beginner",
+    steps: 21,
+    price: "Free",
+    url: "https://feedbacklab.app/workshop",
+    tags: ["No-Code", "Claude", "Deploy to the Web", "Hands-On"],
+    outcomes: [
+      "Set up Claude and build a working web app from a plain-English idea",
+      "Deploy it to a live, shareable web address",
+      "Secure it and keep a backup of your code",
+    ],
+    requirements: "A laptop and an idea. Accounts on Claude and Vercel are recommended.",
+    relatedEvent: {
+      label: "Join the in-person workshop",
+      date: "Sep 17",
+      url: "/events",
+    },
+  },
+];
+
 export default function Training() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLevel, setSelectedLevel] = useState<Level>("all");
@@ -981,6 +1058,105 @@ export default function Training() {
         </div>
       </section>
 
+      <section className="py-16 bg-card border-y" id="modules" data-testid="section-modules">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <motion.div {...fadeIn} className="text-center max-w-2xl mx-auto mb-10">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium mb-4">
+              <GraduationCap className="h-3.5 w-3.5" />
+              Self-Paced Learning
+            </div>
+            <h2 className="font-serif text-3xl font-bold mb-3" data-testid="text-modules-title">
+              Modules
+            </h2>
+            <p className="text-muted-foreground leading-relaxed">
+              Short, hands-on modules you can complete on your own schedule — each one ends with something real you built. New modules are added regularly.
+            </p>
+          </motion.div>
+
+          <div className="space-y-6">
+            {learningModules.map((m, i) => (
+              <motion.div key={m.slug} {...fadeIn} transition={{ delay: 0.05 * i, duration: 0.5 }}>
+                <Card className="overflow-hidden" data-testid={`card-module-${m.slug}`}>
+                  <div className="grid md:grid-cols-3 gap-0">
+                    <div className="md:col-span-1 bg-gradient-to-br from-primary/10 to-accent/20 dark:from-primary/20 dark:to-accent/10 flex flex-col items-center justify-center p-8 text-center">
+                      <div className="w-16 h-16 rounded-2xl bg-primary/15 flex items-center justify-center mb-4">
+                        {(() => { const Icon = m.icon ?? Rocket; return <Icon className="h-8 w-8 text-primary" />; })()}
+                      </div>
+                      <h3 className="font-serif text-xl font-bold leading-tight" data-testid={`text-module-title-${m.slug}`}>
+                        {m.title}
+                      </h3>
+                      <p className="text-xs text-primary font-medium mt-1">{m.subtitle}</p>
+                      <div className="flex flex-wrap items-center justify-center gap-3 text-[11px] text-muted-foreground mt-3">
+                        {m.steps && (
+                          <span className="flex items-center gap-1"><BookOpen className="h-3 w-3" /> {m.steps} Steps</span>
+                        )}
+                        <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {m.duration}</span>
+                        <span className="flex items-center gap-1"><Star className="h-3 w-3" /> {m.level}</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-3">{m.provider}</p>
+                    </div>
+                    <div className="md:col-span-2 p-8">
+                      <div className="flex flex-wrap items-center gap-2 mb-3">
+                        <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-primary/20">{m.format}</Badge>
+                        <Badge variant="outline" className="text-[10px]">{m.price}</Badge>
+                        {m.tags.map((t) => (
+                          <Badge key={t} variant="outline" className="text-[10px]">{t}</Badge>
+                        ))}
+                      </div>
+                      <p className="text-muted-foreground leading-relaxed mb-5">{m.description}</p>
+                      <div className="mb-5">
+                        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">You'll walk away with</h4>
+                        <ul className="space-y-1.5">
+                          {m.outcomes.map((o) => (
+                            <li key={o} className="flex items-start gap-2 text-sm">
+                              <CheckCircle2 className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                              <span>{o}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                      {m.requirements && (
+                        <p className="text-xs text-muted-foreground mb-5">
+                          <span className="font-semibold text-foreground">What you need:</span> {m.requirements}
+                        </p>
+                      )}
+                      {m.videos && m.videos.length > 0 && (
+                        <div className="mb-6" id={m.slug} data-testid={`videos-module-${m.slug}`}>
+                          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Watch the clips</h4>
+                          <div className="grid gap-4 sm:grid-cols-2">
+                            {m.videos.map((clip) => (
+                              <VideoClipCard key={clip.id} clip={clip} compact />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <div className="flex flex-wrap items-center gap-3">
+                        {m.url && (
+                          <a href={m.url} target="_blank" rel="noopener noreferrer">
+                            <Button className="gap-1.5" data-testid={`button-module-start-${m.slug}`}>
+                              Start the Module
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </Button>
+                          </a>
+                        )}
+                        {m.relatedEvent && (
+                          <Link href={m.relatedEvent.url}>
+                            <Button variant="outline" className="gap-1.5" data-testid={`button-module-event-${m.slug}`}>
+                              <Users className="h-3.5 w-3.5" />
+                              {m.relatedEvent.label} · {m.relatedEvent.date}
+                            </Button>
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="py-20 bg-gradient-to-br from-primary/5 via-background to-accent/10 relative overflow-hidden">
         <div className="absolute inset-0">
           <div className="absolute top-10 right-20 w-72 h-72 bg-primary/5 rounded-full blur-3xl" />
@@ -1089,6 +1265,7 @@ export default function Training() {
                 { label: "Create an AI Agent", id: "builder-lab", icon: Bot },
                 { label: "Responsible AI", id: "responsible-ai", icon: Shield },
                 { label: "AI Foundations", id: "ai-journey", icon: Brain },
+                { label: "Modules", id: "modules", icon: GraduationCap },
                 { label: "Free Courses", id: "video-courses", icon: SiYoutube },
                 { label: "Tools & Frameworks", id: "open-source-tools", icon: Wrench },
               ].map((q, i) => (

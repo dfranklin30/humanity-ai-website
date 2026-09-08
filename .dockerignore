@@ -19,3 +19,6 @@ Dockerfile
 .replit
 replit.md
 .replitignore
+
+# Video clips synced to Azure Blob Storage by the deploy workflow — never baked into the image
+media
