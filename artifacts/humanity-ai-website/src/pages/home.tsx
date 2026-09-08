@@ -17,6 +17,7 @@ import {
   Brain,
   Lightbulb,
   Sparkles,
+  Video,
 } from "lucide-react";
 import { SiLinkedin, SiSlack } from "react-icons/si";
 import { useQuery } from "@tanstack/react-query";
@@ -35,6 +36,8 @@ import { AINewsTicker, ArxivFeed } from "@/components/ai-news";
 import { VoicesShowcase } from "@/components/voices-showcase";
 import { SlackCommunity } from "@/components/slack-community";
 import { SLACK_INVITE_URL } from "@/lib/community";
+import { VideoClipCard } from "@/components/video-clip";
+import { claudeHacksClips, featuredClip } from "@/data/claude-hacks";
 
 const pillars = [
   {
@@ -1197,6 +1200,51 @@ export default function Home() {
                   </a>
                 ))}
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Claude Hacks — Founder video series (clips streamed from Azure Blob Storage; edit src/data/claude-hacks.ts to add one) */}
+        <div className="py-16 border-b border-foreground/10" data-testid="section-claude-hacks">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-primary mb-6">
+            <Video className="h-4 w-4" />
+            From Our Founder · Video Series
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+            <div className="lg:col-span-5">
+              <h2 className="font-serif text-4xl md:text-5xl font-bold leading-[1.05] mb-4">
+                Claude <span className="italic text-primary">Hacks</span>
+              </h2>
+              <p className="font-serif text-lg text-muted-foreground italic mb-6">
+                Short clips. Real workflows. Use them today.
+              </p>
+              <p className="text-muted-foreground leading-relaxed mb-6">
+                Danielle A. Franklin shows exactly how Humanity + AI runs on Claude — from setting up a Project that remembers your context to turning recurring nonprofit chores into two-minute workflows. Every episode ends with something you can copy.
+              </p>
+              <div className="flex items-center gap-6 text-sm text-foreground/70 mb-8 border-t border-foreground/10 pt-6">
+                <span className="flex items-center gap-2">
+                  <Video className="h-4 w-4 text-primary" /> {claudeHacksClips.length} clips
+                </span>
+                <span className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-primary" /> Latest: {featuredClip().episode ?? "New"}
+                </span>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Link href="/training#claude-hacks">
+                  <Button className="rounded-none font-serif italic w-full sm:w-auto" data-testid="button-claude-hacks-all">
+                    Watch the Whole Series
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                </Link>
+                <Link href="/training">
+                  <Button variant="outline" className="rounded-none font-serif italic w-full sm:w-auto border-foreground/20" data-testid="button-claude-hacks-learning-hub">
+                    In the Learning Hub
+                  </Button>
+                </Link>
+              </div>
+            </div>
+            <div className="lg:col-span-7">
+              <VideoClipCard clip={featuredClip()} />
             </div>
           </div>
         </div>

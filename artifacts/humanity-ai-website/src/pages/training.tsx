@@ -13,13 +13,16 @@ import {
   BarChart3, Bot, Shield, Layers, Heart, Lightbulb,
   Target, Compass, Rocket, TrendingUp, Database,
   FileText, Building2, Scale, Eye, Leaf, HandHeart, Award,
-  MessageSquare, ShieldCheck, CheckCircle2
+  MessageSquare, ShieldCheck, CheckCircle2,
+  Video,
 } from "lucide-react";
 import { SiYoutube, SiGithub, SiLinkedin } from "react-icons/si";
 import { EditorialMasthead } from "@/components/editorial-masthead";
 import { useQuery } from "@tanstack/react-query";
 import { CampaignMeter, type CampaignProgress } from "@/components/campaign-meter";
 import jofiaPhoto from "@assets/image_1775903668936.png";
+import { VideoClipCard } from "@/components/video-clip";
+import { claudeHacksClips, type VideoClip } from "@/data/claude-hacks";
 
 const fadeIn = {
   initial: { opacity: 0, y: 20 },
@@ -658,16 +661,41 @@ interface LearningModule {
   level: "Beginner" | "Intermediate" | "Advanced";
   steps?: number;
   price: string;
-  url: string;
+  /** External "Start the Module" link. Omit for modules whose content is embedded (e.g. video series). */
+  url?: string;
   tags: string[];
   outcomes: string[];
   requirements?: string;
   relatedEvent?: { label: string; date: string; url: string };
+  /** Embedded video clips rendered inside the module card (streamed from Azure Blob Storage). */
+  videos?: VideoClip[];
+  icon?: typeof Rocket;
 }
 
 // Self-paced learning modules. Add new entries here — the "Modules" section
 // on the Learning Hub renders this list in order.
 const learningModules: LearningModule[] = [
+  {
+    slug: "claude-hacks",
+    title: "Claude Hacks",
+    subtitle: "Short video hacks for getting real work done with Claude",
+    provider: "Video series · hosted by Danielle A. Franklin, Founder",
+    description:
+      "Bite-sized screen recordings from the Humanity + AI founder showing exactly how we use Claude to run a nonprofit — Projects, Cowork, and repeatable workflows. Watch a clip, copy the move, use it today. New episodes drop regularly; the newest are at the top.",
+    format: "Video series",
+    duration: `${claudeHacksClips.length} clips · ~${claudeHacksClips.reduce((n, c) => n + parseInt(c.duration, 10), 0)} min`,
+    level: "Beginner",
+    price: "Free",
+    tags: ["Claude", "Projects", "Cowork", "Nonprofit Ops"],
+    outcomes: [
+      "Set up a Claude Project so it remembers your organization's context",
+      "Kick off tasks in Cowork instead of re-explaining yourself every chat",
+      "Turn a recurring chore into a workflow you can rerun in minutes",
+    ],
+    requirements: "A Claude account (free tier works). No coding.",
+    videos: claudeHacksClips,
+    icon: Video,
+  },
   {
     slug: "build-your-first-website",
     title: "Build Your First Website",
@@ -1052,7 +1080,7 @@ export default function Training() {
                   <div className="grid md:grid-cols-3 gap-0">
                     <div className="md:col-span-1 bg-gradient-to-br from-primary/10 to-accent/20 dark:from-primary/20 dark:to-accent/10 flex flex-col items-center justify-center p-8 text-center">
                       <div className="w-16 h-16 rounded-2xl bg-primary/15 flex items-center justify-center mb-4">
-                        <Rocket className="h-8 w-8 text-primary" />
+                        {(() => { const Icon = m.icon ?? Rocket; return <Icon className="h-8 w-8 text-primary" />; })()}
                       </div>
                       <h3 className="font-serif text-xl font-bold leading-tight" data-testid={`text-module-title-${m.slug}`}>
                         {m.title}
@@ -1092,13 +1120,25 @@ export default function Training() {
                           <span className="font-semibold text-foreground">What you need:</span> {m.requirements}
                         </p>
                       )}
+                      {m.videos && m.videos.length > 0 && (
+                        <div className="mb-6" id={m.slug} data-testid={`videos-module-${m.slug}`}>
+                          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Watch the clips</h4>
+                          <div className="grid gap-4 sm:grid-cols-2">
+                            {m.videos.map((clip) => (
+                              <VideoClipCard key={clip.id} clip={clip} compact />
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       <div className="flex flex-wrap items-center gap-3">
-                        <a href={m.url} target="_blank" rel="noopener noreferrer">
-                          <Button className="gap-1.5" data-testid={`button-module-start-${m.slug}`}>
-                            Start the Module
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </Button>
-                        </a>
+                        {m.url && (
+                          <a href={m.url} target="_blank" rel="noopener noreferrer">
+                            <Button className="gap-1.5" data-testid={`button-module-start-${m.slug}`}>
+                              Start the Module
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </Button>
+                          </a>
+                        )}
                         {m.relatedEvent && (
                           <Link href={m.relatedEvent.url}>
                             <Button variant="outline" className="gap-1.5" data-testid={`button-module-event-${m.slug}`}>
