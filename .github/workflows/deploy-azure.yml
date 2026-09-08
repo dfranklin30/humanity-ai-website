@@ -6,10 +6,8 @@
 #         → build the Docker image → push to Azure Container Registry
 #         → point the `humanity-ai` Container App at the new image.
 #
-# One-time setup (see deploy/AZURE_RUNBOOK.md):
-#   Repo secret AZURE_CREDENTIALS = output of
-#   `az ad sp create-for-rbac ... --json-auth`, plus the
-#   "Storage Blob Data Contributor" role on sthumanityplusai.
+# Auth: federated (OIDC) - no secret stored in GitHub.
+# One-time setup is documented in deploy/AZURE_RUNBOOK.md.
 # ============================================================
 name: Deploy to Azure Container Apps
 
@@ -37,22 +35,28 @@ env:
 
 permissions:
   contents: read
+  id-token: write   # required for federated (OIDC) login to Azure
 
 jobs:
   build-and-deploy:
     name: Build image & deploy
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    environment: production
 
     steps:
       - name: Check out
         uses: actions/checkout@v4
 
-      - name: Azure login
+      # Federated (OIDC) login - no stored password. These three IDs are
+      # identifiers, not secrets; access comes from the federated credential
+      # on the gh-humanity-ai-deploy app, which only trusts tokens issued to
+      # this repository's main branch.
+      - name: Azure login (OIDC)
         uses: azure/login@v2
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          client-id: f36dc42d-759d-49d5-a86f-2cd56955c940
+          tenant-id: 81099b22-b661-4c71-8aba-a8670f2b9ae7
+          subscription-id: 33680346-29fc-4366-845d-a04681b59a52
 
       - name: Sync video clips to Blob Storage
         # media/training-videos → public container `training-videos` (streamed by the site)

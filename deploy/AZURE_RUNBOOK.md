@@ -30,30 +30,23 @@ Every push to `main` runs `.github/workflows/deploy-azure.yml`:
 Watch it at https://github.com/dfranklin30/humanity-ai-website/actions. A deploy takes
 about 5 minutes. To redeploy without a code change use **Run workflow** on that page.
 
-### One-time setup for the workflow (do once)
+### One-time setup for the workflow (already done)
 
-The workflow needs an Azure identity. In **Azure Cloud Shell** (the `>_` icon in the
-portal) run:
-
-```bash
-az ad sp create-for-rbac \
-  --name gh-humanity-ai-deploy \
-  --role Contributor \
-  --scopes /subscriptions/33680346-29fc-4366-845d-a04681b59a52/resourceGroups/rg-humanityplusai \
-  --json-auth
-```
-
-Copy the whole JSON it prints. In GitHub: repo → **Settings → Secrets and variables →
-Actions → New repository secret**, name `AZURE_CREDENTIALS`, paste the JSON.
-
-The identity also needs to write blobs (Contributor alone can't). Still in Cloud Shell:
+The workflow signs in to Azure with **federated credentials (OIDC)** — there is no
+password or secret stored in GitHub. Trust is established by a federated credential on
+the `gh-humanity-ai-deploy` app registration that only accepts tokens issued to this
+repository's `main` branch:
 
 ```bash
-APP_ID=$(az ad sp list --display-name gh-humanity-ai-deploy --query "[0].appId" -o tsv)
-az role assignment create --assignee "$APP_ID" --role "Storage Blob Data Contributor" \
-  --scope /subscriptions/33680346-29fc-4366-845d-a04681b59a52/resourceGroups/rg-humanityplusai/providers/Microsoft.Storage/storageAccounts/sthumanityplusai
+az ad app federated-credential create --id f36dc42d-759d-49d5-a86f-2cd56955c940 \
+  --parameters '{"name":"github-main","issuer":"https://token.actions.githubusercontent.com","subject":"repo:dfranklin30/humanity-ai-website:ref:refs/heads/main","audiences":["api://AzureADTokenExchange"]}'
 ```
-(Optional: Settings → Environments → `production` if you want approvals before deploys.)
+
+That identity holds two roles: **Contributor** on `rg-humanityplusai` (to build/deploy)
+and **Storage Blob Data Contributor** on `sthumanityplusai` (to upload video clips).
+
+If the repo is ever renamed, or deploys should run from another branch, add a matching
+federated credential for the new `subject` value.
 
 ### Rollback
 
