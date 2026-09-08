@@ -30,6 +30,7 @@ env:
   ACR_NAME: acrhumanityplusai
   IMAGE_NAME: humanity-ai
   CONTAINER_APP: humanity-ai
+  SUBSCRIPTION_ID: 33680346-29fc-4366-845d-a04681b59a52
   STORAGE_ACCOUNT: sthumanityplusai
   VIDEO_CONTAINER: training-videos
 
@@ -59,22 +60,46 @@ jobs:
           subscription-id: 33680346-29fc-4366-845d-a04681b59a52
 
       - name: Sync video clips to Blob Storage
-        # media/training-videos → public container `training-videos` (streamed by the site)
+        # media/training-videos -> public container `training-videos` (streamed by the site).
+        # Uses an account key fetched at run time (never stored) because the data-plane
+        # OAuth path can report success without creating the container.
         run: |
+          set -euo pipefail
+
+          echo "==> Allowing anonymous blob reads on $STORAGE_ACCOUNT"
           az storage account update -n "$STORAGE_ACCOUNT" -g "$AZURE_RESOURCE_GROUP" \
             --allow-blob-public-access true --output none
+
+          KEY=$(az storage account keys list -n "$STORAGE_ACCOUNT" -g "$AZURE_RESOURCE_GROUP" \
+                  --query "[0].value" -o tsv)
+          if [ -z "$KEY" ]; then echo "Could not read a storage account key"; exit 1; fi
+
+          echo "==> Ensuring container $VIDEO_CONTAINER exists (public read)"
           az storage container create --name "$VIDEO_CONTAINER" --account-name "$STORAGE_ACCOUNT" \
-            --public-access blob --auth-mode login --output none
-          az storage blob upload-batch --account-name "$STORAGE_ACCOUNT" --auth-mode login \
+            --account-key "$KEY" --public-access blob --output table
+
+          # Fail loudly rather than uploading into thin air
+          if ! az storage container show --name "$VIDEO_CONTAINER" --account-name "$STORAGE_ACCOUNT" \
+                 --account-key "$KEY" --output none; then
+            echo "Container $VIDEO_CONTAINER still does not exist - aborting"; exit 1
+          fi
+
+          echo "==> Uploading clips"
+          az storage blob upload-batch --account-name "$STORAGE_ACCOUNT" --account-key "$KEY" \
             --destination "$VIDEO_CONTAINER" --source media/training-videos \
             --overwrite --output table
+
           # Correct content types so browsers stream instead of download
           for f in media/training-videos/*.mp4; do [ -e "$f" ] || continue
-            az storage blob update --account-name "$STORAGE_ACCOUNT" --auth-mode login \
+            az storage blob update --account-name "$STORAGE_ACCOUNT" --account-key "$KEY" \
               -c "$VIDEO_CONTAINER" -n "$(basename "$f")" --content-type video/mp4 --output none; done
           for f in media/training-videos/*.jpg; do [ -e "$f" ] || continue
-            az storage blob update --account-name "$STORAGE_ACCOUNT" --auth-mode login \
+            az storage blob update --account-name "$STORAGE_ACCOUNT" --account-key "$KEY" \
               -c "$VIDEO_CONTAINER" -n "$(basename "$f")" --content-type image/jpeg --output none; done
+
+          echo "==> Blobs now in $VIDEO_CONTAINER:"
+          az storage blob list -c "$VIDEO_CONTAINER" --account-name "$STORAGE_ACCOUNT" \
+            --account-key "$KEY" --query "[].{name:name, mb:properties.contentLength}" -o table
 
       - name: Log in to Azure Container Registry
         run: az acr login --name "$ACR_NAME"
