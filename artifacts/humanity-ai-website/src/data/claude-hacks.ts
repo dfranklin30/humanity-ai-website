@@ -37,6 +37,19 @@ export interface VideoClip {
 
 export const claudeHacksClips: VideoClip[] = [
   {
+    id: "ep04-custom-instructions",
+    episode: "Ep. 04",
+    title: "Claude Hacks: Custom Instructions & Claude's Voice",
+    description:
+      "Third stop in the series: after a Project and a workflow, Danielle shows how to shape the way Claude writes for you \u2014 adding standing instructions to a Project, scheduling a recurring Monday brief, and having Claude draft a volunteer thank-you email in Humanity + AI's own voice.",
+    file: "claude-hacks-ep04.mp4",
+    poster: "poster-ep04.jpg",
+    duration: "1 min",
+    orientation: "landscape",
+    published: "2026-09-08",
+    tags: ["Claude", "Projects", "Custom Instructions", "Email"],
+  },
+  {
     id: "ep03-claude-hacks",
     episode: "Ep. 03",
     title: "Claude Hacks: Projects, Cowork & Everyday Workflows",
