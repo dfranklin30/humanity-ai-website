@@ -37,6 +37,19 @@ export interface VideoClip {
 
 export const claudeHacksClips: VideoClip[] = [
   {
+    id: "ep05-writing-a-good-paper",
+    episode: "Ep. 05",
+    title: "Claude Hacks: Writing a Good Paper",
+    description:
+      "The move that makes AI writing worth sending: before Claude drafts a word, make it interview you. Danielle asks for a one-page letter of inquiry to a foundation funding our AI literacy workshops \u2014 and has Claude ask the five questions it needs answered first, one batch at a time, so the draft comes back with the real details and in her voice.",
+    file: "claude-hacks-ep05.mp4",
+    poster: "poster-ep05.jpg",
+    duration: "1 min",
+    orientation: "portrait",
+    published: "2026-09-09",
+    tags: ["Claude", "Grant Writing", "Prompting", "Nonprofit Ops"],
+  },
+  {
     id: "ep04-custom-instructions",
     episode: "Ep. 04",
     title: "Claude Hacks: Custom Instructions & Claude's Voice",
