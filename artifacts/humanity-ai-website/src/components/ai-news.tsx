@@ -24,16 +24,16 @@ interface NewsPayload {
 function dotClass(category: string): string {
   return (
     "mt-[7px] inline-block h-1.5 w-1.5 shrink-0 rounded-full " +
-    (category === "markets"
-      ? "bg-emerald-400"
+    (category === "policy"
+      ? "bg-emerald-700"
       : category === "research"
-        ? "bg-sky-400"
-        : "bg-[#f0c674]")
+        ? "bg-sky-700"
+        : "bg-[#A8751C]")
   );
 }
 
 // Rolling "AI News" highlights — headlines from AI news, frontier-model news,
-// markets, and arXiv, each clickable straight to the source. The stack scrolls
+// ethics & policy, and arXiv, each clickable straight to the source. The stack scrolls
 // vertically and pauses on hover so anything interesting can be clicked.
 export function AINewsTicker() {
   const { data } = useQuery<NewsPayload>({
@@ -49,7 +49,7 @@ export function AINewsTicker() {
 
   return (
     <div
-      className="relative w-full bg-[#06130d] border-b border-[#f0c674]/20 overflow-hidden"
+      className="relative w-full bg-[#FFFFFF] border-b border-[#A8751C]/20 overflow-hidden"
       data-testid="bar-ai-news"
     >
       <style>{`
@@ -59,7 +59,7 @@ export function AINewsTicker() {
         @media (prefers-reduced-motion: reduce) { .ai-news-track { animation: none; } }
       `}</style>
       <div className="flex items-stretch">
-        <div className="flex flex-col items-center justify-center gap-2 shrink-0 px-3 sm:px-4 py-3 bg-[#f0c674] text-[#081c14] font-extrabold uppercase tracking-[0.14em] text-[10px] sm:text-xs z-10">
+        <div className="flex flex-col items-center justify-center gap-2 shrink-0 px-3 sm:px-4 py-3 bg-[#f0c674] text-[#FBFAF7] font-extrabold uppercase tracking-[0.14em] text-[10px] sm:text-xs z-10">
           <Radio className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-pulse" />
           <span className="text-center leading-tight">
             AI
@@ -75,7 +75,7 @@ export function AINewsTicker() {
                 href={n.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-start gap-2 px-4 sm:px-5 py-1.5 text-[13px] leading-snug text-[#e7efe9] hover:text-[#f0c674] transition-colors"
+                className="flex items-start gap-2 px-4 sm:px-5 py-1.5 text-[13px] leading-snug text-[#e7efe9] hover:text-[#A8751C] transition-colors"
                 data-testid={`ticker-item-${i}`}
               >
                 <span className={dotClass(n.category)} />
@@ -86,8 +86,8 @@ export function AINewsTicker() {
             ))}
           </div>
           {/* Soft fades so headlines slide in and out rather than snapping. */}
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-5 bg-gradient-to-b from-[#06130d] to-transparent" />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-5 bg-gradient-to-t from-[#06130d] to-transparent" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-5 bg-gradient-to-b from-[#FFFFFF] to-transparent" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-5 bg-gradient-to-t from-[#FFFFFF] to-transparent" />
         </div>
       </div>
     </div>
@@ -105,13 +105,13 @@ export function ArxivFeed() {
 
   return (
     <section
-      className="relative isolate w-full bg-[#0a2117]/70 backdrop-blur-[2px] text-[#FAF9F6] py-14 border-b border-white/10"
+      className="relative isolate w-full bg-[#FFFFFF]/70 backdrop-blur-[2px] text-[#14201B] py-14 border-b border-black/10"
       data-testid="section-arxiv"
     >
       <div className="max-w-[1400px] mx-auto px-4 md:px-8">
         <div className="flex items-end justify-between gap-4 mb-8 flex-wrap">
           <div>
-            <div className="inline-flex items-center gap-2 text-[#f0c674] font-bold uppercase tracking-[0.16em] text-xs mb-2">
+            <div className="inline-flex items-center gap-2 text-[#A8751C] font-bold uppercase tracking-[0.16em] text-xs mb-2">
               <FileText className="h-4 w-4" /> Latest AI Research &amp; Models
             </div>
             <h2 className="text-2xl md:text-4xl font-serif">Fresh from arXiv</h2>
@@ -120,7 +120,7 @@ export function ArxivFeed() {
             href="https://arxiv.org/list/cs.AI/recent"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm text-[#f0c674] hover:underline inline-flex items-center gap-1"
+            className="text-sm text-[#A8751C] hover:underline inline-flex items-center gap-1"
             data-testid="link-arxiv-all"
           >
             Browse all <ArrowUpRight className="h-4 w-4" />
@@ -133,7 +133,7 @@ export function ArxivFeed() {
               href={p.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="group rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-[#f0c674]/40 transition-colors p-5 flex flex-col"
+              className="group rounded-2xl border border-black/10 bg-black/[0.03] hover:bg-black/[0.05] hover:border-[#A8751C]/40 transition-colors p-5 flex flex-col"
               data-testid={`arxiv-card-${i}`}
             >
               <div className="text-[11px] uppercase tracking-widest text-sky-300/80 mb-2">
@@ -141,14 +141,14 @@ export function ArxivFeed() {
                   ? new Date(p.published).toLocaleDateString(undefined, { month: "short", day: "numeric" })
                   : "arXiv"}
               </div>
-              <h3 className="font-semibold leading-snug mb-2 group-hover:text-[#f0c674] transition-colors line-clamp-3">
+              <h3 className="font-semibold leading-snug mb-2 group-hover:text-[#A8751C] transition-colors line-clamp-3">
                 {p.title}
               </h3>
               {p.authors && (
                 <div className="text-xs text-[#9fb3a6] mb-2 line-clamp-1">{p.authors}</div>
               )}
               <p className="text-[13px] text-[#c9d6ce]/80 line-clamp-3 flex-1">{p.summary}</p>
-              <div className="mt-3 text-[#f0c674] text-xs font-semibold inline-flex items-center gap-1">
+              <div className="mt-3 text-[#A8751C] text-xs font-semibold inline-flex items-center gap-1">
                 Read on arXiv <ArrowUpRight className="h-3.5 w-3.5" />
               </div>
             </a>
