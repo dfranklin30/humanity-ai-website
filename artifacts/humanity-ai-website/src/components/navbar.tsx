@@ -32,15 +32,20 @@ export function Navbar() {
   const { user, isAuthenticated, logout } = useAuth();
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-[#f0c674]/20 bg-[#0a2117]/80 text-[#FAF9F6] backdrop-blur supports-[backdrop-filter]:bg-[#0a2117]/55">
+    <header className="sticky top-0 z-50 w-full border-b border-[#A8751C]/20 bg-[#FFFFFF]/80 text-[#14201B] backdrop-blur supports-[backdrop-filter]:bg-[#FFFFFF]/55">
       <div className="max-w-7xl mx-auto flex h-16 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <Link href="/" className="flex items-center gap-2" data-testid="link-home-logo">
-          <div className="w-9 h-9 rounded-md bg-[#f0c674] flex items-center justify-center">
-            <span className="text-[#081c14] font-serif font-bold text-lg">H</span>
-          </div>
+          <img
+            src="/humanity-ai-logo.png"
+            alt="Humanity + AI, Inc."
+            width={36}
+            height={36}
+            className="w-9 h-9 rounded-full object-contain"
+            data-testid="img-navbar-logo"
+          />
           <div className="hidden sm:flex flex-col">
             <span className="font-serif font-bold text-sm leading-tight">Humanity + AI</span>
-            <span className="text-[10px] text-[#FAF9F6]/50 leading-tight tracking-wider uppercase">Inc.</span>
+            <span className="text-[10px] text-[#14201B]/50 leading-tight tracking-wider uppercase">Inc.</span>
           </div>
         </Link>
 
@@ -51,7 +56,7 @@ export function Navbar() {
               asChild
               variant="ghost"
               size="sm"
-              className={`nav-link relative text-sm font-medium tracking-wide text-[#FAF9F6]/75 hover:bg-transparent hover:text-[#FAF9F6] ${location === link.href ? "is-active text-[#FAF9F6]" : ""}`}
+              className={`nav-link relative text-sm font-medium tracking-wide text-[#14201B]/75 hover:bg-transparent hover:text-[#14201B] ${location === link.href ? "is-active text-[#14201B]" : ""}`}
             >
               <Link href={link.href} data-testid={`link-nav-${link.label.toLowerCase().replace(/\s/g, '-')}`}>
                 {link.label}
@@ -65,7 +70,7 @@ export function Navbar() {
             size="icon"
             variant="ghost"
             onClick={toggleTheme}
-            className="text-[#FAF9F6] hover:bg-[#FAF9F6]/10 hover:text-[#FAF9F6]"
+            className="text-[#14201B] hover:bg-[#14201B]/10 hover:text-[#14201B]"
             data-testid="button-theme-toggle"
           >
             {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
@@ -74,11 +79,11 @@ export function Navbar() {
           {isAuthenticated && user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-full overflow-hidden text-[#FAF9F6] hover:bg-[#FAF9F6]/10" data-testid="button-user-menu">
+                <Button variant="ghost" size="icon" className="rounded-full overflow-hidden text-[#14201B] hover:bg-[#14201B]/10" data-testid="button-user-menu">
                   {user.avatarUrl ? (
                     <img src={user.avatarUrl} alt={user.displayName || user.username} className="w-9 h-9 object-cover rounded-full" />
                   ) : (
-                    <div className="w-9 h-9 rounded-full bg-[#f0c674]/20 text-[#f0c674] flex items-center justify-center">
+                    <div className="w-9 h-9 rounded-full bg-[#f0c674]/20 text-[#A8751C] flex items-center justify-center">
                       <UserIcon className="h-4 w-4" />
                     </div>
                   )}
@@ -116,7 +121,7 @@ export function Navbar() {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Button asChild size="sm" variant="outline" className="hidden sm:flex gap-1 bg-transparent border-[#FAF9F6]/30 text-[#FAF9F6] hover:bg-[#FAF9F6]/10 hover:text-[#FAF9F6]">
+            <Button asChild size="sm" variant="outline" className="hidden sm:flex gap-1 bg-transparent border-[#14201B]/30 text-[#14201B] hover:bg-[#14201B]/10 hover:text-[#14201B]">
               <Link href="/login" data-testid="link-signin-nav">
                 <LogIn className="h-3.5 w-3.5" />
                 Sign in
@@ -124,7 +129,7 @@ export function Navbar() {
             </Button>
           )}
 
-          <Button asChild size="sm" className="flex gap-1 font-semibold bg-[#f0c674] text-[#081c14] hover:bg-[#f0c674]/90">
+          <Button asChild size="sm" className="flex gap-1 font-semibold bg-[#f0c674] text-[#FBFAF7] hover:bg-[#f0c674]/90">
             <Link href="/donate" data-testid="link-donate-nav">
               <Heart className="h-3.5 w-3.5 fill-current" />
               Donate Now
@@ -132,7 +137,7 @@ export function Navbar() {
           </Button>
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
-              <Button size="icon" variant="ghost" className="lg:hidden text-[#FAF9F6] hover:bg-[#FAF9F6]/10 hover:text-[#FAF9F6]" data-testid="button-mobile-menu">
+              <Button size="icon" variant="ghost" className="lg:hidden text-[#14201B] hover:bg-[#14201B]/10 hover:text-[#14201B]" data-testid="button-mobile-menu">
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>

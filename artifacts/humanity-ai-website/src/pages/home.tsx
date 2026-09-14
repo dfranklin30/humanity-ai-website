@@ -255,13 +255,13 @@ export default function Home() {
       />
       {/* Flashing Membership Beacon */}
       <Link href="/donate" data-testid="link-membership-bar">
-        <div className="group relative w-full bg-[#081c14]/70 backdrop-blur-sm border-b border-[#f0c674]/30 overflow-hidden cursor-pointer">
+        <div className="group relative w-full bg-[#FBFAF7]/70 backdrop-blur-sm border-b border-[#A8751C]/30 overflow-hidden cursor-pointer">
           <div className="max-w-[1400px] mx-auto px-4 py-2.5 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-center">
-            <span className="animate-membership-flash inline-flex items-center gap-2 text-[#f0c674] font-bold uppercase tracking-[0.16em] text-[11px] sm:text-sm">
+            <span className="animate-membership-flash inline-flex items-center gap-2 text-[#A8751C] font-bold uppercase tracking-[0.16em] text-[11px] sm:text-sm">
               <Sparkles className="h-4 w-4" />
               Become a Member — Plans from $10/month
             </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#f0c674] text-[#081c14] font-bold text-xs px-4 py-1 animate-membership-glow group-hover:scale-105 transition-transform">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#f0c674] text-[#FBFAF7] font-bold text-xs px-4 py-1 animate-membership-glow group-hover:scale-105 transition-transform">
               Join Now <ArrowRight className="h-3.5 w-3.5" />
             </span>
           </div>
@@ -273,7 +273,7 @@ export default function Home() {
 
       {/* Dark AI Hero — deep field where humanity meets AI */}
       <section
-        className="relative isolate overflow-hidden bg-[#0a2117]/55 backdrop-blur-[2px] text-[#FAF9F6]"
+        className="relative isolate overflow-hidden bg-[#FFFFFF]/55 backdrop-blur-[2px] text-[#14201B]"
         data-testid="section-hero"
       >
         {/* Topographic dotted line-art */}
@@ -291,14 +291,14 @@ export default function Home() {
                 cy="500"
                 r={60 + i * 30}
                 fill="none"
-                stroke="#6ee7b7"
+                stroke="#0E6B4A"
                 strokeWidth="1.1"
                 strokeDasharray="2 9"
               />
             ))}
           </svg>
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_38%,rgba(110,231,183,0.12),transparent_60%)]" />
-          <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-b from-transparent to-[#0a2117]" />
+          <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-b from-transparent to-[#FFFFFF]" />
         </div>
 
         <div className="max-w-[1100px] mx-auto px-4 md:px-8 py-16 md:py-24 flex flex-col items-center text-center">
@@ -307,28 +307,28 @@ export default function Home() {
             <img
               src="/humanity-ai-logo.png"
               alt="Humanity + AI animated logo"
-              className="animate-logo-float relative mx-auto h-44 w-44 md:h-56 md:w-56 object-contain drop-shadow-[0_0_45px_rgba(110,231,183,0.35)]"
+              className="animate-logo-float relative mx-auto h-44 w-44 md:h-56 md:w-56 object-contain drop-shadow-[0_10px_28px_rgba(20,32,27,0.18)]"
               data-testid="img-animated-logo"
             />
           </div>
-          <div className="text-[11px] sm:text-xs font-semibold tracking-[0.28em] uppercase text-[#6ee7b7] flex items-center gap-2 mb-7">
+          <div className="text-[11px] sm:text-xs font-semibold tracking-[0.28em] uppercase text-[#0E6B4A] flex items-center gap-2 mb-7">
             <span className="h-px w-6 bg-[#6ee7b7]/50" />
             Nonprofit · Aligning AI with Humanity
             <span className="h-px w-6 bg-[#6ee7b7]/50" />
           </div>
 
           <h1
-            className="font-serif text-5xl md:text-7xl lg:text-[7.5rem] leading-[0.95] tracking-tight font-bold text-[#FAF9F6]"
+            className="font-serif text-5xl md:text-7xl lg:text-[7.5rem] leading-[0.95] tracking-tight font-bold text-[#14201B]"
             data-testid="text-masthead"
           >
             Humanity + AI
           </h1>
 
-          <div className="mt-7 flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 text-[10px] sm:text-xs font-medium text-[#FAF9F6]/55 uppercase tracking-[0.2em] border-t border-b border-[#FAF9F6]/15 py-2.5">
+          <div className="mt-7 flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 text-[10px] sm:text-xs font-medium text-[#14201B]/55 uppercase tracking-[0.2em] border-t border-b border-[#14201B]/15 py-2.5">
             <span>Issue 01</span>
-            <span className="hidden sm:inline text-[#6ee7b7]/70">◦</span>
+            <span className="hidden sm:inline text-[#0E6B4A]/70">◦</span>
             <span>Where Humanity Meets Artificial Intelligence</span>
-            <span className="hidden sm:inline text-[#6ee7b7]/70">◦</span>
+            <span className="hidden sm:inline text-[#0E6B4A]/70">◦</span>
             <span>Est. 2024</span>
           </div>
 
@@ -337,12 +337,12 @@ export default function Home() {
             data-testid="text-hero-title"
           >
             Where Humanity Meets{" "}
-            <span className="italic font-light text-[#6ee7b7]">
+            <span className="italic font-light text-[#0E6B4A]">
               Artificial Intelligence.
             </span>
           </h2>
           <p
-            className="text-base md:text-lg text-[#FAF9F6]/70 leading-relaxed max-w-2xl mt-6 font-serif"
+            className="text-base md:text-lg text-[#14201B]/70 leading-relaxed max-w-2xl mt-6 font-serif"
             data-testid="text-hero-subtitle"
           >
             We're a nonprofit on a mission to keep the most powerful technology
@@ -354,7 +354,7 @@ export default function Home() {
             <Button
               asChild
               size="lg"
-              className="animate-membership-glow rounded-full px-8 h-12 bg-[#f0c674] text-[#081c14] hover:bg-[#f0c674] hover:text-[#081c14] font-bold tracking-wide text-base"
+              className="animate-membership-glow rounded-full px-8 h-12 bg-[#f0c674] text-[#FBFAF7] hover:bg-[#f0c674] hover:text-[#FBFAF7] font-bold tracking-wide text-base"
               data-testid="button-hero-membership"
             >
               <Link href="/donate">
@@ -366,7 +366,7 @@ export default function Home() {
               asChild
               size="lg"
               variant="outline"
-              className="rounded-full px-8 h-12 bg-transparent border-[#FAF9F6]/40 text-[#FAF9F6] hover:bg-[#FAF9F6] hover:text-[#0a2117] font-serif italic tracking-wide"
+              className="rounded-full px-8 h-12 bg-transparent border-[#14201B]/40 text-[#14201B] hover:bg-[#14201B] hover:text-[#FFFFFF] font-serif italic tracking-wide"
               data-testid="button-hero-ai"
             >
               <Link href="/ai-hub">
@@ -383,7 +383,7 @@ export default function Home() {
       {/* Latest AI research & models streamed from arXiv */}
       <ArxivFeed />
 
-      <main className="max-w-[1400px] mx-auto px-4 md:px-8 py-8 relative isolate bg-[#FAF9F6] dark:bg-[#0a2117] rounded-t-[2.5rem] shadow-[0_-24px_70px_rgba(3,2,12,0.55)]">
+      <main className="max-w-[1400px] mx-auto px-4 md:px-8 py-8 relative isolate bg-[#14201B] dark:bg-[#FFFFFF] rounded-t-[2.5rem] shadow-[0_-24px_70px_rgba(3,2,12,0.55)]">
         <AmbientBackground className="-z-10" />
         {/* Top Fold: Cover Feature + Organization Brief */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-stretch border-b border-foreground/10 py-16">
@@ -488,7 +488,7 @@ export default function Home() {
                   </div>
                 )}
                 <div className="p-6 md:p-8 relative">
-                <div className="absolute top-0 right-0 p-4 border-l border-b border-foreground/10 bg-[#FAF9F6] dark:bg-background text-center min-w-[80px]">
+                <div className="absolute top-0 right-0 p-4 border-l border-b border-foreground/10 bg-[#14201B] dark:bg-background text-center min-w-[80px]">
                   <span className="block text-[10px] font-bold text-primary uppercase tracking-wider">
                     {featuredEventDate.toLocaleString("en-US", {
                       month: "short",
@@ -1178,7 +1178,7 @@ export default function Home() {
                     href={part.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="group bg-[#FAF9F6] dark:bg-[#0a2117] p-5 hover:bg-white dark:hover:bg-[#0c2a1c] transition-colors"
+                    className="group bg-[#14201B] dark:bg-[#FFFFFF] p-5 hover:bg-white dark:hover:bg-[#EDF5F0] transition-colors"
                     data-testid={`link-rag-home-part-${part.n}`}
                   >
                     <div className="flex items-baseline justify-between mb-2">

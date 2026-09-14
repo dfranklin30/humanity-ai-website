@@ -43,9 +43,9 @@
   --chart-3: 197 37% 24%;
   --chart-4: 43 74% 39%;
   --chart-5: 27 87% 47%;
-  --font-sans: "Plus Jakarta Sans", sans-serif;
-  --font-serif: "Space Grotesk", sans-serif;
-  --font-mono: JetBrains Mono, monospace;
+  --font-sans: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-serif: Fraunces, Georgia, "Times New Roman", serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --radius: .5rem;
   --shadow-2xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.00);
   --shadow-xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.00);
@@ -172,7 +172,7 @@
 
   body {
     @apply font-sans antialiased text-foreground;
-    background-color: #05030f;
+    background-color: #FFFFFF;
   }
 }
 
@@ -344,104 +344,68 @@
   .nav-link::after,
   .nav-link:hover,
   .nav-link.is-active,
-  .rr-stars,
-  .rr-aurora,
-  .rr-road-stripes {
+  .rr-wash {
     animation: none;
   }
 }
 
 /* ── Rainbow Road cosmic backdrop ─────────────────────────────────── */
 .rainbow-road-bg {
+  /* Daylight canvas. This used to be a night sky with stars, an aurora and a
+     rainbow perspective road — striking, but it made every page read dark and
+     sat oddly under a nonprofit's board bios and funding asks. What replaces it
+     is the same idea at noon: two soft washes of the brand greens plus a warm
+     gold low on the page, so the ground has depth without ever going dark. */
   position: fixed;
   inset: 0;
   z-index: -50;
   overflow: hidden;
   pointer-events: none;
-  background: radial-gradient(125% 95% at 50% -10%, #14123a 0%, #0a0822 38%, #05030f 70%, #03020a 100%);
-}
-
-.rr-stars {
-  position: absolute;
-  inset: 0;
-  background-image:
-    radial-gradient(1px 1px at 12% 18%, #ffffff, transparent 60%),
-    radial-gradient(1px 1px at 72% 12%, #cfe9ff, transparent 60%),
-    radial-gradient(1.6px 1.6px at 46% 32%, #ffffff, transparent 60%),
-    radial-gradient(1px 1px at 22% 62%, #ffd6f5, transparent 60%),
-    radial-gradient(1.4px 1.4px at 86% 54%, #d6fff0, transparent 60%),
-    radial-gradient(1px 1px at 58% 78%, #ffffff, transparent 60%),
-    radial-gradient(1px 1px at 33% 88%, #e9d5ff, transparent 60%);
-  background-repeat: repeat;
-  background-size: 340px 340px, 300px 300px, 380px 380px, 320px 320px, 360px 360px, 280px 280px, 300px 300px;
-  opacity: 0.55;
-  animation: rr-twinkle 5.5s ease-in-out infinite alternate;
-}
-
-.rr-aurora {
-  position: absolute;
-  inset: -12% -12% 40% -12%;
   background:
-    radial-gradient(42% 34% at 20% 12%, rgba(124, 77, 255, 0.30), transparent 70%),
-    radial-gradient(40% 30% at 82% 6%, rgba(0, 176, 255, 0.26), transparent 70%),
-    radial-gradient(48% 34% at 52% 0%, rgba(255, 0, 200, 0.20), transparent 70%);
-  filter: blur(28px);
-  animation: rr-aurora-drift 20s ease-in-out infinite alternate;
+    radial-gradient(70% 55% at 78% -8%, #EDF5F0 0%, rgba(237,245,240,0) 72%),
+    radial-gradient(55% 45% at 8% 4%, #F3F7F4 0%, rgba(243,247,244,0) 70%),
+    radial-gradient(85% 45% at 50% 108%, #FBF3E2 0%, rgba(251,243,226,0) 68%),
+    #FFFFFF;
 }
 
-.rr-road {
+.rr-wash {
   position: absolute;
-  left: 50%;
-  bottom: -8%;
-  width: 200vmax;
-  height: 155vmax;
-  transform: translateX(-50%) perspective(52vmax) rotateX(74deg);
-  transform-origin: 50% 100%;
-  -webkit-mask-image: linear-gradient(to top, #000 0%, #000 28%, transparent 80%);
-  mask-image: linear-gradient(to top, #000 0%, #000 28%, transparent 80%);
-  opacity: 0.78;
+  inset: -10% -10% 45% -10%;
+  background:
+    radial-gradient(38% 30% at 22% 14%, rgba(14, 107, 74, 0.07), transparent 70%),
+    radial-gradient(34% 26% at 80% 8%, rgba(110, 231, 183, 0.10), transparent 70%);
+  filter: blur(34px);
+  animation: rr-wash-drift 24s ease-in-out infinite alternate;
 }
 
-.rr-road-stripes {
+.rr-hairline {
   position: absolute;
-  inset: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 42vmax;
   background: repeating-linear-gradient(
     to top,
-    #ff003c 0 5%,
-    #ff7a00 5% 10%,
-    #ffe000 10% 15%,
-    #29d967 15% 20%,
-    #00b3ff 20% 25%,
-    #7b5cff 25% 30%,
-    #ff3df0 30% 35%,
-    transparent 35% 50%
+    rgba(14, 107, 74, 0.05) 0 1px,
+    transparent 1px 7vmax
   );
-  background-size: 100% 64vmax;
-  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 22%, #000 78%, transparent 100%);
-  mask-image: linear-gradient(to right, transparent 0%, #000 22%, #000 78%, transparent 100%);
-  filter: saturate(1.35) drop-shadow(0 0 18px rgba(255, 255, 255, 0.3));
-  animation: rr-road-scroll 5.5s linear infinite;
+  -webkit-mask-image: linear-gradient(to top, #000 0%, transparent 85%);
+  mask-image: linear-gradient(to top, #000 0%, transparent 85%);
 }
 
-.rr-vignette {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(125% 80% at 50% 38%, transparent 42%, rgba(3, 2, 12, 0.55) 100%);
+@keyframes rr-wash-drift {
+  from { transform: translate3d(-1.5%, 0, 0) scale(1); }
+  to   { transform: translate3d(1.5%, 1.5%, 0) scale(1.05); }
 }
 
-@keyframes rr-road-scroll {
-  from { background-position: 0 0; }
-  to { background-position: 0 64vmax; }
+@media (prefers-reduced-motion: reduce) {
+  .rr-wash { animation: none; }
 }
 
-@keyframes rr-twinkle {
-  from { opacity: 0.35; }
-  to { opacity: 0.7; }
 }
 
-@keyframes rr-aurora-drift {
-  from { transform: translateY(-2%) scale(1); opacity: 0.75; }
-  to { transform: translateY(2%) scale(1.06); opacity: 1; }
+}
+
 }
 
 @keyframes logo-float {
