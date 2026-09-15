@@ -33,6 +33,7 @@ import alexisPhoto from "@assets/alexis_portrait_opt.webp";
 import teamCoverPhoto from "@assets/team_cover_opt.webp";
 import { AmbientBackground } from "@/components/ambient-bg";
 import { AINewsTicker, ArxivFeed } from "@/components/ai-news";
+import { FeaturedResearch } from "@/components/featured-research";
 import { VoicesShowcase } from "@/components/voices-showcase";
 import { SlackCommunity } from "@/components/slack-community";
 import { SLACK_INVITE_URL } from "@/lib/community";
@@ -381,6 +382,7 @@ export default function Home() {
       <VoicesShowcase />
 
       {/* Latest AI research & models streamed from arXiv */}
+      <FeaturedResearch />
       <ArxivFeed />
 
       <main className="max-w-[1400px] mx-auto px-4 md:px-8 py-8 relative isolate bg-[#FBFAF7] dark:bg-[#0F1A15] rounded-t-[2.5rem] shadow-[0_-24px_70px_rgba(3,2,12,0.55)]">
