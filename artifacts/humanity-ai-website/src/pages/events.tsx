@@ -233,10 +233,10 @@ export default function Events() {
           ) : eventsList && eventsList.length > 0 ? (
             <div className="space-y-12">
               <div data-testid="section-calendar">
-                <h2 className="font-serif text-2xl font-bold mb-1 text-white" data-testid="heading-calendar">
+                <h2 className="font-serif text-2xl font-bold mb-1 text-[#14201B]" data-testid="heading-calendar">
                   Calendar
                 </h2>
-                <p className="text-sm text-white/70 mb-6">
+                <p className="text-sm text-[#4B5F55] mb-6">
                   Browse upcoming sessions and past recordings by month. Click any event to scroll to its details.
                 </p>
                 <EventCalendar
@@ -259,10 +259,10 @@ export default function Events() {
                 />
               </div>
               <div>
-                <h2 className="font-serif text-2xl font-bold mb-1 text-white" data-testid="heading-upcoming-events">
+                <h2 className="font-serif text-2xl font-bold mb-1 text-[#14201B]" data-testid="heading-upcoming-events">
                   Upcoming
                 </h2>
-                <p className="text-sm text-white/70 mb-6">
+                <p className="text-sm text-[#4B5F55] mb-6">
                   Workshops, seminars and gatherings open to the community.
                 </p>
                 {upcoming.length > 0 ? (
@@ -270,17 +270,17 @@ export default function Events() {
                     {upcoming.map((e, i) => renderEvent(e, i, false))}
                   </div>
                 ) : (
-                  <div className="border border-dashed border-white/20 rounded-md p-8 text-center text-sm text-white/70">
+                  <div className="border border-dashed border-black/15 rounded-md p-8 text-center text-sm text-[#4B5F55]">
                     No upcoming events on the calendar right now — check back soon.
                   </div>
                 )}
               </div>
               {past.length > 0 && (
                 <div>
-                  <h2 className="font-serif text-2xl font-bold mb-1 text-white" data-testid="heading-past-events">
+                  <h2 className="font-serif text-2xl font-bold mb-1 text-[#14201B]" data-testid="heading-past-events">
                     Past Events &amp; Recordings
                   </h2>
-                  <p className="text-sm text-white/70 mb-6">
+                  <p className="text-sm text-[#4B5F55] mb-6">
                     Catch up on conversations and sessions from the community.
                   </p>
                   <div className="space-y-6">
@@ -291,9 +291,9 @@ export default function Events() {
             </div>
           ) : (
             <div className="text-center py-16">
-              <Calendar className="h-12 w-12 text-white/30 mx-auto mb-4" />
-              <h3 className="font-semibold text-lg mb-2 text-white">No events yet</h3>
-              <p className="text-white/70">Check back soon for new events and gatherings.</p>
+              <Calendar className="h-12 w-12 text-[#8A9A92] mx-auto mb-4" />
+              <h3 className="font-semibold text-lg mb-2 text-[#14201B]">No events yet</h3>
+              <p className="text-[#4B5F55]">Check back soon for new events and gatherings.</p>
             </div>
           )}
         </div>
