@@ -136,7 +136,7 @@ export function ArxivFeed() {
               className="group rounded-2xl border border-black/10 bg-black/[0.03] hover:bg-black/[0.05] hover:border-[#A8751C]/40 transition-colors p-5 flex flex-col"
               data-testid={`arxiv-card-${i}`}
             >
-              <div className="text-[11px] uppercase tracking-widest text-sky-300/80 mb-2">
+              <div className="text-[11px] uppercase tracking-widest text-[#3D6B8A] mb-2">
                 {p.published
                   ? new Date(p.published).toLocaleDateString(undefined, { month: "short", day: "numeric" })
                   : "arXiv"}
@@ -147,7 +147,7 @@ export function ArxivFeed() {
               {p.authors && (
                 <div className="text-xs text-[#4B5F55] mb-2 line-clamp-1">{p.authors}</div>
               )}
-              <p className="text-[13px] text-[#c9d6ce]/80 line-clamp-3 flex-1">{p.summary}</p>
+              <p className="text-[13px] text-[#4B5F55] line-clamp-3 flex-1">{p.summary}</p>
               <div className="mt-3 text-[#A8751C] text-xs font-semibold inline-flex items-center gap-1">
                 Read on arXiv <ArrowUpRight className="h-3.5 w-3.5" />
               </div>
