@@ -307,7 +307,7 @@ export default function Home() {
             <img
               src="/humanity-ai-logo.png"
               alt="Humanity + AI animated logo"
-              className="animate-logo-float relative mx-auto h-44 w-44 md:h-56 md:w-56 object-contain drop-shadow-[0_10px_28px_rgba(20,32,27,0.18)]"
+              className="relative mx-auto h-44 w-44 md:h-56 md:w-56 object-contain drop-shadow-[0_10px_28px_rgba(20,32,27,0.18)]"
               data-testid="img-animated-logo"
             />
           </div>
@@ -383,7 +383,7 @@ export default function Home() {
       {/* Latest AI research & models streamed from arXiv */}
       <ArxivFeed />
 
-      <main className="max-w-[1400px] mx-auto px-4 md:px-8 py-8 relative isolate bg-[#14201B] dark:bg-[#FFFFFF] rounded-t-[2.5rem] shadow-[0_-24px_70px_rgba(3,2,12,0.55)]">
+      <main className="max-w-[1400px] mx-auto px-4 md:px-8 py-8 relative isolate bg-[#FBFAF7] dark:bg-[#0F1A15] rounded-t-[2.5rem] shadow-[0_-24px_70px_rgba(3,2,12,0.55)]">
         <AmbientBackground className="-z-10" />
         {/* Top Fold: Cover Feature + Organization Brief */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-stretch border-b border-foreground/10 py-16">
@@ -1178,7 +1178,7 @@ export default function Home() {
                     href={part.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="group bg-[#14201B] dark:bg-[#FFFFFF] p-5 hover:bg-white dark:hover:bg-[#EDF5F0] transition-colors"
+                    className="group bg-[#FBFAF7] dark:bg-[#0F1A15] p-5 hover:bg-white dark:hover:bg-[#EDF5F0] transition-colors"
                     data-testid={`link-rag-home-part-${part.n}`}
                   >
                     <div className="flex items-baseline justify-between mb-2">
