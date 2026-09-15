@@ -488,7 +488,7 @@ export default function Home() {
                   </div>
                 )}
                 <div className="p-6 md:p-8 relative">
-                <div className="absolute top-0 right-0 p-4 border-l border-b border-foreground/10 bg-[#14201B] dark:bg-background text-center min-w-[80px]">
+                <div className="absolute top-0 right-0 p-4 border-l border-b border-foreground/10 bg-[#EDF5F0] dark:bg-background text-center min-w-[80px]">
                   <span className="block text-[10px] font-bold text-primary uppercase tracking-wider">
                     {featuredEventDate.toLocaleString("en-US", {
                       month: "short",
@@ -1073,16 +1073,16 @@ export default function Home() {
                       >
                         <div className="absolute -top-px left-0 w-12 h-0.5 bg-primary transition-all duration-300 group-hover:w-32" />
                         <div className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 items-baseline">
-                          <span className="font-serif text-3xl md:text-4xl font-bold text-primary/30 tabular-nums leading-none group-hover:text-primary/70 transition-colors">
+                          <span className="font-serif text-3xl md:text-4xl font-bold text-primary/70 tabular-nums leading-none group-hover:text-primary/70 transition-colors">
                             {String(i + 1).padStart(2, "0")}
                           </span>
                           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] uppercase tracking-[0.2em] font-bold">
                             <span className="text-primary">{post.category}</span>
-                            <span className="text-muted-foreground/50">•</span>
+                            <span className="text-muted-foreground/70">•</span>
                             <span className="text-muted-foreground">
                               {post.author}
                             </span>
-                            <span className="text-muted-foreground/50">•</span>
+                            <span className="text-muted-foreground/70">•</span>
                             <span className="text-muted-foreground/70 normal-case tracking-normal font-medium font-serif italic">
                               {formattedDate}
                             </span>
@@ -1256,7 +1256,7 @@ export default function Home() {
 
             <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 relative z-10">
               <div>
-                <div className="text-xs uppercase tracking-widest font-bold text-primary mb-4 flex items-center gap-2">
+                <div className="text-xs uppercase tracking-widest font-bold text-emerald-300 mb-4 flex items-center gap-2">
                   <GraduationCap className="h-4 w-4" />
                   Free Training
                 </div>
