@@ -3,6 +3,17 @@ import { blogPosts, events, users, campaigns } from "@workspace/db";
 import { sql, like, eq, and } from "drizzle-orm";
 
 export async function seedDatabase() {
+  // Retired from the calendar: the Sep 18 Quick Hacks kickoff. Dropping it from
+  // the seed above stops it being re-created; this clears the row already in the
+  // database. Guarded so a failure here can never block startup.
+  try {
+    await db.execute(
+      sql`DELETE FROM events WHERE title LIKE 'Humanity + AI Quick Hacks Ep. 06%'`,
+    );
+  } catch (err) {
+    console.error("[seed] could not retire the Sep 18 Quick Hacks kickoff:", err);
+  }
+
   await db.update(users)
     .set({ email: "danielle@humanityplusai.org" })
     .where(eq(users.email, "danielle@humanityplusai.og"));
@@ -998,19 +1009,6 @@ Read the full piece on JourneyBytes.`,
     },
   ];
 
-  // Retired from the calendar: the Sep 18 Quick Hacks kickoff. Dropping it from
-  // the seed above stops it being re-created; this clears the row already in the
-  // database. Guarded so a failure here can never block startup.
-  try {
-    await db.execute(
-      sql`DELETE FROM event_signups WHERE event_id IN (SELECT id FROM events WHERE date = '2026-09-18' AND title LIKE 'Humanity + AI Quick Hacks Ep. 06%')`,
-    );
-    await db.execute(
-      sql`DELETE FROM events WHERE date = '2026-09-18' AND title LIKE 'Humanity + AI Quick Hacks Ep. 06%'`,
-    );
-  } catch (err) {
-    console.error("[seed] could not retire the Sep 18 Quick Hacks kickoff:", err);
-  }
 
   for (const seedEvent of eventSeed) {
     const [existing] = await db
