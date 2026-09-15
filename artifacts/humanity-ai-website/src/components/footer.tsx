@@ -133,7 +133,7 @@ export function Footer() {
                 type="submit"
                 size="sm"
                 disabled={newsletterMutation.isPending}
-                className="bg-[#f0c674] text-[#FBFAF7] hover:bg-[#f0c674]/90"
+                className="bg-[#f0c674] text-[#14201B] hover:bg-[#f0c674]/90"
                 data-testid="button-newsletter-subscribe"
               >
                 <Mail className="h-4 w-4" />
