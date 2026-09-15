@@ -1236,7 +1236,7 @@ export default function Training() {
                     <div className="w-11 h-11 rounded-lg bg-primary/10 flex items-center justify-center">
                       <p.icon className="h-5 w-5 text-primary" />
                     </div>
-                    <span className="font-serif text-2xl text-muted-foreground/40">{p.num}</span>
+                    <span className="font-serif text-2xl text-muted-foreground/70">{p.num}</span>
                   </div>
                   <h3 className="font-serif text-xl font-bold mb-2">{p.label}</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed flex-1 mb-4">{p.desc}</p>
@@ -1541,12 +1541,12 @@ export default function Training() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div {...fadeIn} className="grid lg:grid-cols-12 gap-10 mb-14 items-end">
             <div className="lg:col-span-8">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/20 text-primary text-[11px] font-bold uppercase tracking-widest mb-5">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-400/20 text-emerald-300 text-[11px] font-bold uppercase tracking-widest mb-5">
                 <ShieldCheck className="h-3 w-3" />
                 Responsible AI Hub · Led by Jofiah Jose Prakash
               </div>
               <h2 className="font-serif text-3xl md:text-5xl font-bold tracking-tight leading-[1.05] mb-4" data-testid="text-responsible-ai-title">
-                The ethics backbone of <span className="italic font-light text-primary">everything we teach.</span>
+                The ethics backbone of <span className="italic font-light text-emerald-300">everything we teach.</span>
               </h2>
               <p className="text-base text-background/70 leading-relaxed font-serif max-w-2xl">
                 Responsible AI isn't a chapter at the end. It's the operating system underneath every learning path, every builder template, and every shipped system. Curated and led by our Director of AI Ethics & Governance.
@@ -1561,7 +1561,7 @@ export default function Training() {
                   <p className="text-sm font-bold">Jofiah Jose Prakash</p>
                   <p className="text-[11px] text-background/60 uppercase tracking-widest">Director of AI Ethics</p>
                   <Link href="/about/board/jofia-jose-prakash">
-                    <button className="text-[11px] text-primary hover:underline mt-1 inline-flex items-center gap-1" data-testid="link-jofia-profile-rai">
+                    <button className="text-[11px] text-emerald-300 hover:underline mt-1 inline-flex items-center gap-1" data-testid="link-jofia-profile-rai">
                       Board Profile <ArrowRight className="h-3 w-3" />
                     </button>
                   </Link>

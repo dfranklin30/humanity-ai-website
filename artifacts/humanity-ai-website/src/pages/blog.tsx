@@ -341,7 +341,7 @@ export default function Blog() {
             <div className="absolute top-0 left-0 w-full h-1 bg-primary" />
             <div className="grid lg:grid-cols-2 gap-8 items-center relative z-10">
               <div>
-                <div className="text-xs uppercase tracking-widest font-bold text-primary mb-4">
+                <div className="text-xs uppercase tracking-widest font-bold text-emerald-300 mb-4">
                   Submit Your Voice
                 </div>
                 <h2 className="font-serif text-3xl md:text-4xl font-bold mb-4 text-background">

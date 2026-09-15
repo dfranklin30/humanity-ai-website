@@ -59,7 +59,7 @@ export function Footer() {
           <div>
             <div className="flex items-center gap-2 mb-4">
               <div className="w-8 h-8 rounded-md bg-[#f0c674] flex items-center justify-center">
-                <span className="text-[#FBFAF7] font-serif font-bold">H</span>
+                <span className="text-[#14201B] font-serif font-bold">H</span>
               </div>
               <div>
                 <div className="font-serif font-bold text-sm">Humanity + AI</div>
