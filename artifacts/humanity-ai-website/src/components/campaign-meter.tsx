@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Heart, ArrowRight, Users } from "lucide-react";
+import { Heart, ArrowRight } from "lucide-react";
 
 export interface CampaignProgress {
   slug: string;
@@ -12,39 +12,6 @@ export interface CampaignProgress {
   category?: string;
 }
 
-function formatUSD(cents: number) {
-  return (cents / 100).toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  });
-}
-
-function ProgressBar({
-  pct,
-  trackClassName = "bg-foreground/10",
-  heightClass = "h-2",
-}: {
-  pct: number;
-  trackClassName?: string;
-  heightClass?: string;
-}) {
-  return (
-    <div
-      className={`${heightClass} w-full ${trackClassName} overflow-hidden rounded-full`}
-      role="progressbar"
-      aria-valuenow={pct}
-      aria-valuemin={0}
-      aria-valuemax={100}
-    >
-      <div
-        className="h-full bg-primary transition-all duration-700 rounded-full"
-        style={{ width: `${pct}%` }}
-      />
-    </div>
-  );
-}
-
 export function CampaignMeter({
   campaign,
   variant = "inline",
@@ -54,56 +21,26 @@ export function CampaignMeter({
   variant?: "inline" | "card";
   className?: string;
 }) {
-  const pct =
-    campaign.goalCents > 0
-      ? Math.min(100, Math.round((campaign.raisedCents / campaign.goalCents) * 100))
-      : 0;
-
   if (variant === "card") {
     return (
       <div
         className={`border border-foreground/10 bg-white dark:bg-card p-6 md:p-8 ${className}`}
         data-testid={`campaign-card-${campaign.slug}`}
       >
-        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-primary mb-4">
+        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-700 mb-4">
           <Heart className="h-3.5 w-3.5" />
-          Fundraising Campaign
+          Support This Work
         </div>
-        <h3 className="font-serif text-2xl md:text-3xl font-bold leading-tight mb-3">
+        <h3 className="font-serif text-2xl md:text-3xl font-bold leading-tight mb-3 text-[#14201B]">
           {campaign.title}
         </h3>
         {campaign.description && (
-          <p className="text-muted-foreground leading-relaxed font-serif mb-6">
-            {campaign.description}
-          </p>
+          <p className="text-[#4B5F55] leading-relaxed mb-6">{campaign.description}</p>
         )}
-        <div className="flex items-baseline justify-between mb-2">
-          <span
-            className="font-serif text-3xl font-bold text-foreground"
-            data-testid={`campaign-raised-${campaign.slug}`}
-          >
-            {formatUSD(campaign.raisedCents)}
-          </span>
-          <span className="text-sm text-muted-foreground">
-            of {formatUSD(campaign.goalCents)} goal
-          </span>
-        </div>
-        <ProgressBar pct={pct} />
-        <div className="flex items-center justify-between mt-3 mb-6 text-xs uppercase tracking-widest font-bold text-muted-foreground">
-          <span data-testid={`campaign-pct-${campaign.slug}`}>{pct}% Funded</span>
-          <span className="flex items-center gap-1.5 normal-case tracking-normal font-normal">
-            <Users className="h-3.5 w-3.5" />
-            {campaign.donorCount} {campaign.donorCount === 1 ? "supporter" : "supporters"}
-          </span>
-        </div>
-        <Button asChild className="rounded-none font-serif italic w-full">
-          <Link
-            href={`/donate?campaign=${campaign.slug}`}
-            data-testid={`button-donate-${campaign.slug}`}
-          >
-            <Heart className="h-4 w-4 mr-2" />
-            Support {campaign.title}
-            <ArrowRight className="h-4 w-4 ml-2" />
+        <Button asChild className="gap-2">
+          <Link href="/donate" data-testid={`campaign-donate-${campaign.slug}`}>
+            Donate
+            <ArrowRight className="h-4 w-4" />
           </Link>
         </Button>
       </div>
@@ -111,54 +48,24 @@ export function CampaignMeter({
   }
 
   return (
-    <div
-      className={`mt-7 rounded-2xl border border-black/15 bg-white/[0.06] backdrop-blur-sm p-5 sm:p-6 shadow-lg shadow-black/20 ${className}`}
-      data-testid={`campaign-inline-${campaign.slug}`}
-    >
-      <div className="flex items-center justify-between mb-3">
+    <div className={className} data-testid={`campaign-inline-${campaign.slug}`}>
+      <div className="flex items-center justify-between gap-4 mb-3">
         <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-emerald-700 flex items-center gap-1.5">
           <Heart className="h-3.5 w-3.5" />
-          Fundraising Goal
+          Support This Work
         </span>
-        <span
-          className="text-xs font-bold uppercase tracking-widest text-[#2C3E35]"
-          data-testid={`campaign-pct-${campaign.slug}`}
-        >
-          {pct}% Funded
-        </span>
-      </div>
-      <ProgressBar pct={pct} trackClassName="bg-black/12" heightClass="h-3" />
-      <div className="flex items-center justify-between mt-3 mb-5">
-        <span className="text-sm">
-          <span
-            className="font-bold text-[#14201B] text-base"
-            data-testid={`campaign-raised-${campaign.slug}`}
-          >
-            {formatUSD(campaign.raisedCents)}
-          </span>{" "}
-          <span className="text-[#4B5F55]">
-            raised of {formatUSD(campaign.goalCents)}
-          </span>
-        </span>
-        <span className="text-xs text-[#4B5F55] flex items-center gap-1">
-          <Users className="h-3 w-3" />
-          {campaign.donorCount}
-        </span>
-      </div>
-      <Button
-        asChild
-        size="sm"
-        className="rounded-none font-serif italic w-full gap-1.5"
-      >
         <Link
-          href={`/donate?campaign=${campaign.slug}`}
-          data-testid={`button-donate-${campaign.slug}`}
+          href="/donate"
+          className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#A8751C] hover:underline inline-flex items-center gap-1"
+          data-testid={`campaign-donate-inline-${campaign.slug}`}
         >
-          <Heart className="h-3.5 w-3.5" />
-          Donate to this campaign
-          <ArrowRight className="h-3.5 w-3.5" />
+          Donate
+          <ArrowRight className="h-3 w-3" />
         </Link>
-      </Button>
+      </div>
+      {campaign.description && (
+        <p className="text-sm text-[#4B5F55] leading-relaxed">{campaign.description}</p>
+      )}
     </div>
   );
 }
