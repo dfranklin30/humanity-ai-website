@@ -112,35 +112,35 @@ export function CampaignMeter({
 
   return (
     <div
-      className={`mt-7 rounded-2xl border border-white/15 bg-white/[0.06] backdrop-blur-sm p-5 sm:p-6 shadow-lg shadow-black/20 ${className}`}
+      className={`mt-7 rounded-2xl border border-black/15 bg-white/[0.06] backdrop-blur-sm p-5 sm:p-6 shadow-lg shadow-black/20 ${className}`}
       data-testid={`campaign-inline-${campaign.slug}`}
     >
       <div className="flex items-center justify-between mb-3">
-        <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-emerald-300 flex items-center gap-1.5">
+        <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-emerald-700 flex items-center gap-1.5">
           <Heart className="h-3.5 w-3.5" />
           Fundraising Goal
         </span>
         <span
-          className="text-xs font-bold uppercase tracking-widest text-white/80"
+          className="text-xs font-bold uppercase tracking-widest text-[#2C3E35]"
           data-testid={`campaign-pct-${campaign.slug}`}
         >
           {pct}% Funded
         </span>
       </div>
-      <ProgressBar pct={pct} trackClassName="bg-white/15" heightClass="h-3" />
+      <ProgressBar pct={pct} trackClassName="bg-black/12" heightClass="h-3" />
       <div className="flex items-center justify-between mt-3 mb-5">
         <span className="text-sm">
           <span
-            className="font-bold text-white text-base"
+            className="font-bold text-[#14201B] text-base"
             data-testid={`campaign-raised-${campaign.slug}`}
           >
             {formatUSD(campaign.raisedCents)}
           </span>{" "}
-          <span className="text-white/70">
+          <span className="text-[#4B5F55]">
             raised of {formatUSD(campaign.goalCents)}
           </span>
         </span>
-        <span className="text-xs text-white/70 flex items-center gap-1">
+        <span className="text-xs text-[#4B5F55] flex items-center gap-1">
           <Users className="h-3 w-3" />
           {campaign.donorCount}
         </span>
