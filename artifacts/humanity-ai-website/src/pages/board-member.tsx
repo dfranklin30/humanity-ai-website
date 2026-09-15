@@ -49,7 +49,7 @@ const boardMembers: Record<string, {
     seat: "Seat 1",
     seatLabel: "Founder & Board Chair",
     photo: daniellePhoto,
-    badgeColor: "bg-primary/5 text-emerald-300 border-primary/20",
+    badgeColor: "bg-primary/5 text-emerald-700 border-primary/20",
     linkedin: "https://www.linkedin.com/in/danielle-franklin-53318269/",
     shortBio: "Defense technology executive and AI innovator with 20+ years driving mission-impact across OSD, SDA, U.S. Navy, MDA, and USSF.",
     fullBio: [
@@ -143,7 +143,7 @@ const boardMembers: Record<string, {
     seat: "Seat 3",
     seatLabel: "Finance & Fundraising Strategy",
     photo: williamPhoto,
-    badgeColor: "bg-emerald-500/5 text-emerald-300 border-emerald-500/20",
+    badgeColor: "bg-emerald-500/5 text-emerald-700 border-emerald-500/20",
     linkedin: "https://www.linkedin.com/in/wkreitzer/",
     shortBio: "Finance & Fundraising Strategist overseeing financial health, grant strategy, donor development, and budget planning for Humanity + AI, Inc.",
     fullBio: [
@@ -564,9 +564,9 @@ export default function BoardMember() {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4 text-white">Board Member Not Found</h1>
+          <h1 className="text-2xl font-bold mb-4 text-[#14201B]">Board Member Not Found</h1>
           <Link href="/about">
-            <Button variant="outline" className="gap-2 text-white hover:text-white border-white/25" data-testid="link-back-about">
+            <Button variant="outline" className="gap-2 text-[#14201B] hover:text-[#14201B] border-black/15" data-testid="link-back-about">
               <ArrowLeft className="h-4 w-4" />
               Back to About
             </Button>
@@ -617,7 +617,7 @@ export default function BoardMember() {
       <section className="py-12">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <Link href="/about">
-            <Button variant="ghost" className="gap-2 mb-8 -ml-2 text-white hover:text-white" data-testid="link-back-about">
+            <Button variant="ghost" className="gap-2 mb-8 -ml-2 text-[#14201B] hover:text-[#14201B]" data-testid="link-back-about">
               <ArrowLeft className="h-4 w-4" />
               Back to About
             </Button>
@@ -638,7 +638,7 @@ export default function BoardMember() {
               <div className="space-y-3">
                 {member.links.map((link, i) => (
                   <a key={i} href={link.url} target="_blank" rel="noopener noreferrer" className="block">
-                    <Button variant="outline" className="w-full gap-2 justify-start text-white hover:text-white border-white/25" data-testid={`link-${link.label.toLowerCase().replace(/\s/g, '-')}`}>
+                    <Button variant="outline" className="w-full gap-2 justify-start text-[#14201B] hover:text-[#14201B] border-black/15" data-testid={`link-${link.label.toLowerCase().replace(/\s/g, '-')}`}>
                       {link.icon === "linkedin" ? <SiLinkedin className="h-4 w-4" /> :
                        link.icon === "medium" ? <BookOpen className="h-4 w-4" /> :
                        link.icon === "mail" ? <Mail className="h-4 w-4" /> :
@@ -652,28 +652,28 @@ export default function BoardMember() {
 
             <div>
               {member.tagline && (
-                <p className="text-[11px] font-semibold tracking-[0.18em] uppercase text-emerald-300 mb-3" data-testid="text-board-member-tagline">
+                <p className="text-[11px] font-semibold tracking-[0.18em] uppercase text-emerald-700 mb-3" data-testid="text-board-member-tagline">
                   {member.tagline}
                 </p>
               )}
               <Badge variant="outline" className={`text-xs mb-3 ${member.badgeColor}`}>
                 {member.seat} — {member.seatLabel}
               </Badge>
-              <h1 className="font-serif text-3xl md:text-4xl font-bold mb-2 text-white" data-testid="text-board-member-name">{member.name}</h1>
-              <p className="text-lg text-emerald-300 font-medium mb-3" data-testid="text-board-member-title">{member.title}</p>
+              <h1 className="font-serif text-3xl md:text-4xl font-bold mb-2 text-[#14201B]" data-testid="text-board-member-name">{member.name}</h1>
+              <p className="text-lg text-emerald-700 font-medium mb-3" data-testid="text-board-member-title">{member.title}</p>
 
               {member.subtitle && (
-                <p className="font-serif italic text-base md:text-lg text-white/75 leading-relaxed mb-6 max-w-2xl" data-testid="text-board-member-subtitle">
+                <p className="font-serif italic text-base md:text-lg text-[#4B5F55] leading-relaxed mb-6 max-w-2xl" data-testid="text-board-member-subtitle">
                   {member.subtitle}
                 </p>
               )}
 
               {member.stats && member.stats.length > 0 && (
-                <div className="grid grid-cols-3 gap-4 mb-8 py-4 border-y border-white/15" data-testid="board-member-stats">
+                <div className="grid grid-cols-3 gap-4 mb-8 py-4 border-y border-black/15" data-testid="board-member-stats">
                   {member.stats.map((stat, i) => (
                     <div key={i} data-testid={`stat-${i}`}>
-                      <div className="font-serif text-2xl md:text-3xl font-bold text-emerald-300 leading-none">{stat.value}</div>
-                      <div className="text-[10px] font-medium tracking-wider uppercase text-white/60 mt-2">{stat.label}</div>
+                      <div className="font-serif text-2xl md:text-3xl font-bold text-emerald-700 leading-none">{stat.value}</div>
+                      <div className="text-[10px] font-medium tracking-wider uppercase text-[#5B6F65] mt-2">{stat.label}</div>
                     </div>
                   ))}
                 </div>
@@ -682,13 +682,13 @@ export default function BoardMember() {
 
               <div className="space-y-4 mb-10">
                 {member.fullBio.map((paragraph, i) => (
-                  <p key={i} className="text-white/80 leading-relaxed">{paragraph}</p>
+                  <p key={i} className="text-[#2C3E35] leading-relaxed">{paragraph}</p>
                 ))}
               </div>
 
               {member.videoHighlight && (
                 <div className="mb-10" data-testid="section-video-highlight">
-                  <p className="text-xs font-medium text-emerald-300 uppercase tracking-wide mb-3 flex items-center gap-2">
+                  <p className="text-xs font-medium text-emerald-700 uppercase tracking-wide mb-3 flex items-center gap-2">
                     <PlayCircle className="h-4 w-4" />
                     Featured Talk
                   </p>
@@ -728,7 +728,7 @@ export default function BoardMember() {
 
               {member.articleHighlights && member.articleHighlights.length > 0 && (
                 <div className="mb-10">
-                  <p className="text-xs font-medium text-emerald-300 uppercase tracking-wide mb-3 flex items-center gap-2">
+                  <p className="text-xs font-medium text-emerald-700 uppercase tracking-wide mb-3 flex items-center gap-2">
                     <BookOpen className="h-4 w-4" />
                     Recent Article Highlights
                   </p>
@@ -806,7 +806,7 @@ export default function BoardMember() {
 
               {member.buildingProjects && member.buildingProjects.length > 0 && (
                 <div className="mb-10" data-testid="section-building">
-                  <p className="text-xs font-medium text-emerald-300 uppercase tracking-wide mb-4 flex items-center gap-2">
+                  <p className="text-xs font-medium text-emerald-700 uppercase tracking-wide mb-4 flex items-center gap-2">
                     <Lightbulb className="h-4 w-4" />
                     What I'm Building
                   </p>
@@ -823,17 +823,17 @@ export default function BoardMember() {
 
               {member.perspectives && member.perspectives.length > 0 && (
                 <div className="mb-4" data-testid="section-perspectives">
-                  <p className="text-xs font-medium text-emerald-300 uppercase tracking-wide mb-4 flex items-center gap-2">
+                  <p className="text-xs font-medium text-emerald-700 uppercase tracking-wide mb-4 flex items-center gap-2">
                     <Globe className="h-4 w-4" />
                     My Take on Where This Is Going
                   </p>
                   <ol className="space-y-4">
                     {member.perspectives.map((take, i) => (
                       <li key={i} className="flex gap-4 items-start" data-testid={`perspective-${i}`}>
-                        <span className="font-serif text-2xl font-bold text-emerald-300/40 leading-none w-8 shrink-0 pt-1">
+                        <span className="font-serif text-2xl font-bold text-emerald-700/40 leading-none w-8 shrink-0 pt-1">
                           {String(i + 1).padStart(2, "0")}
                         </span>
-                        <p className="text-[15px] leading-relaxed text-white/85 border-t border-white/15 flex-1 pt-3">
+                        <p className="text-[15px] leading-relaxed text-[#2C3E35] border-t border-black/15 flex-1 pt-3">
                           {take}
                         </p>
                       </li>
@@ -848,7 +848,7 @@ export default function BoardMember() {
 
       <section className="py-16 bg-muted/20">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="font-serif text-2xl font-bold mb-8 text-center text-white">Other Board Members</h2>
+          <h2 className="font-serif text-2xl font-bold mb-8 text-center text-[#14201B]">Other Board Members</h2>
           <div className="grid sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
             {otherMembers.map((other) => (
               <OtherMemberCard key={other.slug} member={other} />

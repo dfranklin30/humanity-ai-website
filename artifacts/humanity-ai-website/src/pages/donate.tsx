@@ -215,11 +215,11 @@ export default function Donate() {
           <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
           </div>
-          <h2 className="font-serif text-2xl font-bold mb-3 text-white" data-testid="text-donation-success">Thank You!</h2>
-          <p className="text-white/70 mb-6">
+          <h2 className="font-serif text-2xl font-bold mb-3 text-[#14201B]" data-testid="text-donation-success">Thank You!</h2>
+          <p className="text-[#4B5F55] mb-6">
             Your generous donation helps us continue our mission of bridging humanity and AI. Together, we're making a difference.
           </p>
-          <Button onClick={() => setSuccess(false)} variant="outline" className="gap-2 text-white hover:text-white border-white/25" data-testid="button-donate-again">
+          <Button onClick={() => setSuccess(false)} variant="outline" className="gap-2 text-[#14201B] hover:text-[#14201B] border-black/15" data-testid="button-donate-again">
             <Heart className="h-4 w-4" />
             Make Another Donation
           </Button>
@@ -256,15 +256,15 @@ export default function Donate() {
       <section id="membership-tiers" className="py-20 border-b border-border" data-testid="section-membership-tiers">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div {...fadeIn} className="max-w-3xl mb-12">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-400/10 text-emerald-300 text-sm font-medium mb-6">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-400/10 text-emerald-700 text-sm font-medium mb-6">
               <Sparkles className="h-3.5 w-3.5" />
               Membership Program
             </div>
-            <h2 className="font-serif text-3xl lg:text-4xl font-bold tracking-tight leading-[1.1] mb-5 text-white" data-testid="text-membership-title">
+            <h2 className="font-serif text-3xl lg:text-4xl font-bold tracking-tight leading-[1.1] mb-5 text-[#14201B]" data-testid="text-membership-title">
               Join the community at the{" "}
-              <span className="text-emerald-300">level that fits you</span>
+              <span className="text-emerald-700">level that fits you</span>
             </h2>
-            <p className="text-lg text-white/70 leading-relaxed">
+            <p className="text-lg text-[#4B5F55] leading-relaxed">
               Become a member and power our mission while unlocking benefits that
               grow at every tier. Choose a monthly plan below — cancel anytime.
             </p>
@@ -321,7 +321,7 @@ export default function Donate() {
             ))}
           </div>
 
-          <p className="text-sm text-white/70 mt-8 text-center">
+          <p className="text-sm text-[#4B5F55] mt-8 text-center">
             Cancel anytime. Secure checkout powered by Stripe.
           </p>
 

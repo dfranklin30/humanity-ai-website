@@ -37,7 +37,7 @@ export function FundraisingBanner() {
           Help us fund the initiatives shaping responsible AI
         </span>
         <Link href="/donate" data-testid="link-banner-donate">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#f0c674] text-[#FBFAF7] font-bold text-xs px-4 py-1 hover:scale-105 transition-transform cursor-pointer">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#f0c674] text-[#14201B] font-bold text-xs px-4 py-1 hover:scale-105 transition-transform cursor-pointer">
             Donate <ArrowRight className="h-3.5 w-3.5" />
           </span>
         </Link>

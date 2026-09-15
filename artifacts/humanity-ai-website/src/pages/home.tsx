@@ -261,7 +261,7 @@ export default function Home() {
               <Sparkles className="h-4 w-4" />
               Become a Member — Plans from $10/month
             </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#f0c674] text-[#FBFAF7] font-bold text-xs px-4 py-1 animate-membership-glow group-hover:scale-105 transition-transform">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#f0c674] text-[#14201B] font-bold text-xs px-4 py-1 animate-membership-glow group-hover:scale-105 transition-transform">
               Join Now <ArrowRight className="h-3.5 w-3.5" />
             </span>
           </div>
@@ -354,7 +354,7 @@ export default function Home() {
             <Button
               asChild
               size="lg"
-              className="animate-membership-glow rounded-full px-8 h-12 bg-[#f0c674] text-[#FBFAF7] hover:bg-[#f0c674] hover:text-[#FBFAF7] font-bold tracking-wide text-base"
+              className="animate-membership-glow rounded-full px-8 h-12 bg-[#f0c674] text-[#14201B] hover:bg-[#f0c674] hover:text-[#14201B] font-bold tracking-wide text-base"
               data-testid="button-hero-membership"
             >
               <Link href="/donate">

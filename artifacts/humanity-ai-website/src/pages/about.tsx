@@ -538,8 +538,8 @@ export default function About() {
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div {...fadeIn} className="text-center max-w-2xl mx-auto mb-16">
-            <h2 className="font-serif text-3xl font-bold mb-4 text-white" data-testid="text-timeline-title">Our Journey</h2>
-            <p className="text-white/70">Key milestones in our mission to bridge humanity and AI.</p>
+            <h2 className="font-serif text-3xl font-bold mb-4 text-[#14201B]" data-testid="text-timeline-title">Our Journey</h2>
+            <p className="text-[#4B5F55]">Key milestones in our mission to bridge humanity and AI.</p>
           </motion.div>
           <div className="max-w-2xl mx-auto space-y-0">
             {timeline.map((item, i) => (
@@ -553,12 +553,12 @@ export default function About() {
               >
                 <div className="flex flex-col items-center">
                   <div className="w-3 h-3 rounded-full bg-primary shrink-0 mt-1.5" />
-                  {i < timeline.length - 1 && <div className="w-px flex-1 bg-white/15" />}
+                  {i < timeline.length - 1 && <div className="w-px flex-1 bg-black/12" />}
                 </div>
                 <div className="pb-8">
-                  <div className="text-xs text-emerald-300 font-semibold mb-1">{item.year}</div>
-                  <h3 className="font-semibold text-sm mb-1 text-white">{item.title}</h3>
-                  <p className="text-sm text-white/70">{item.desc}</p>
+                  <div className="text-xs text-emerald-700 font-semibold mb-1">{item.year}</div>
+                  <h3 className="font-semibold text-sm mb-1 text-[#14201B]">{item.title}</h3>
+                  <p className="text-sm text-[#4B5F55]">{item.desc}</p>
                 </div>
               </motion.div>
             ))}
