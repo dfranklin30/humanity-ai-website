@@ -129,7 +129,7 @@ export function Navbar() {
             </Button>
           )}
 
-          <Button asChild size="sm" className="flex gap-1 font-semibold bg-[#f0c674] text-[#FBFAF7] hover:bg-[#f0c674]/90">
+          <Button asChild size="sm" className="flex gap-1 font-semibold bg-[#f0c674] text-[#14201B] hover:bg-[#f0c674]/90">
             <Link href="/donate" data-testid="link-donate-nav">
               <Heart className="h-3.5 w-3.5 fill-current" />
               Donate Now
