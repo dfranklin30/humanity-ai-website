@@ -59,7 +59,7 @@ export function AINewsTicker() {
         @media (prefers-reduced-motion: reduce) { .ai-news-track { animation: none; } }
       `}</style>
       <div className="flex items-stretch">
-        <div className="flex flex-col items-center justify-center gap-2 shrink-0 px-3 sm:px-4 py-3 bg-[#f0c674] text-[#FBFAF7] font-extrabold uppercase tracking-[0.14em] text-[10px] sm:text-xs z-10">
+        <div className="flex flex-col items-center justify-center gap-2 shrink-0 px-3 sm:px-4 py-3 bg-[#f0c674] text-[#14201B] font-extrabold uppercase tracking-[0.14em] text-[10px] sm:text-xs z-10">
           <Radio className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-pulse" />
           <span className="text-center leading-tight">
             AI
@@ -75,11 +75,11 @@ export function AINewsTicker() {
                 href={n.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-start gap-2 px-4 sm:px-5 py-1.5 text-[13px] leading-snug text-[#e7efe9] hover:text-[#A8751C] transition-colors"
+                className="flex items-start gap-2 px-4 sm:px-5 py-1.5 text-[13px] leading-snug text-[#1B2A22] hover:text-[#A8751C] transition-colors"
                 data-testid={`ticker-item-${i}`}
               >
                 <span className={dotClass(n.category)} />
-                <span className="font-semibold text-[#9fb3a6] shrink-0">{n.source}</span>
+                <span className="font-semibold text-[#4B5F55] shrink-0">{n.source}</span>
                 <span className="opacity-90 line-clamp-1">{n.title}</span>
                 <ArrowUpRight className="h-3.5 w-3.5 opacity-60 shrink-0 mt-[2px]" />
               </a>
@@ -145,7 +145,7 @@ export function ArxivFeed() {
                 {p.title}
               </h3>
               {p.authors && (
-                <div className="text-xs text-[#9fb3a6] mb-2 line-clamp-1">{p.authors}</div>
+                <div className="text-xs text-[#4B5F55] mb-2 line-clamp-1">{p.authors}</div>
               )}
               <p className="text-[13px] text-[#c9d6ce]/80 line-clamp-3 flex-1">{p.summary}</p>
               <div className="mt-3 text-[#A8751C] text-xs font-semibold inline-flex items-center gap-1">
