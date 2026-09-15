@@ -28,7 +28,7 @@ const CACHE_TTL_MS = 20 * 60 * 1000; // 20 minutes
 let cache: { at: number; data: NewsPayload } | null = null;
 let inflight: Promise<NewsPayload> | null = null;
 
-async function fetchText(url: string, timeoutMs = 9000): Promise<string | null> {
+async function fetchText(url: string, timeoutMs = 15000): Promise<string | null> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
@@ -131,7 +131,7 @@ async function build(): Promise<NewsPayload> {
       ),
     ),
     fetchText(
-      "http://export.arxiv.org/api/query?search_query=cat:cs.AI+OR+cat:cs.LG+OR+cat:cs.CL&sortBy=submittedDate&sortOrder=descending&max_results=12",
+      "https://export.arxiv.org/api/query?search_query=cat:cs.AI+OR+cat:cs.LG+OR+cat:cs.CL&sortBy=submittedDate&sortOrder=descending&max_results=12",
     ),
   ]);
 

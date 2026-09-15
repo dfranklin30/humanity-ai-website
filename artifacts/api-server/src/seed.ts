@@ -829,20 +829,6 @@ Read the full piece on JourneyBytes.`,
     // Fridays 5pm ET, Sept 18 - Dec 18. Nov 27 is skipped (Thanksgiving).
     // Ep. 11 is the Doug (developers.net) guest episode and runs 15 min longer.
     {
-      title: "Humanity + AI Quick Hacks Ep. 06 — Kickoff: What a 45-Minute Hack Looks Like",
-      description: "The first live episode of Quick Hacks, the follow-on to Claude Hacks. Where that series was Danielle recording alone, this one puts people in the room: we take one real problem, build one working thing, and do it inside forty-five minutes with the tape rolling. This opener sets the format and the recording workflow, so every session afterwards becomes a training asset the community can learn from.",
-      date: "2026-09-18",
-      time: "5:00 PM - 6:00 PM ET",
-      location: "Online — Join Virtually",
-      type: "Podcast",
-      imageUrl: "/uploads/quick-hacks-ep06.webp",
-      secondaryImageUrl: null,
-      link: "https://riverside.com/studio/danielle-franklins-studio-dy1Ck?t=ad2d1c7c94b95c266294",
-      recordingUrl: null,
-      speakerName: "Danielle Franklin",
-      speakerProfileUrl: null,
-    },
-    {
       title: "Humanity + AI Quick Hacks Ep. 07 — Prompting That Survives Contact With Reality",
       description: "The gap between a prompt that works once and instructions that work every time. We take a request someone on the team actually sends every week and turn it into something repeatable — with examples, constraints, and a way to tell when it has gone wrong. Bring a task you have explained to an AI more than twice.",
       date: "2026-09-25",
@@ -1011,6 +997,20 @@ Read the full piece on JourneyBytes.`,
       speakerProfileUrl: null,
     },
   ];
+
+  // Retired from the calendar: the Sep 18 Quick Hacks kickoff. Dropping it from
+  // the seed above stops it being re-created; this clears the row already in the
+  // database. Guarded so a failure here can never block startup.
+  try {
+    await db.execute(
+      sql`DELETE FROM event_signups WHERE event_id IN (SELECT id FROM events WHERE date = '2026-09-18' AND title LIKE 'Humanity + AI Quick Hacks Ep. 06%')`,
+    );
+    await db.execute(
+      sql`DELETE FROM events WHERE date = '2026-09-18' AND title LIKE 'Humanity + AI Quick Hacks Ep. 06%'`,
+    );
+  } catch (err) {
+    console.error("[seed] could not retire the Sep 18 Quick Hacks kickoff:", err);
+  }
 
   for (const seedEvent of eventSeed) {
     const [existing] = await db
