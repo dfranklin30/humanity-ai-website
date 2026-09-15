@@ -253,14 +253,14 @@ export default function Programs() {
               <Sparkles className="h-3.5 w-3.5" />
               Our Programs
             </div>
-            <h1 className="font-serif text-5xl lg:text-7xl font-bold tracking-tight leading-[1.05] mb-7 text-white" data-testid="text-programs-title">
+            <h1 className="font-serif text-5xl lg:text-7xl font-bold tracking-tight leading-[1.05] mb-7 text-[#14201B]" data-testid="text-programs-title">
               Where humanity<br />
               meets{" "}
               <span className="italic bg-gradient-to-r from-primary via-emerald-500 to-teal-400 bg-clip-text text-transparent">
                 intelligence
               </span>
             </h1>
-            <p className="text-xl text-white/75 leading-relaxed">
+            <p className="text-xl text-[#4B5F55] leading-relaxed">
               From groundbreaking research to community education, our initiatives tackle the most pressing questions at the intersection of people and AI — each one led, in the open, by the experts building it.
             </p>
           </motion.div>
@@ -317,12 +317,12 @@ export default function Programs() {
                           <program.icon className={`h-6 w-6 ${program.iconColor}`} />
                         </div>
                         <div>
-                          <h2 className="font-serif text-2xl lg:text-3xl font-bold leading-tight text-white" data-testid={`text-program-title-${i}`}>{program.title}</h2>
-                          <p className="text-sm text-white/70 mt-0.5">{program.subtitle}</p>
+                          <h2 className="font-serif text-2xl lg:text-3xl font-bold leading-tight text-[#14201B]" data-testid={`text-program-title-${i}`}>{program.title}</h2>
+                          <p className="text-sm text-[#4B5F55] mt-0.5">{program.subtitle}</p>
                         </div>
                       </div>
 
-                      <p className="text-white/85 leading-relaxed">{program.desc}</p>
+                      <p className="text-[#2C3E35] leading-relaxed">{program.desc}</p>
 
                       <div className="flex flex-wrap gap-2 mt-6">
                         {program.highlights.map((h, j) => (
@@ -337,7 +337,7 @@ export default function Programs() {
                       </div>
 
                       <div className="mt-7">
-                        <h4 className="text-xs font-semibold uppercase tracking-wider text-white/70 mb-3">Led By</h4>
+                        <h4 className="text-xs font-semibold uppercase tracking-wider text-[#4B5F55] mb-3">Led By</h4>
                         <PeopleRow people={program.people} cardIndex={i} />
                       </div>
 
@@ -380,8 +380,8 @@ export default function Programs() {
       {/* CTA */}
       <section className="relative overflow-hidden py-24 bg-primary text-primary-foreground">
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="absolute -top-24 -left-16 w-96 h-96 rounded-full bg-white/10 blur-3xl" />
-          <div className="absolute -bottom-32 -right-16 w-[28rem] h-[28rem] rounded-full bg-white/10 blur-3xl" />
+          <div className="absolute -top-24 -left-16 w-96 h-96 rounded-full bg-black/12 blur-3xl" />
+          <div className="absolute -bottom-32 -right-16 w-[28rem] h-[28rem] rounded-full bg-black/12 blur-3xl" />
         </div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <motion.div {...fadeIn}>
