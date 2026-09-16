@@ -8,6 +8,7 @@ import { registerRoutes } from "./routes/routes";
 import { serveStatic } from "./static";
 import healthRouter from "./routes/health";
 import { registerAiForKidsRoutes } from "./routes/aiforkids";
+import { registerAikRoutes } from "./aik/routes";
 import { WebhookHandlers } from "./webhookHandlers";
 import { handleStripeDonationEvent } from "./donationFulfillment";
 
@@ -83,6 +84,10 @@ setupAuth(app);
 // AI Builders Academy (/aiforkids) API. Registered before the SPA
 // catch-all in serveStatic so it is never shadowed.
 registerAiForKidsRoutes(app);
+
+// Kids AI Studio (/aiforkids/studio, /aiforkids/facilitator) API at /api/aik.
+// Mounted only when AIK_ENABLED=true; see src/aik/config.ts for all settings.
+registerAikRoutes(app);
 
 // Create http server and register all legacy routes
 export const httpServer: Server = createServer(app);

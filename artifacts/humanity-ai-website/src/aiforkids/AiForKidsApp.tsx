@@ -13,6 +13,8 @@ import Contact from "./pages/Contact";
 import Enroll from "./pages/Enroll";
 import EnrollReceived from "./pages/EnrollReceived";
 import Brochure from "./pages/Brochure";
+import StudioApp from "./studio/StudioApp";
+import FacilitatorApp from "./studio/FacilitatorApp";
 import { BASE } from "./content/program";
 import { Button, Section } from "./components/ui";
 
@@ -59,6 +61,13 @@ export default function AiForKidsApp() {
       <Route path={`${BASE}/brochure/parents`}>
         <Brochure variant="parents" />
       </Route>
+
+      {/* Kids AI Studio: the guarded, facilitator-supervised space where
+          children direct AI. Renders its own chrome (no marketing nav). */}
+      <Route path={`${BASE}/studio`} component={StudioApp} />
+      <Route path={`${BASE}/studio/*`} component={StudioApp} />
+      <Route path={`${BASE}/facilitator`} component={FacilitatorApp} />
+      <Route path={`${BASE}/facilitator/*`} component={FacilitatorApp} />
 
       <Route>
         <KidsLayout>

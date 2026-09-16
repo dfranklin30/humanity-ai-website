@@ -12,6 +12,11 @@ import { EventSignupDialog } from "@/components/event-signup-dialog";
 import { EditorialMasthead } from "@/components/editorial-masthead";
 import { EventCalendar } from "@/components/event-calendar";
 
+/** Absolute http(s) URL — i.e. somewhere off this site. */
+function isExternalUrl(url: string): boolean {
+  return /^https?:\/\//i.test(url);
+}
+
 const fadeIn = {
   initial: { opacity: 0, y: 20 },
   whileInView: { opacity: 1, y: 0 },
@@ -173,13 +178,27 @@ export default function Events() {
                   Recording coming soon.
                 </span>
               )}
+              {/* Board members link to their profile page here on the site; guests
+                  link out to their own page (LinkedIn, a company site). wouter's
+                  <Link> is a CLIENT-SIDE router link, so handing it an absolute
+                  URL makes it try to match an internal route and the button goes
+                  nowhere — external speakers need a plain anchor. */}
               {event.speakerProfileUrl && event.speakerName && (
-                <Link href={event.speakerProfileUrl}>
-                  <Button variant="outline" className="gap-1.5" data-testid={`button-event-speaker-${event.id}`}>
-                    <UserCircle className="h-4 w-4" />
-                    Meet the speaker: {event.speakerName}
-                  </Button>
-                </Link>
+                isExternalUrl(event.speakerProfileUrl) ? (
+                  <a href={event.speakerProfileUrl} target="_blank" rel="noopener noreferrer">
+                    <Button variant="outline" className="gap-1.5" data-testid={`button-event-speaker-${event.id}`}>
+                      <UserCircle className="h-4 w-4" />
+                      Meet the speaker: {event.speakerName}
+                    </Button>
+                  </a>
+                ) : (
+                  <Link href={event.speakerProfileUrl}>
+                    <Button variant="outline" className="gap-1.5" data-testid={`button-event-speaker-${event.id}`}>
+                      <UserCircle className="h-4 w-4" />
+                      Meet the speaker: {event.speakerName}
+                    </Button>
+                  </Link>
+                )
               )}
             </div>
           </div>
