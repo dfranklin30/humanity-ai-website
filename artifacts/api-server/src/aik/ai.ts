@@ -286,10 +286,54 @@ async function fetchWithTimeout(url: string, init: RequestInit, ms: number): Pro
  * Mock responses for local testing without any provider keys.
  * ------------------------------------------------------------------ */
 
+/**
+ * Test scaffolding: with AIK_MOCK_BROKEN_GAME=true the first generated game
+ * is deliberately broken, so the forge's verify-and-repair loop can be
+ * exercised without waiting for a real model to make a real mistake.
+ * Mocking is already refused in production, so this cannot leak there.
+ */
+let mockBrokenGamesServed = 0;
+const MOCK_BROKEN_GAME = `<!DOCTYPE html><html><head><title>Star Catcher</title></head><body>
+<!-- SUMMARY: Catch the stars and dodge the clouds. -->
+<canvas id="c" width="640" height="400"></canvas>
+<script>
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+let stars = null;
+document.addEventListener('keydown', function (e) { player.x += 10; });
+function loop() { ctx.fillRect(0, 0, 640, 400); stars.forEach(function (s) { s.y += 2; }); requestAnimationFrame(loop); }
+loop();
+<\/script></body></html>`;
+
 function mockText(opts: TextCallOptions): string {
   switch (opts.mockKind) {
     case "game":
+      if (process.env.AIK_MOCK_BROKEN_GAME === "true" && mockBrokenGamesServed === 0) {
+        mockBrokenGamesServed++;
+        return MOCK_BROKEN_GAME;
+      }
       return MOCK_GAME;
+    // The studio pipeline's own steps, so the mock exercises plan → build →
+    // verify → critique → polish rather than skipping straight past them.
+    case "plan":
+      return JSON.stringify({
+        title: "Star Catcher",
+        pitch: "Catch falling stars before they hit the ground, and dodge the grumpy clouds.",
+        mechanic: "Move left and right to catch; one life lost per cloud touched.",
+        controls: "Arrow keys, and pointer or touch to follow the finger.",
+        entities: [
+          { name: "Catcher", role: "the player", look: "a smiling basket with stubby legs" },
+          { name: "Star", role: "collectible", look: "a five-point star with a soft glow" },
+          { name: "Cloud", role: "hazard", look: "a grey puffy cloud with a frown" },
+        ],
+        win: "Reach 30 stars for a victory screen.",
+        lose: "Three clouds touched ends the run.",
+        difficulty: "Stars fall faster and clouds appear more often every 10 points.",
+        art: "Night sky gradient, warm yellow stars, cool grey clouds, big readable HUD.",
+        juice: ["Star pops and fades when caught", "Screen shake on a cloud hit", "Score number scales up briefly"],
+      });
+    case "critique":
+      return JSON.stringify(["Add a brief invulnerability flash after a hit so a single cloud cannot cost two lives."]);
     case "story":
       return JSON.stringify({
         title: "The Very Brave Pancake",

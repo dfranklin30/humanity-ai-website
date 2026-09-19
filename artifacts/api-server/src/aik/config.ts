@@ -176,6 +176,12 @@ export const aikConfig = {
   staffChatChars: 4_000,
   /** Hard cap on generated game size (characters). */
   maxGameChars: 60_000,
+  /* --- Studio pipeline (Hub only) ---------------------------------- *
+   * A child's game is small on purpose: easy to read, quick to change.
+   * An adult building a demo needs room, so the studio path gets its own
+   * budget, still well inside maxGameChars.                            */
+  studioGameChars: 28_000,
+  studioMaxTokens: 16_000,
   /** Requests per minute per child session. */
   childRequestsPerMinute: 8,
   /** Requests per minute per IP on the sign-in endpoints. */

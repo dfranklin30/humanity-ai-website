@@ -38,7 +38,18 @@ export type StudioConfig = {
 
 export type Flag = { layer: string; category: string; detail?: string; severity?: number };
 
+export type ForgeStep = {
+  key: string;
+  label: string;
+  state: "running" | "done" | "skipped" | "failed";
+  detail?: string;
+  ms?: number;
+};
+
 export type StudioRequest = {
+  quality?: "fast" | "studio";
+  /** Live pipeline steps while a studio build runs. */
+  progress?: ForgeStep[];
   id: number;
   classId: number;
   childId: number | null;
@@ -244,7 +255,7 @@ export const hubPatchProject = (id: number, patch: Partial<{ name: string; summa
 export const hubDeleteProject = (id: number) => call<{ ok: true }>("DELETE", `/hub/projects/${id}`);
 export const hubFileArtifact = (artifactId: number, projectId: number | null) =>
   call<{ ok: true }>("PATCH", `/hub/artifacts/${artifactId}/project`, { projectId });
-export const hubSubmit = (body: { mode: ModeId; kind: "create" | "change" | "chat"; projectArtifactId?: number; projectId?: number | null; input: Record<string, string> }) =>
+export const hubSubmit = (body: { mode: ModeId; kind: "create" | "change" | "chat"; projectArtifactId?: number; projectId?: number | null; quality?: "fast" | "studio"; input: Record<string, string> }) =>
   call<{ request: StudioRequest; projectId: number | null }>("POST", "/hub/requests", body);
 export const hubRequest = (id: number) => call<{ request: StudioRequest }>("GET", `/hub/requests/${id}`);
 export const hubSpeak = (artifactId: number) => call<{ audio: string; mime: string }>("POST", `/hub/artifacts/${artifactId}/speak`);

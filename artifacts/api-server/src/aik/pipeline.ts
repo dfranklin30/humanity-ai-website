@@ -13,6 +13,7 @@ import * as store from "./store";
 import type { RequestRow, ArtifactRow, ClassRow } from "./store";
 import { getMode, validateInput, systemPrompt, chatSystemPrompt, userPrompt, isRedirect, extractHtml, extractJson, gameSummary, gameTitle, type ModeDef } from "./modes";
 import { completeText, generateImage, generateVideo, ContentFilteredError, type ChatTurn } from "./ai";
+import { forgeGame } from "./forge";
 import { screenInput, screenOutputText, scanGameCode, hardenGameHtml, stripLinks, contentSafetyImage, KID_MESSAGES, type Flag } from "./safety";
 import { isContentSafetyConfigured, isImageConfigured, isVideoConfigured } from "./config";
 
@@ -53,6 +54,9 @@ export type PublicRequest = {
   message: string | null;
   flags: Flag[];
   resultArtifactId: number | null;
+  quality: string;
+  /** Step-by-step state of a studio build, empty on the fast path. */
+  progress: any[];
   createdAt: string;
   completedAt: string | null;
 };
@@ -68,6 +72,8 @@ export function toPublicRequest(r: RequestRow): PublicRequest {
     status: r.status,
     message: r.message,
     flags: Array.isArray(r.flags) ? r.flags : [],
+    quality: r.quality ?? "fast",
+    progress: Array.isArray(r.progress) ? r.progress : [],
     resultArtifactId: r.result_artifact_id,
     createdAt: r.created_at,
     completedAt: r.completed_at,
@@ -173,6 +179,43 @@ export async function runRequest(requestId: number): Promise<void> {
     // 4. Model call (one retry with a tightened instruction on bad shape)
     const sys = systemPrompt(mode, { soundEnabled: klass.sound_enabled });
     const usr = userPrompt(mode, input, current ? projectStateForModel(current) : null);
+
+    /* ---- Studio path: plan, build, run it, repair, critique, polish ----
+     * Only for a "create" in the Hub. Children stay on the fast path, and a
+     * change request stays fast so iteration remains quick for everyone.  */
+    if (req.quality === "studio" && mode.id === "game" && input.kind === "create") {
+      // Progress writes are serialized: they fire faster than Postgres
+      // round-trips, and unordered writes would leave the last-written row
+      // showing an early step forever.
+      let writeChain: Promise<unknown> = Promise.resolve();
+      const forged = await forgeGame({
+        brief: input.text,
+        soundEnabled: klass.sound_enabled,
+        charBudget: aikConfig.studioGameChars,
+        maxTokens: aikConfig.studioMaxTokens,
+        onProgress: (steps) => {
+          writeChain = writeChain.then(() => store.setProgress(req.id, steps)).catch(() => {});
+          publish(req.class_id, { type: "request", request: toPublicRequest({ ...req, status: "working", progress: steps }) });
+        },
+      });
+      await writeChain.catch(() => {});
+      // The authoritative final state, whatever the streaming writes did.
+      await store.setProgress(req.id, forged.steps).catch(() => {});
+      const built = await buildArtifact(mode.id, forged.html, input, current, klass, flags);
+      if (!built.ok) {
+        await finish(req, { status: built.blocked ? "blocked" : "failed", message: built.message, flags: [...flags, ...built.flags] });
+        return;
+      }
+      // Keep the planned title and pitch: they are better than anything
+      // scraped back out of the markup.
+      await complete(
+        req,
+        { ...built.artifact, title: forged.title || built.artifact.title, summary: forged.summary || built.artifact.summary },
+        flags,
+      );
+      return;
+    }
+
     let raw: string;
     try {
       raw = await completeText({ system: sys, user: usr, maxTokens: mode.maxTokens, temperature: mode.temperature, tier: mode.tier, mockKind: mode.id });

@@ -469,6 +469,43 @@ export function ChangeBox({ hint, maxChars, onSubmit, busy }: { hint: string; ma
  * Request status line
  * ------------------------------------------------------------------ */
 
+/**
+ * The studio pipeline, while it runs.
+ *
+ * A build takes 30-90 seconds, and a spinner for that long reads as broken.
+ * Showing the actual steps — designing, writing, testing, fixing — makes the
+ * wait legible, and makes it obvious that the thing was tested rather than
+ * merely generated.
+ */
+export function ForgeSteps({ steps }: { steps: NonNullable<StudioRequest["progress"]> }) {
+  if (!steps?.length) return null;
+  const icon = (state: string) =>
+    state === "done" ? "\u2713" : state === "failed" ? "\u2717" : state === "skipped" ? "\u2013" : "\u25CF";
+  return (
+    <ol className="space-y-2">
+      {steps.map((s, i) => (
+        <li key={`${s.key}-${i}`} className="flex items-start gap-3 text-sm">
+          <span
+            className={cx(
+              "mt-0.5 font-bold",
+              s.state === "done" ? "text-emerald-600" : s.state === "failed" ? "text-rose-600" : s.state === "skipped" ? "text-slate-400" : "animate-pulse text-violet-600",
+            )}
+          >
+            {icon(s.state)}
+          </span>
+          <span className="flex-1">
+            <span className={cx("font-semibold", s.state === "running" ? "text-violet-800" : "text-slate-800")}>{s.label}</span>
+            {s.detail && <span className="text-slate-500"> — {s.detail}</span>}
+          </span>
+          {typeof s.ms === "number" && s.state !== "running" && (
+            <span className="shrink-0 text-xs text-slate-400">{(s.ms / 1000).toFixed(1)}s</span>
+          )}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 export function RequestStatus({ request }: { request: StudioRequest }) {
   if (request.status === "queued" || request.status === "working") return <Spinner label={request.status === "queued" ? "In line…" : "The helper is working on it…"} />;
   if (request.status === "blocked") return <Notice>{request.message ?? "Let's try that a different way."}</Notice>;

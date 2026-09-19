@@ -54,7 +54,7 @@ import {
   type StudioConfig,
   type StudioRequest,
 } from "./api";
-import { ArtifactView, BigButton, Card, ChangeBox, ModeForm, Notice, RequestStatus, Spinner, kindEmoji } from "./components";
+import { ArtifactView, BigButton, Card, ChangeBox, ForgeSteps, ModeForm, Notice, RequestStatus, Spinner, kindEmoji } from "./components";
 import { BASE } from "../content/program";
 import { WEEK_MODULES, SESSION_RHYTHM, type WeekModule } from "../content/weeks";
 
@@ -558,7 +558,7 @@ function ToolRunner({ state, mode, onBack }: { state: HubState; mode: ModeDef; o
           input,
         });
         setRequest(started);
-        const done = await waitForRequest(started.id, hubRequest, setRequest, 240_000);
+        const done = await waitForRequest(started.id, hubRequest, setRequest, 300_000);
         setRequest(done);
         if (done.status === "done" && done.resultArtifactId) {
           const { artifact: a } = await getArtifact(done.resultArtifactId);
@@ -680,6 +680,17 @@ function ToolRunner({ state, mode, onBack }: { state: HubState; mode: ModeDef; o
 
         <div className="space-y-4">
           {request && <RequestStatus request={request} />}
+          {request?.progress && request.progress.length > 0 && (
+            <Card>
+              <h2 className="mb-1 text-lg font-extrabold">
+                {request.status === "done" ? "How it was built" : "Building it"}
+              </h2>
+              <p className="mb-3 text-xs text-slate-500">
+                Designed, written, then actually run and repaired before you see it.
+              </p>
+              <ForgeSteps steps={request.progress} />
+            </Card>
+          )}
           {!request && !artifact && (
             <Card tone="tint">
               <p className="text-sm text-slate-700">Results appear here. Everything you make is private to your workspace until you file it under a project or hand it to a class.</p>

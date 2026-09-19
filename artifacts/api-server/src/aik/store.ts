@@ -111,6 +111,12 @@ export type ChildRow = {
 
 export type RequestStatus = "queued" | "working" | "done" | "blocked" | "failed";
 
+/**
+ * "fast" is one model call — right for a child with two tickets and a
+ * twenty-five minute Make block. "studio" runs the full pipeline in forge.ts.
+ */
+export type Quality = "fast" | "studio";
+
 export type RequestRow = {
   id: number;
   class_id: number;
@@ -123,6 +129,9 @@ export type RequestRow = {
   message: string | null; // kid-facing message (blocked / failed reason)
   flags: any; // array of {layer, category, detail}
   result_artifact_id: number | null;
+  quality: Quality;
+  /** Live step-by-step state while the studio pipeline runs. */
+  progress: any[];
   created_at: string;
   completed_at: string | null;
 };
@@ -272,6 +281,12 @@ export function ensureTables(): Promise<void> {
         )`);
       await db.execute(sql`
         CREATE INDEX IF NOT EXISTS aik_tokens_hash_idx ON aik_tokens (token_hash)`);
+
+      /* ---- Studio pipeline: quality profile and live step progress ----- */
+      await db.execute(sql`
+        ALTER TABLE aik_requests ADD COLUMN IF NOT EXISTS quality text NOT NULL DEFAULT 'fast'`);
+      await db.execute(sql`
+        ALTER TABLE aik_requests ADD COLUMN IF NOT EXISTS progress jsonb NOT NULL DEFAULT '[]'::jsonb`);
 
       /* ---- Hub: staff workspaces and projects -------------------------- *
        * A workspace is a class row with kind = 'workspace': one per
@@ -597,15 +612,23 @@ export async function createRequest(input: {
   kind: "create" | "change" | "chat";
   projectArtifactId: number | null;
   input: any;
+  quality?: Quality;
 }): Promise<RequestRow> {
   await ensureTables();
   const r = one<RequestRow>(
     await db.execute(sql`
-      INSERT INTO aik_requests (class_id, child_id, mode, kind, project_artifact_id, input)
-      VALUES (${input.classId}, ${input.childId}, ${input.mode}, ${input.kind}, ${input.projectArtifactId}, ${JSON.stringify(input.input)}::jsonb)
+      INSERT INTO aik_requests (class_id, child_id, mode, kind, project_artifact_id, input, quality)
+      VALUES (${input.classId}, ${input.childId}, ${input.mode}, ${input.kind}, ${input.projectArtifactId},
+              ${JSON.stringify(input.input)}::jsonb, ${input.quality ?? "fast"})
       RETURNING *`),
   );
   return r!;
+}
+
+/** Live progress while a studio build runs. Cheap, frequent, and lossy by design. */
+export async function setProgress(id: number, steps: any[]): Promise<void> {
+  await ensureTables();
+  await db.execute(sql`UPDATE aik_requests SET progress = ${JSON.stringify(steps)}::jsonb WHERE id = ${id}`);
 }
 
 export async function getRequest(id: number): Promise<RequestRow | null> {

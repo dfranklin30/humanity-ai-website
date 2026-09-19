@@ -1130,6 +1130,7 @@ export function registerAikRoutes(app: Express): void {
           kind: z.enum(["create", "change", "chat"]),
           projectArtifactId: z.number().int().optional(),
           projectId: z.number().int().nullable().optional(),
+          quality: z.enum(["fast", "studio"]).optional(),
           input: z.record(z.any()),
         })
         .safeParse(req.body);
@@ -1156,6 +1157,9 @@ export function registerAikRoutes(app: Express): void {
         kind: body.data.kind,
         projectArtifactId: body.data.projectArtifactId ?? null,
         input,
+        // The Hub defaults to the full pipeline; a change request stays fast
+        // so iterating on something you already have remains quick.
+        quality: body.data.quality ?? (body.data.kind === "create" ? "studio" : "fast"),
       });
       await store.audit(workspace.id, "facilitator", f.id, "hub_request", { requestId: request.id, mode: body.data.mode, kind: body.data.kind });
       void runRequest(request.id);
