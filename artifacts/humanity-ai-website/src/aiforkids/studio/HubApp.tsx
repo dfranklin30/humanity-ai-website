@@ -457,6 +457,7 @@ function Welcome({ state }: { state: HubState }) {
  * ------------------------------------------------------------------ */
 
 const TOOL_ICON: Record<ModeId, string> = {
+  music: "🎵",
   game: "🎮",
   story: "📚",
   prompt: "🎨",
@@ -477,6 +478,7 @@ const STAFF_BLURB: Record<ModeId, string> = {
   quest: "A fact list, quiz or outline on a topic, with every claim flagged for checking. Good for Explorer supports and anything you will verify before it reaches a child.",
   video: "A three-shot storyboard, and a short clip when a video model is switched on. Good for promo pieces and Week 3 examples.",
   robot: "A parts list, build steps, micro:bit starter code and a safety note. Good for Robotics Lab planning and the Inventor Quest path.",
+  music: "Lyrics a child can sing on first hearing, plus a sound description for a music model. Held for you to listen to before a class hears it. Good for the Week 3 club anthem.",
   homework: "Socratic tutoring: it asks questions and works step by step rather than handing over an answer. Good for testing what children will actually get back.",
 };
 
@@ -491,6 +493,7 @@ function toolNote(state: HubState, id: ModeId): string | null {
   const c = state.capabilities;
   if (id === "prompt" && !c.image.ready) return "Writes and assembles the prompt. Turn on an image model to see the picture.";
   if (id === "video" && !c.video.ready) return "Writes the storyboard. Turn on a video model to render the clip.";
+  if (id === "music" && !c.music.ready) return "Writes the lyrics. Turn on a music model to hear it performed.";
   return null;
 }
 

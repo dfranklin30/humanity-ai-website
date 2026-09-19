@@ -4,7 +4,7 @@
  */
 
 export type FieldDef = { key: string; label: string; hint: string; required?: boolean; choices?: string[]; maxChars?: number };
-export type ModeId = "game" | "story" | "prompt" | "quest" | "video" | "robot" | "homework";
+export type ModeId = "game" | "story" | "prompt" | "music" | "quest" | "video" | "robot" | "homework";
 export type ModeDef = {
   id: ModeId;
   name: string;

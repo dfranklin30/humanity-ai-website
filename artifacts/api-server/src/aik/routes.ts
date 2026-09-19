@@ -548,7 +548,7 @@ export function registerAikRoutes(app: Express): void {
       const body = z
         .object({
           name: z.string().min(1).max(80).optional(),
-          modes: z.array(z.enum(["game", "story", "prompt", "quest", "video", "robot", "homework"])).optional(),
+          modes: z.array(z.enum(["game", "story", "prompt", "music", "quest", "video", "robot", "homework"])).optional(),
           ticketLimit: z.number().int().min(0).max(20).optional(),
           chatTurnLimit: z.number().int().min(0).max(60).optional(),
           paused: z.boolean().optional(),
@@ -777,7 +777,7 @@ export function registerAikRoutes(app: Express): void {
     wrap(async (req, res) => {
       const klass = await ownedClass(req, res);
       if (!klass) return;
-      const body = z.object({ mode: z.enum(["game", "story", "prompt", "quest", "video", "robot", "homework"]), kind: z.enum(["create", "change", "chat"]), projectArtifactId: z.number().int().optional(), input: z.record(z.any()) }).safeParse(req.body);
+      const body = z.object({ mode: z.enum(["game", "story", "prompt", "music", "quest", "video", "robot", "homework"]), kind: z.enum(["create", "change", "chat"]), projectArtifactId: z.number().int().optional(), input: z.record(z.any()) }).safeParse(req.body);
       if (!body.success) return void res.status(400).json({ error: "Invalid order." });
       const request = await store.createRequest({ classId: klass.id, childId: null, mode: body.data.mode, kind: body.data.kind, projectArtifactId: body.data.projectArtifactId ?? null, input: body.data.input });
       publish(klass.id, { type: "request", request: toPublicRequest(request) });
@@ -876,7 +876,7 @@ export function registerAikRoutes(app: Express): void {
     wrap(async (req, res) => {
       const { child, klass } = req as CReq;
       if (!allow(`creq:${child.id}`, aikConfig.childRequestsPerMinute)) return void res.status(429).json({ error: "Whoa, fast fingers! Wait a moment and try again." });
-      const body = z.object({ mode: z.enum(["game", "story", "prompt", "quest", "video", "robot", "homework"]), kind: z.enum(["create", "change", "chat"]), projectArtifactId: z.number().int().optional(), input: z.record(z.any()) }).safeParse(req.body);
+      const body = z.object({ mode: z.enum(["game", "story", "prompt", "music", "quest", "video", "robot", "homework"]), kind: z.enum(["create", "change", "chat"]), projectArtifactId: z.number().int().optional(), input: z.record(z.any()) }).safeParse(req.body);
       if (!body.success) return void res.status(400).json({ error: "That order didn't look right." });
 
       if (klass.paused) return void res.status(423).json({ error: KID_MESSAGES.paused });
@@ -1126,7 +1126,7 @@ export function registerAikRoutes(app: Express): void {
       if (!allow(`hreq:${f.id}`, 30)) return void res.status(429).json({ error: "Slow down a moment and try again." });
       const body = z
         .object({
-          mode: z.enum(["game", "story", "prompt", "quest", "video", "robot", "homework"]),
+          mode: z.enum(["game", "story", "prompt", "music", "quest", "video", "robot", "homework"]),
           kind: z.enum(["create", "change", "chat"]),
           projectArtifactId: z.number().int().optional(),
           projectId: z.number().int().nullable().optional(),

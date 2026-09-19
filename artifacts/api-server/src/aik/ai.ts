@@ -341,6 +341,13 @@ function mockText(opts: TextCallOptions): string {
         });
       }
       return realRobotMock();
+    case "music":
+      return JSON.stringify({
+        title: "Make It With AI",
+        lyrics: "We bring our big ideas and we type them really clear,\nThe robot helps us build it and the whole room gives a cheer.\n\nMake it with AI! Make it with AI!\nWe are the directors and we're reaching for the sky!",
+        musicPrompt: "Upbeat pop for kids, bright piano and claps, 120 bpm, big sing-along chorus, clear kid-friendly vocals",
+        tip: "Your chant line is short and easy to shout \u2014 that's exactly what makes a chorus stick.",
+      });
     case "plan":
       return JSON.stringify({
         title: "Star Catcher",

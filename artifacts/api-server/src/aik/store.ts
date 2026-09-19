@@ -19,8 +19,8 @@ import { db } from "../db";
  * Types
  * ------------------------------------------------------------------ */
 
-export type ModeId = "game" | "story" | "prompt" | "quest" | "video" | "robot" | "homework";
-export const ALL_MODES: ModeId[] = ["game", "story", "prompt", "quest", "video", "robot", "homework"];
+export type ModeId = "game" | "story" | "prompt" | "music" | "quest" | "video" | "robot" | "homework";
+export const ALL_MODES: ModeId[] = ["game", "story", "prompt", "music", "quest", "video", "robot", "homework"];
 
 /**
  * Accounts.

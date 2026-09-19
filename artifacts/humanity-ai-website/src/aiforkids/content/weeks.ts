@@ -193,12 +193,12 @@ export const WEEK_MODULES: WeekModule[] = [
     kidsWill: [
       "Play Prompt Detective and discover why specific words matter",
       "Write prompts for club poster art and compare results",
-      "Co-write a club anthem and compose their own eight-bar loop",
+      "Co-write the club anthem in Music Maker and compose their own eight-bar loop",
     ],
-    studioModes: ["prompt"],
+    studioModes: ["prompt", "music"],
     ticketLimit: 2,
     tools:
-      "Kids AI Studio in Prompt Craft mode, image approval gate on. Facilitator: music generation on an adult account, speakers. Kids: a browser music sandbox with no login, Prompt Cards, Lyric Template.",
+      "Kids AI Studio in Prompt Craft and Music Maker modes, approval gate on for both. Speakers. Kids: a browser music sandbox with no login, Prompt Cards, Lyric Template.",
     prep: [
       "Generate three mystery images the night before with prompts of different specificity — vague, medium, very detailed — for Prompt Detective.",
       "Unlock Prompt Craft with the approval gate on.",

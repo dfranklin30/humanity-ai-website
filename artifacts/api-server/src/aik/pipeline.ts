@@ -8,11 +8,11 @@
  */
 import { EventEmitter } from "events";
 import { logger } from "../lib/logger";
-import { aikConfig } from "./config";
+import { aikConfig, isMusicConfigured } from "./config";
 import * as store from "./store";
 import type { RequestRow, ArtifactRow, ClassRow } from "./store";
 import { getMode, validateInput, systemPrompt, chatSystemPrompt, userPrompt, isRedirect, extractHtml, extractJson, gameSummary, gameTitle, type ModeDef } from "./modes";
-import { completeText, generateImage, generateVideo, ContentFilteredError, type ChatTurn } from "./ai";
+import { completeText, generateImage, generateVideo, generateMusic, ContentFilteredError, type ChatTurn } from "./ai";
 import { forgeGame, refineJson } from "./forge";
 import { verifyMicrobitCode } from "./verify";
 import { screenInput, screenOutputText, scanGameCode, hardenGameHtml, stripLinks, contentSafetyImage, KID_MESSAGES, type Flag } from "./safety";
@@ -500,6 +500,52 @@ async function buildArtifact(
       safetyNote: stripLinks(String(j.safetyNote ?? "Batteries only. Ask a grown-up before using tools.").slice(0, 240)),
     });
     return { ok: true, artifact: { kind: "robot", title, content, mime: "application/json", summary: stripLinks(String(j.job ?? "").slice(0, 120)), approved: true } };
+  }
+
+  /* ---- Music Maker -------------------------------------------------
+   * The child writes the words; the model turns them into a singable song
+   * and a description a music model can perform. Both the lyrics and the
+   * sound description are screened before anything is generated, and the
+   * finished audio always waits for a facilitator to listen first.      */
+  if (modeId === "music") {
+    const j = extractJson<{ title?: string; lyrics?: string; musicPrompt?: string; tip?: string }>(raw);
+    if (!j || !j.lyrics || !j.musicPrompt) {
+      return { ok: false, retryable: true, blocked: false, message: KID_MESSAGES.failed, flags: [{ layer: "system", category: "bad_json" }] };
+    }
+    const title = stripLinks(String(j.title ?? fallbackTitle).slice(0, 60));
+    const lyrics = stripLinks(String(j.lyrics).slice(0, 1200));
+    const musicPrompt = stripLinks(String(j.musicPrompt).slice(0, 300));
+    const tip = stripLinks(String(j.tip ?? "").slice(0, 160));
+
+    const out = await screenOutputText([title, lyrics, musicPrompt].join("\n"));
+    if (!out.ok) return { ok: false, retryable: false, blocked: true, message: out.kidMessage, flags: out.flags };
+
+    // The words are the artifact; the audio is an extra when a model exists.
+    const sheet = JSON.stringify({ title, lyrics, musicPrompt });
+    if (!isMusicConfigured()) {
+      return {
+        ok: true,
+        artifact: { kind: "audio", title, content: "", mime: "text/plain", summary: sheet, approved: true,
+          kidNote: tip || "Here are your words! Your facilitator can sing or play them while music is switched off." },
+      };
+    }
+    try {
+      const media = await generateMusic(musicPrompt, 45);
+      return {
+        ok: true,
+        artifact: { kind: "audio", title, content: media.base64, mime: media.mime, summary: sheet, approved: false,
+          kidNote: tip || "Your song is ready. Your facilitator will listen, then play it for everyone." },
+      };
+    } catch (err) {
+      if (err instanceof ContentFilteredError) return { ok: false, retryable: false, blocked: true, message: KID_MESSAGES.unsafe, flags: [{ layer: "content_safety", category: "provider_filter" }] };
+      logger.error({ err }, "[aik] music generation failed");
+      // The lyrics survive even when the audio does not.
+      return {
+        ok: true,
+        artifact: { kind: "audio", title, content: "", mime: "text/plain", summary: sheet, approved: true,
+          kidNote: "Here are your words! The music didn't come out this time \u2014 try once more later." },
+      };
+    }
   }
 
   if (modeId === "video") {

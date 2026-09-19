@@ -124,6 +124,27 @@ export const MODES: Record<ModeId, ModeDef> = {
     maxTokens: 1200,
     temperature: 0.5,
   },
+  music: {
+    id: "music",
+    name: "Music Maker",
+    emoji: "🎵",
+    tagline: "Write the words. Pick the sound. Hear your song.",
+    blurb: "Write your own lyrics, choose a style, and the AI turns it into a real song. Your facilitator listens before the class does.",
+    artifactKind: "audio",
+    interaction: "form",
+    tier: "default",
+    needsApproval: true,
+    createFields: [
+      { key: "about", label: "What's the song about", hint: "our club, a cat who loves pizza, the last day of school", required: true },
+      { key: "feeling", label: "How should it feel", hint: "pick one", required: true, choices: ["happy and bouncy", "proud and big", "silly and funny", "calm and dreamy", "brave and adventurous"] },
+      { key: "style", label: "Style", hint: "pick one", required: true, choices: ["pop", "rock", "hip-hop beat", "country", "movie soundtrack", "marching band"] },
+      { key: "chant", label: "A line everyone sings", hint: "Make it with AI!", required: false },
+      { key: "extra", label: "Anything else", hint: "add a drum solo, start quiet then get loud", required: false },
+    ],
+    changeHint: "Change one thing: make it faster, add a chant, more drums…",
+    maxTokens: 900,
+    temperature: 0.8,
+  },
   quest: {
     id: "quest",
     name: "Quest Helper",
@@ -313,6 +334,16 @@ OUTPUT FORMAT: reply with ONLY a JSON object, no markdown fences:
 The child gives: who or what, where, mood or colors, art style. Assemble ONE clear picture description of at most 45 words that an image model can draw. Always add "no text, no real people, kid-friendly" at the end. Do not add violent, scary, or romantic elements even if implied.
 OUTPUT FORMAT: reply with ONLY a JSON object, no markdown fences: {"prompt": string, "tip": string}
 - tip: one encouraging sentence (max 18 words) noticing a detail the child used well or suggesting one to add next time.`;
+    case "music":
+      return `You write short, singable songs for children aged 8-11, and a description an AI music model can turn into audio.${COMMON_RULES}
+The child gives: what the song is about, how it should feel, a style, optionally a line everyone sings and an extra idea.
+- Lyrics: a verse and a chorus, at most 12 short lines in total. Simple words a child can sing on first hearing. Rhyme where it helps, never force it.
+- If the child gave a line everyone sings, that line IS the chorus hook and must appear at least twice, word for word.
+- Wholesome and true to what the child asked for. No romance, no sadness about real loss, no brands, no real people, no slang that could be misheard.
+OUTPUT FORMAT: reply with ONLY a JSON object, no markdown fences: {"title": string, "lyrics": string, "musicPrompt": string, "tip": string}
+- lyrics: the words, with a blank line between verse and chorus. Label neither; just the words.
+- musicPrompt: at most 40 words describing the sound for a music model - style, tempo, instruments, mood, and "clear kid-friendly vocals". Never name a real artist or band.
+- tip: one encouraging sentence (max 18 words) about something the child chose well.`;
     case "quest":
       return `You help children start a project about a topic they love. You produce a FIRST DRAFT that the child must check; you are honest that facts need checking.${COMMON_RULES}
 OUTPUT FORMAT: reply with ONLY a JSON object, no markdown fences:

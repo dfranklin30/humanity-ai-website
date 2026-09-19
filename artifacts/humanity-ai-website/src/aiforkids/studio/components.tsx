@@ -218,6 +218,37 @@ export function ArtifactView({ artifact, compact }: { artifact: Artifact; compac
     );
   }
 
+  if (artifact.kind === "audio") {
+    let song: { title?: string; lyrics?: string; musicPrompt?: string } = {};
+    try {
+      song = JSON.parse(artifact.summary ?? "{}");
+    } catch {
+      /* fall through to whatever we have */
+    }
+    const hasAudio = Boolean(artifact.content) && artifact.mime.startsWith("audio/");
+    return (
+      <div className="space-y-4">
+        {hasAudio ? (
+          <audio controls preload="none" className="w-full" src={`data:${artifact.mime};base64,${artifact.content}`}>
+            Your browser can't play this song.
+          </audio>
+        ) : (
+          <Notice tone="info">The words are yours. Music isn't switched on for this class yet — sing it or clap it!</Notice>
+        )}
+        <div className="rounded-2xl bg-violet-50 p-4 ring-1 ring-violet-100">
+          <p className="text-xs font-bold uppercase tracking-wide text-violet-700">The words</p>
+          <p className="mt-2 whitespace-pre-line text-lg leading-relaxed text-slate-800">{song.lyrics ?? "—"}</p>
+        </div>
+        {song.musicPrompt && (
+          <details className="rounded-xl bg-slate-50 p-3 text-sm ring-1 ring-slate-200">
+            <summary className="cursor-pointer font-semibold text-slate-700">How we asked for the sound</summary>
+            <p className="mt-2 text-slate-600">{song.musicPrompt}</p>
+          </details>
+        )}
+      </div>
+    );
+  }
+
   if (artifact.kind === "chat") {
     let t: { turns?: { role: string; text: string }[] } = {};
     try {
@@ -267,7 +298,7 @@ export function ArtifactLoader({ id, compact }: { id: number; compact?: boolean 
 }
 
 export function kindEmoji(kind: ArtifactMeta["kind"]): string {
-  return { game: "🎮", story: "📚", image: "🎨", quest: "🧭", video: "🎬", robot: "🤖", chat: "💬", audio: "🔊" }[kind] ?? "✨";
+  return { game: "🎮", story: "📚", image: "🎨", quest: "🧭", video: "🎬", robot: "🤖", chat: "💬", audio: "🎵" }[kind] ?? "✨";
 }
 
 /* ------------------------------------------------------------------ *

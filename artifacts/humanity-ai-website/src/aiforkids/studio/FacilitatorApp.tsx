@@ -267,6 +267,7 @@ const MODE_LABELS: Record<ModeId, string> = {
   game: "🎮 Game Maker",
   story: "📚 Story Maker",
   prompt: "🎨 Prompt Craft",
+  music: "🎵 Music Maker",
   quest: "🧭 Quest Helper",
   video: "🎬 Video Maker",
   robot: "🤖 Robotics Lab",
