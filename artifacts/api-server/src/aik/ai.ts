@@ -293,6 +293,7 @@ async function fetchWithTimeout(url: string, init: RequestInit, ms: number): Pro
  * Mocking is already refused in production, so this cannot leak there.
  */
 let mockBrokenGamesServed = 0;
+let mockBrokenRobotsServed = 0;
 const MOCK_BROKEN_GAME = `<!DOCTYPE html><html><head><title>Star Catcher</title></head><body>
 <!-- SUMMARY: Catch the stars and dodge the clouds. -->
 <canvas id="c" width="640" height="400"></canvas>
@@ -305,6 +306,17 @@ function loop() { ctx.fillRect(0, 0, 640, 400); stars.forEach(function (s) { s.y
 loop();
 <\/script></body></html>`;
 
+function realRobotMock(): string {
+      return JSON.stringify({
+        name: "Snack Scout",
+        job: "Finds a dropped snack and beeps when it gets close.",
+        parts: ["micro:bit", "battery pack", "2 wheels + motors", "cardboard body", "ultrasonic distance sensor"],
+        steps: ["Build a cardboard box body and tape the micro:bit on top.", "Attach the wheels and motors to the bottom.", "Point the distance sensor forward.", "Load the code and press A to start."],
+        code: "// First: in MakeCode click Extensions and add \\\"sonar\\\".\ninput.onButtonPressed(Button.A, function () {\n  basic.showIcon(IconNames.Happy)\n  basic.forever(function () {\n    if (sonar.ping(DigitalPin.P1, DigitalPin.P2, PingUnit.Centimeters) < 10) {\n      music.playTone(Note.C5, music.beat(BeatFraction.Half))\n    }\n  })\n})",
+        safetyNote: "Batteries only. No plugging into the wall. Ask a grown-up before using scissors.",
+      });
+}
+
 function mockText(opts: TextCallOptions): string {
   switch (opts.mockKind) {
     case "game":
@@ -315,6 +327,20 @@ function mockText(opts: TextCallOptions): string {
       return MOCK_GAME;
     // The studio pipeline's own steps, so the mock exercises plan → build →
     // verify → critique → polish rather than skipping straight past them.
+    case "robot":
+      if (process.env.AIK_MOCK_BROKEN_ROBOT === "true" && mockBrokenRobotsServed === 0) {
+        mockBrokenRobotsServed++;
+        return JSON.stringify({
+          name: "Snack Scout",
+          job: "Drives forward and stops when it sees something close.",
+          parts: ["micro:bit", "battery pack", "2 motors", "wheels", "ultrasonic sensor", "cardboard", "tape"],
+          steps: ["Tape the battery pack underneath.", "Attach the two motors and wheels.", "Mount the sensor facing forward.", "Clip the micro:bit on top."],
+          // Deliberately wrong: `robot` is not a micro:bit API, and radio is banned.
+          code: "radio.setGroup(1)\nbasic.forever(function () {\n    robot.driveForward(60)\n    basic.pause(200)\n})",
+          safetyNote: "Batteries only. Ask a grown-up before cutting cardboard.",
+        });
+      }
+      return realRobotMock();
     case "plan":
       return JSON.stringify({
         title: "Star Catcher",
@@ -366,15 +392,6 @@ function mockText(opts: TextCallOptions): string {
           { shot: 3, description: "The robot does a happy wiggle as Earth rises behind it.", seconds: 1 },
         ],
         videoPrompt: "A friendly round robot waters glowing flowers on the moon, starry sky, Earth rising, cartoon style, bright colors, no text",
-      });
-    case "robot":
-      return JSON.stringify({
-        name: "Snack Scout",
-        job: "Finds a dropped snack and beeps when it gets close.",
-        parts: ["micro:bit", "battery pack", "2 wheels + motors", "cardboard body", "ultrasonic distance sensor"],
-        steps: ["Build a cardboard box body and tape the micro:bit on top.", "Attach the wheels and motors to the bottom.", "Point the distance sensor forward.", "Load the code and press A to start."],
-        code: "input.onButtonPressed(Button.A, function () {\n  basic.showIcon(IconNames.Happy)\n  basic.forever(function () {\n    if (sonar.ping(DigitalPin.P1, DigitalPin.P2, PingUnit.Centimeters) < 10) {\n      music.playTone(Note.C5, music.beat(BeatFraction.Half))\n    }\n  })\n})",
-        safetyNote: "Batteries only. No plugging into the wall. Ask a grown-up before using scissors.",
       });
     case "chat":
       return "Great question! Let's figure it out together. What do you already know about it? Tell me one thing, and we'll build from there.";

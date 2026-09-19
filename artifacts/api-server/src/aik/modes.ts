@@ -101,7 +101,7 @@ export const MODES: Record<ModeId, ModeDef> = {
       { key: "detail", label: "One surprising detail", hint: "the dragon is afraid of butterflies", required: false },
     ],
     changeHint: "Rewrite one panel, change the ending, make it funnier, add a twist…",
-    maxTokens: 1200,
+    maxTokens: 4000,
     temperature: 0.8,
   },
   prompt: {
@@ -112,7 +112,7 @@ export const MODES: Record<ModeId, ModeDef> = {
     blurb: "Describe who, where and the mood. Learn how details change the picture. Your facilitator approves every image.",
     artifactKind: "image",
     interaction: "form",
-    tier: "fast",
+    tier: "default",
     needsApproval: true,
     createFields: [
       { key: "what", label: "Who or what", hint: "a robot gardener, a friendly octopus", required: true },
@@ -121,7 +121,7 @@ export const MODES: Record<ModeId, ModeDef> = {
       { key: "style", label: "Art style", hint: "pick one", required: true, choices: ["cartoon", "watercolor", "pixel art", "clay", "crayon", "paper cut-out"] },
     ],
     changeHint: "Change one detail: make it nighttime, add a hat, more sparkles…",
-    maxTokens: 400,
+    maxTokens: 1200,
     temperature: 0.5,
   },
   quest: {
@@ -142,7 +142,7 @@ export const MODES: Record<ModeId, ModeDef> = {
       { key: "audience", label: "It's for…", hint: "my class, my little brother, the Expo", required: false },
     ],
     changeHint: "Add a fact about ___, make the quiz harder, add a title slide…",
-    maxTokens: 900,
+    maxTokens: 3000,
     temperature: 0.5,
   },
   video: {
@@ -162,7 +162,7 @@ export const MODES: Record<ModeId, ModeDef> = {
     ],
     changeHint: "Make it daytime, add sparkles, make the robot dance…",
     tier: "default",
-    maxTokens: 700,
+    maxTokens: 2500,
     temperature: 0.7,
     needsApproval: true,
   },
@@ -185,7 +185,7 @@ export const MODES: Record<ModeId, ModeDef> = {
     chatGreeting: "Welcome to the Robotics Lab! Ask me how sensors, motors or the code work. Remember: batteries only, and a grown-up for tools.",
     chatPlaceholder: "How does the distance sensor know something is close?",
     tier: "default",
-    maxTokens: 1400,
+    maxTokens: 4000,
     temperature: 0.5,
     needsApproval: false,
   },
@@ -201,8 +201,8 @@ export const MODES: Record<ModeId, ModeDef> = {
     changeHint: "",
     chatGreeting: "Hi! I'm your homework helper. Tell me the problem and what you've tried so far, and we'll work it out together, one step at a time.",
     chatPlaceholder: "I'm stuck on 3/4 + 1/8…",
-    tier: "fast",
-    maxTokens: 500,
+    tier: "default",
+    maxTokens: 2500,
     temperature: 0.4,
     needsApproval: false,
   },
@@ -281,7 +281,7 @@ OUTPUT FORMAT: reply with ONLY a JSON object, no markdown fences:
 {"name": string, "job": string, "parts": [string x4-7], "steps": [string x4-6], "code": string, "safetyNote": string}
 - parts: common kid kit parts only (micro:bit, battery pack, motors, wheels, servo, LEDs, buzzer, ultrasonic/light/sound sensor, cardboard, tape).
 - steps: short build steps in order, one sentence each.
-- code: a SHORT MakeCode-style JavaScript program for micro:bit (under 25 lines) that does the robot's job. Use only micro:bit APIs (basic, input, music, pins, radio is not allowed). Add one comment per block explaining what it does in kid words.`;
+- code: a SHORT MakeCode-style JavaScript program for micro:bit (under 25 lines) that does the robot's job. Prefer core APIs only: basic, input, music, pins, led, control. 'radio' is not allowed. If the robot genuinely needs an extension (for example 'sonar' for an ultrasonic sensor), that is fine, but the FIRST line must be a comment telling the child to add it, like: // First: in MakeCode click Extensions and add \"sonar\". Never invent an API: every name you call must be a real micro:bit function. The code is parsed automatically before a child sees it. Add one comment per block explaining what it does in kid words.`;
     case "homework":
       return `You are a patient homework helper for children aged 8–11 (grades 3–5).${COMMON_RULES}
 HOW YOU HELP:

@@ -13,7 +13,8 @@ import * as store from "./store";
 import type { RequestRow, ArtifactRow, ClassRow } from "./store";
 import { getMode, validateInput, systemPrompt, chatSystemPrompt, userPrompt, isRedirect, extractHtml, extractJson, gameSummary, gameTitle, type ModeDef } from "./modes";
 import { completeText, generateImage, generateVideo, ContentFilteredError, type ChatTurn } from "./ai";
-import { forgeGame } from "./forge";
+import { forgeGame, refineJson } from "./forge";
+import { verifyMicrobitCode } from "./verify";
 import { screenInput, screenOutputText, scanGameCode, hardenGameHtml, stripLinks, contentSafetyImage, KID_MESSAGES, type Flag } from "./safety";
 import { isContentSafetyConfigured, isImageConfigured, isVideoConfigured } from "./config";
 
@@ -255,6 +256,44 @@ export async function runRequest(requestId: number): Promise<void> {
       await finish(req, { status: built.blocked ? "blocked" : "failed", message: built.message, flags: [...flags, ...built.flags] });
       return;
     }
+    /* ---- Studio path for the writing studios --------------------------
+     * Story, Quest and Robotics produce JSON, not a program, so there is
+     * nothing to execute. They get the half of the pipeline that applies: a
+     * second opinion against the brief and one revision — and, for Robotics,
+     * the micro:bit code parsed and repaired first, because a child is about
+     * to type that into MakeCode and flash it onto real hardware.        */
+    if (req.quality === "studio" && input.kind === "create" && REFINABLE.has(mode.id)) {
+      let writeChain: Promise<unknown> = Promise.resolve();
+      const refined = await refineJson({
+        kind: mode.id,
+        brief: input.text,
+        current: built.artifact.content,
+        schemaHint: SCHEMA_HINTS[mode.id] ?? "",
+        maxTokens: mode.maxTokens,
+        verify: mode.id === "robot" ? verifyRobotJson : undefined,
+        onProgress: (steps) => {
+          writeChain = writeChain.then(() => store.setProgress(req.id, steps)).catch(() => {});
+          publish(req.class_id, { type: "request", request: toPublicRequest({ ...req, status: "working", progress: steps }) });
+        },
+      }).catch((err) => {
+        logger.warn({ err, requestId: req.id }, "[aik] refine failed; shipping the first draft");
+        return null;
+      });
+      await writeChain.catch(() => {});
+      if (refined) {
+        await store.setProgress(req.id, refined.steps).catch(() => {});
+        if (refined.changed) {
+          // Re-screen the revision: it is new model output like any other.
+          const rebuilt = await buildArtifact(mode.id, refined.json, input, current, klass, flags);
+          if (rebuilt.ok) {
+            await complete(req, rebuilt.artifact, flags);
+            return;
+          }
+          logger.warn({ requestId: req.id }, "[aik] refined version failed screening; shipping the first draft");
+        }
+      }
+    }
+
     await complete(req, built.artifact, flags);
   } catch (err) {
     logger.error({ err, requestId }, "[aik] pipeline error");
@@ -282,6 +321,27 @@ async function complete(req: RequestRow, artifactInput: NewArtifact, flags: Flag
   if (!artifact.approved) {
     const { content, ...meta } = artifact;
     publish(req.class_id, { type: "approval", artifact: meta });
+  }
+}
+
+/** Studios whose JSON output gets the critique-and-polish pass. */
+const REFINABLE = new Set(["story", "quest", "robot"]);
+
+/** Enough of the shape for the model to return the same object, corrected. */
+const SCHEMA_HINTS: Record<string, string> = {
+  story: '{"title": string, "panels": [{"narration": string, "dialogue": string} x6], "coverPrompt": string}',
+  quest: '{"title": string, "items": [{"text": string, "checkMe": boolean, "sourceHint": string}], "nextIdea": string}',
+  robot: '{"name": string, "job": string, "parts": [string], "steps": [string], "code": string, "safetyNote": string}',
+};
+
+/** Parse the robot artifact and run its micro:bit code through the checker. */
+function verifyRobotJson(json: string): string[] {
+  try {
+    const parsed = JSON.parse(json);
+    const report = verifyMicrobitCode(String(parsed?.code ?? ""));
+    return report.ok ? [] : report.issues.map((i) => i.detail);
+  } catch {
+    return ["The robot plan is not valid JSON."];
   }
 }
 

@@ -379,16 +379,62 @@ export async function refineJson(opts: {
   current: string;
   schemaHint: string;
   maxTokens: number;
+  /**
+   * Optional check on the finished JSON — Robotics uses it to run the
+   * micro:bit code through the parser before a child is asked to type it
+   * into MakeCode. Returns problems phrased for the model.
+   */
+  verify?: (json: string) => string[];
   onProgress?: ForgeProgress;
 }): Promise<{ json: string; steps: ForgeStep[]; changed: boolean }> {
   const steps = new Steps(opts.onProgress);
+  let current = opts.current;
+
+  /* Check first, because a broken program is a worse problem than a dull one. */
+  if (opts.verify) {
+    steps.begin("verify", "Checking the code");
+    let problems = opts.verify(current);
+    steps.end("verify", problems.length ? "failed" : "done", problems.length ? `${problems.length} problem${problems.length === 1 ? "" : "s"} found` : "runs clean");
+    for (let attempt = 1; attempt <= 2 && problems.length; attempt++) {
+      steps.begin(`repair${attempt}`, `Fixing the code${attempt > 1 ? ` (attempt ${attempt})` : ""}`);
+      try {
+        const fixed = await completeText({
+          system: `You fix children's micro:bit starter code.${COMMON_RULES}\nReply with ONLY the corrected JSON object in exactly this shape, no fences and no prose:\n${opts.schemaHint}`,
+          user: `These problems were found by running the code through a parser:\n\n${problems.map((x, i) => `${i + 1}. ${x}`).join("\n")}\n\nFix every one. Change nothing else.\n\nCURRENT:\n${current}`,
+          maxTokens: opts.maxTokens,
+          temperature: 0.3,
+          tier: "default",
+          mockKind: opts.kind,
+        });
+        const parsed = parseJson<any>(fixed);
+        if (!parsed) {
+          steps.end(`repair${attempt}`, "failed", "the fix didn't parse");
+          break;
+        }
+        const next = JSON.stringify(parsed);
+        const nextProblems = opts.verify(next);
+        if (nextProblems.length <= problems.length) {
+          current = next;
+          problems = nextProblems;
+          steps.end(`repair${attempt}`, "done", problems.length ? `${problems.length} left` : "all clear");
+        } else {
+          steps.end(`repair${attempt}`, "skipped", "the fix made it worse; keeping the previous version");
+          break;
+        }
+      } catch {
+        steps.end(`repair${attempt}`, "failed");
+        break;
+      }
+    }
+  }
+
   steps.begin("critique", "Looking for what's missing");
   let notes: string[] = [];
   try {
     const critique = await completeText({
       system: `You review ${opts.kind} work for children against the brief it came from. Be specific; do not flatter.${COMMON_RULES}
 Reply with ONLY a JSON array of at most 3 strings, each one concrete improvement. Reply [] if it already delivers the brief.`,
-      user: `BRIEF:\n${opts.brief}\n\nCURRENT WORK:\n${opts.current}`,
+      user: `BRIEF:\n${opts.brief}\n\nCURRENT WORK:\n${current}`,
       maxTokens: 500,
       temperature: 0.5,
       tier: "default",
@@ -398,16 +444,16 @@ Reply with ONLY a JSON array of at most 3 strings, each one concrete improvement
     steps.end("critique", "done", notes.length ? `${notes.length} improvement${notes.length === 1 ? "" : "s"}` : "nothing worth changing");
   } catch {
     steps.end("critique", "skipped");
-    return { json: opts.current, steps: steps.all(), changed: false };
+    return { json: current, steps: steps.all(), changed: current !== opts.current };
   }
 
-  if (!notes.length) return { json: opts.current, steps: steps.all(), changed: false };
+  if (!notes.length) return { json: current, steps: steps.all(), changed: current !== opts.current };
 
   steps.begin("polish", "Polishing");
   try {
     const revised = await completeText({
       system: `You revise ${opts.kind} work for children.${COMMON_RULES}\nReply with ONLY the corrected JSON object in exactly this shape, no fences and no prose:\n${opts.schemaHint}`,
-      user: `Apply these improvements and keep everything else as it is.\n\n${notes.map((n, i) => `${i + 1}. ${n}`).join("\n")}\n\nCURRENT:\n${opts.current}`,
+      user: `Apply these improvements and keep everything else as it is.\n\n${notes.map((n, i) => `${i + 1}. ${n}`).join("\n")}\n\nCURRENT:\n${current}`,
       maxTokens: opts.maxTokens,
       temperature: 0.6,
       tier: "default",
@@ -415,13 +461,19 @@ Reply with ONLY a JSON array of at most 3 strings, each one concrete improvement
     });
     const parsed = parseJson<any>(revised);
     if (!parsed) {
-      steps.end("polish", "skipped", "the revision didn't parse; keeping the original");
-      return { json: opts.current, steps: steps.all(), changed: false };
+      steps.end("polish", "skipped", "the revision didn't parse; keeping the working version");
+      return { json: current, steps: steps.all(), changed: current !== opts.current };
+    }
+    const revisedJson = JSON.stringify(parsed);
+    // A polish that breaks the code is discarded, exactly as with games.
+    if (opts.verify && opts.verify(revisedJson).length > 0) {
+      steps.end("polish", "skipped", "the polished version broke the code; keeping the working one");
+      return { json: current, steps: steps.all(), changed: current !== opts.current };
     }
     steps.end("polish", "done", `${notes.length} applied`);
-    return { json: JSON.stringify(parsed), steps: steps.all(), changed: true };
+    return { json: revisedJson, steps: steps.all(), changed: true };
   } catch {
     steps.end("polish", "skipped");
-    return { json: opts.current, steps: steps.all(), changed: false };
+    return { json: current, steps: steps.all(), changed: current !== opts.current };
   }
 }

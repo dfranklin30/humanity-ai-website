@@ -267,3 +267,106 @@ export function verifyGameHtml(html: string): VerifyReport {
 export function issuesForModel(report: VerifyReport): string {
   return report.issues.map((i, n) => `${n + 1}. [${i.kind}] ${i.detail}`).join("\n");
 }
+
+
+/* ------------------------------------------------------------------ *
+ * micro:bit starter code
+ *
+ * Robotics Lab hands a child JavaScript they will paste into MakeCode and
+ * flash onto real hardware. Nothing checked it. A child who pastes code with
+ * a syntax error gets an error wall in MakeCode and no idea why, in a
+ * 25-minute Make block — the worst possible moment to lose them.
+ *
+ * This parses the program and checks it against the micro:bit API surface the
+ * prompt allows. It cannot run it: there is no micro:bit here, and the
+ * behaviour depends on real sensors. Syntax and vocabulary are what it knows.
+ * ------------------------------------------------------------------ */
+
+/** Namespaces the Robotics Lab prompt permits. `radio` is deliberately absent. */
+const MICROBIT_NAMESPACES = ["basic", "input", "music", "pins", "led", "control", "Math", "console", "serial", "images", "game"];
+
+/**
+ * MakeCode's enums. These read like undefined identifiers to a plain parser
+ * but are exactly what correct micro:bit code uses — `Button.A`,
+ * `AnalogPin.P0` — so leaving them out flags good programs as broken.
+ */
+const MICROBIT_ENUMS = [
+  "Button", "AnalogPin", "DigitalPin", "TouchPin", "Pin", "Gesture", "Direction", "Dimension",
+  "Note", "BeatFraction", "Rotation", "DisplayMode", "PulseValue", "NumberFormat", "LedSpriteProperty",
+  "EventBusSource", "EventBusValue", "MesDpadButtonInfo", "Colors", "SoundExpression", "Sound",
+  "IconNames", "PingUnit", "ArrowNames", "Delimiters", "SerialPin", "BaudRate", "AcceleratorRange",
+];
+
+/**
+ * Namespaces that exist only once a child installs a MakeCode *extension*.
+ * `sonar` is the common one: the Robotics Lab lists an ultrasonic sensor as an
+ * allowed part, so the model reaches for it — but a child pasting that into a
+ * fresh MakeCode project hits an error wall with no idea why. Allowed, as long
+ * as the code says out loud that the extension has to be added first.
+ */
+const MICROBIT_EXTENSIONS: Record<string, string> = {
+  sonar: "sonar (for the ultrasonic distance sensor)",
+  neopixel: "neopixel (for addressable LED strips)",
+  servos: "servos",
+  motors: "motors",
+  Kitronik: "the Kitronik board extension",
+};
+
+export function verifyMicrobitCode(code: string): VerifyReport {
+  const issues: VerifyIssue[] = [];
+  const trimmed = (code ?? "").trim();
+  const observed = { drawCalls: 0, hasLoop: false, listeners: [] as string[], canvasSize: null, scriptChars: trimmed.length };
+
+  if (!trimmed) {
+    issues.push({ kind: "missing", detail: "There is no code at all." });
+    return { ok: false, issues, observed };
+  }
+
+  // 1. Does it parse? MakeCode JavaScript is ordinary JavaScript.
+  try {
+    new vm.Script(trimmed, { filename: "microbit.js" });
+  } catch (err) {
+    issues.push({ kind: "syntax", detail: `The code does not parse, so MakeCode will refuse it: ${describeError(err)}` });
+    return { ok: false, issues, observed };
+  }
+
+  // 2. Is every namespace it calls one a micro:bit actually has?
+  const used = new Set<string>();
+  for (const m of trimmed.matchAll(/\b([A-Za-z_$][\w$]*)\s*\./g)) used.add(m[1]);
+  const declared = new Set<string>();
+  for (const m of trimmed.matchAll(/\b(?:let|const|var|function)\s+([A-Za-z_$][\w$]*)/g)) declared.add(m[1]);
+  for (const m of trimmed.matchAll(/\bfunction\s*\(([^)]*)\)/g)) for (const a of m[1].split(",")) if (a.trim()) declared.add(a.trim());
+  for (const name of used) {
+    if (declared.has(name) || MICROBIT_NAMESPACES.includes(name) || MICROBIT_ENUMS.includes(name)) continue;
+    if (MICROBIT_EXTENSIONS[name]) {
+      // Fine to use, as long as the child is told to add it.
+      const mentioned = new RegExp(`(extension|add|import)[^\n]*${name}|${name}[^\n]*extension`, "i").test(trimmed);
+      if (!mentioned) {
+        issues.push({
+          kind: "quality",
+          detail: `Uses the "${name}" namespace, which needs the MakeCode extension ${MICROBIT_EXTENSIONS[name]}. Add a first-line comment telling the child to add that extension in MakeCode before pasting the code, or rewrite it using only core APIs (pins, basic, input, music).`,
+        });
+      }
+      continue;
+    }
+    if (name === "radio") {
+      issues.push({ kind: "missing", detail: "Uses radio, which is not allowed in this program. Do the same job without radio." });
+    } else {
+      issues.push({ kind: "missing", detail: `Uses "${name}", which is not a micro:bit API and is never defined in this code.` });
+    }
+  }
+
+  // 3. Does it do anything? A micro:bit program that registers no handler and
+  //    has no forever loop flashes fine and then simply sits there.
+  const hasEntry = /basic\s*\.\s*forever|input\s*\.\s*on|control\s*\.\s*in|basic\s*\.\s*show|led\s*\.\s*plot|pins\s*\./.test(trimmed);
+  if (!hasEntry) {
+    issues.push({ kind: "missing", detail: "Nothing ever runs: there is no basic.forever, no input.on... handler, and nothing shown or driven." });
+  } else {
+    observed.hasLoop = /basic\s*\.\s*forever/.test(trimmed);
+  }
+
+  const lines = trimmed.split("\n").filter((l) => l.trim()).length;
+  if (lines > 40) issues.push({ kind: "quality", detail: `The program is ${lines} lines. Children retype this: get it under 25.` });
+
+  return { ok: issues.length === 0, issues, observed };
+}
