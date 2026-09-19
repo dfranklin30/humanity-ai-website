@@ -66,11 +66,11 @@ function Header() {
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/75">
       <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-5 py-3 sm:px-8">
-        <Link href={BASE} className="flex shrink-0 items-center gap-3" aria-label="AI Builders Academy home">
+        <Link href={BASE} className="flex shrink-0 items-center gap-3" aria-label={`${PROGRAM.name} home`}>
           <Logo />
           <span className="hidden leading-tight sm:block">
             <span className="block text-base font-extrabold tracking-tight text-slate-900">
-              AI Builders Academy
+              {PROGRAM.name}
             </span>
             <span className="block text-xs font-medium text-slate-500">by {ORG.shortName}</span>
           </span>

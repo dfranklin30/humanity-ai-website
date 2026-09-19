@@ -177,6 +177,52 @@ export const fRequest = (id: number) => call<{ request: StudioRequest }>("GET", 
 export const fExportUrl = (classId: number) => `/api/aik/facilitator/classes/${classId}/export`;
 export const fFeedUrl = (classId: number) => `/api/aik/facilitator/classes/${classId}/feed`;
 
+/* ------------------------------------------------------------------ *
+ * The Hub — /aiforkids/hub
+ * Staff-side: the same tools and the same screened pipeline, without the
+ * kid-sized limits, plus projects to file the work under.
+ * ------------------------------------------------------------------ */
+
+export type ProjectKind = "org" | "program" | "class";
+
+export type Project = {
+  id: number;
+  facilitator_id: number;
+  class_id: number | null;
+  name: string;
+  summary: string;
+  kind: ProjectKind;
+  week: number | null;
+  archived: boolean;
+  created_at: string;
+  updated_at: string;
+  artifacts?: number;
+};
+
+export type HubState = {
+  facilitator: Facilitator;
+  workspaceId: number;
+  capabilities: StudioConfig["capabilities"];
+  tools: ModeDef[];
+  projects: Project[];
+  recent: ArtifactMeta[];
+  classes: PublicClass[];
+};
+
+export const hubLoad = () => call<HubState>("GET", "/hub");
+export const hubCreateProject = (body: { name: string; summary?: string; kind?: ProjectKind; week?: number | null }) =>
+  call<{ project: Project }>("POST", "/hub/projects", body);
+export const hubProject = (id: number) => call<{ project: Project; artifacts: ArtifactMeta[] }>("GET", `/hub/projects/${id}`);
+export const hubPatchProject = (id: number, patch: Partial<{ name: string; summary: string; archived: boolean }>) =>
+  call<{ project: Project }>("PATCH", `/hub/projects/${id}`, patch);
+export const hubDeleteProject = (id: number) => call<{ ok: true }>("DELETE", `/hub/projects/${id}`);
+export const hubFileArtifact = (artifactId: number, projectId: number | null) =>
+  call<{ ok: true }>("PATCH", `/hub/artifacts/${artifactId}/project`, { projectId });
+export const hubSubmit = (body: { mode: ModeId; kind: "create" | "change" | "chat"; projectArtifactId?: number; projectId?: number | null; input: Record<string, string> }) =>
+  call<{ request: StudioRequest; projectId: number | null }>("POST", "/hub/requests", body);
+export const hubRequest = (id: number) => call<{ request: StudioRequest }>("GET", `/hub/requests/${id}`);
+export const hubSpeak = (artifactId: number) => call<{ audio: string; mime: string }>("POST", `/hub/artifacts/${artifactId}/speak`);
+
 /** Poll a child request until it settles (done/blocked/failed). */
 export async function waitForRequest(id: number, getter: (id: number) => Promise<{ request: StudioRequest }>, onTick?: (r: StudioRequest) => void, timeoutMs = 120_000): Promise<StudioRequest> {
   const start = Date.now();

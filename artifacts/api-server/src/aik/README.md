@@ -24,6 +24,33 @@ blocklist → Azure AI Content Safety + Prompt Shields → model → output scre
 facilitator approval before a child sees it. Chats are turn-limited per session
 and every turn is screened both ways and shown on the facilitator dashboard.
 
+## The Hub (`/aiforkids/hub`)
+
+The staff side. One signed-in place where Humanity + AI does its own AI work:
+every tool as a no-code form, every result filed under a project, the eight
+week modules of *Make It With AI* with their run-sheets, and the way into the
+class dashboard.
+
+A **workspace** is a class row with `kind = 'workspace'` and no children — one
+per facilitator, created on first visit. Staff requests therefore run the
+identical pipeline: PII catcher, blocklist, Content Safety, prompt shields,
+output screening, game code scan and audit log all apply to adult work exactly
+as they do to a child's. Only the limits differ:
+
+| | Children | Staff Hub |
+|---|---|---|
+| Modules | only what the facilitator unlocked | all |
+| Orders per session | ticket limit (2 by default) | unlimited |
+| Field length | 160 chars (`maxFieldChars`) | 1,200 (`staffFieldChars`) |
+| Chat length | 300 chars | 4,000 (`staffChatChars`) |
+| Images / video | held for facilitator approval | approved on arrival |
+| Screening | full | full — identical |
+
+Endpoints live under `/api/aik/hub` and all require a facilitator session.
+`aik_projects` groups artifacts; `aik_artifacts.project_id` is the link.
+Week modules render at `/aiforkids/week/1..8` and `/aiforkids/hub/week/1..8`,
+both behind the same sign-in.
+
 ## Turning it on
 
 The Studio is **off** unless `AIK_ENABLED=true`. With it off, nothing under
@@ -44,7 +71,8 @@ key per provider; children never hold licenses.
 | `AIK_OSS_BASE_URL`, `AIK_OSS_API_KEY`, `AIK_OSS_MODEL` | e.g. Foundry endpoint + `Llama-4-Maverick` / `gpt-oss-120b` / `Qwen3` |
 | `AIK_OSS_TEXT_PROVIDER` | which provider serves modules marked `tier: "oss"` (default `oss` when configured) |
 | **Images** | |
-| `AIK_IMAGE_PROVIDER` | `azure` or `fal` (open-source FLUX etc.) |
+| `AIK_IMAGE_PROVIDER` | `azure`, `oss` (Azure AI Foundry / any OpenAI-compatible images endpoint) or `fal` |
+| `AIK_OSS_IMAGE_BASE_URL`, `AIK_OSS_IMAGE_API_KEY`, `AIK_OSS_IMAGE_MODEL` | open-source image model, e.g. a Foundry FLUX.1 deployment. Falls back to the `AIK_OSS_*` text endpoint and key when not set separately. |
 | `AIK_AZURE_OPENAI_ENDPOINT`, `AIK_AZURE_OPENAI_API_KEY`, `AIK_AZURE_OPENAI_IMAGE_DEPLOYMENT`, (`AIK_AZURE_OPENAI_TEXT_DEPLOYMENT`, `AIK_AZURE_OPENAI_API_VERSION`) | Azure OpenAI |
 | `AIK_FAL_KEY`, `AIK_FAL_IMAGE_MODEL` (default `fal-ai/flux/schnell`) | fal.ai |
 | **Video** | |
@@ -52,7 +80,9 @@ key per provider; children never hold licenses.
 | `AIK_FAL_VIDEO_MODEL` | default `fal-ai/ltx-video` (open-source text-to-video). Verify the model id on fal.ai before enabling. |
 | **Music / voice** | |
 | `AIK_MUSIC_PROVIDER` | `elevenlabs`, `fal` (`AIK_FAL_MUSIC_MODEL`, default `fal-ai/stable-audio`) or `none` |
-| `AIK_TTS_PROVIDER`, `AIK_ELEVENLABS_API_KEY`, `AIK_ELEVENLABS_VOICE_ID` | "Read it to me" on stories, quests and robot plans |
+| `AIK_TTS_PROVIDER` | `azure` (Azure AI Speech) · `elevenlabs` · `none` |
+| `AIK_AZURE_SPEECH_KEY`, `AIK_AZURE_SPEECH_REGION`, `AIK_AZURE_SPEECH_VOICE` | Azure AI Speech. **The same multi-service AIServices resource that serves Content Safety also serves Speech**, so "Read it to me" needs no new vendor — reuse that key and its region. Default voice `en-US-AvaMultilingualNeural`. |
+| `AIK_ELEVENLABS_API_KEY`, `AIK_ELEVENLABS_VOICE_ID` | ElevenLabs alternative |
 | **Screening** | |
 | `AIK_CONTENT_SAFETY_ENDPOINT`, `AIK_CONTENT_SAFETY_KEY` | Azure AI Content Safety |
 | `AIK_REQUIRE_CONTENT_SAFETY` | default `true` in production: fail closed |

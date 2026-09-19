@@ -15,6 +15,7 @@ import EnrollReceived from "./pages/EnrollReceived";
 import Brochure from "./pages/Brochure";
 import StudioApp from "./studio/StudioApp";
 import FacilitatorApp from "./studio/FacilitatorApp";
+import HubApp from "./studio/HubApp";
 import { BASE } from "./content/program";
 import { Button, Section } from "./components/ui";
 
@@ -66,6 +67,12 @@ export default function AiForKidsApp() {
           children direct AI. Renders its own chrome (no marketing nav). */}
       <Route path={`${BASE}/studio`} component={StudioApp} />
       <Route path={`${BASE}/studio/*`} component={StudioApp} />
+      {/* The Hub: the staff workspace — every tool, every project, and the
+          eight week modules. Facilitator sign-in gated, its own chrome. */}
+      <Route path={`${BASE}/hub`} component={HubApp} />
+      <Route path={`${BASE}/hub/*`} component={HubApp} />
+      <Route path={`${BASE}/week/:n`} component={HubApp} />
+
       <Route path={`${BASE}/facilitator`} component={FacilitatorApp} />
       <Route path={`${BASE}/facilitator/*`} component={FacilitatorApp} />
 

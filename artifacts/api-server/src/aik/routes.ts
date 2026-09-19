@@ -700,6 +700,219 @@ export function registerAikRoutes(app: Express): void {
     }),
   );
 
+
+  /* ================================================================== *
+   * The Hub — /aiforkids/hub
+   *
+   * One signed-in place where Humanity + AI staff do their own AI work and
+   * see every project. It runs on the same screened pipeline as the kids'
+   * Studio: a workspace is just a class row with no children, so Content
+   * Safety, prompt shields, output screening and the audit log all apply.
+   * What differs is the limits — no ticket meter, every module unlocked,
+   * and media approved on arrival because the adult here is the approver.
+   * ================================================================== */
+
+  /** The facilitator's own workspace, created on first visit. */
+  async function workspaceFor(req: Request): Promise<store.ClassRow> {
+    const f = (req as FReq).facilitator;
+    return store.ensureWorkspace(f.id, f.display_name);
+  }
+
+  app.get(
+    `${base}/hub`,
+    requireFacilitator,
+    wrap(async (req, res) => {
+      const f = (req as FReq).facilitator;
+      const workspace = await workspaceFor(req);
+      const [projects, recent, classes] = await Promise.all([
+        store.listProjects(f.id),
+        store.listWorkspaceArtifacts(workspace.id, null, 24),
+        store.listClasses(f.id, f.is_admin),
+      ]);
+      res.json({
+        facilitator: publicFacilitator(f),
+        workspaceId: workspace.id,
+        capabilities: capabilitySummary(),
+        tools: publicModes(),
+        projects,
+        recent,
+        classes: classes.map(toPublicClass),
+      });
+    }),
+  );
+
+  app.post(
+    `${base}/hub/projects`,
+    requireFacilitator,
+    wrap(async (req, res) => {
+      const f = (req as FReq).facilitator;
+      const body = z
+        .object({
+          name: z.string().trim().min(1).max(80),
+          summary: z.string().trim().max(400).optional(),
+          kind: z.enum(["org", "program", "class"]).optional(),
+          week: z.number().int().min(1).max(8).nullable().optional(),
+        })
+        .safeParse(req.body);
+      if (!body.success) return void res.status(400).json({ error: "Give the project a name." });
+      const workspace = await workspaceFor(req);
+      const project = await store.createProject({
+        facilitatorId: f.id,
+        classId: workspace.id,
+        name: body.data.name,
+        summary: body.data.summary ?? "",
+        kind: body.data.kind ?? "org",
+        week: body.data.week ?? null,
+      });
+      await store.audit(workspace.id, "facilitator", f.id, "project_created", { projectId: project.id, name: project.name });
+      res.json({ project });
+    }),
+  );
+
+  /** A project the signed-in facilitator owns. */
+  async function ownedProject(req: Request, res: Response): Promise<store.ProjectRow | null> {
+    const f = (req as FReq).facilitator;
+    const id = Number(req.params.pid);
+    const p = Number.isInteger(id) ? await store.getProject(id) : null;
+    if (!p || (p.facilitator_id !== f.id && !f.is_admin)) {
+      res.status(404).json({ error: "Project not found." });
+      return null;
+    }
+    return p;
+  }
+
+  app.get(
+    `${base}/hub/projects/:pid`,
+    requireFacilitator,
+    wrap(async (req, res) => {
+      const p = await ownedProject(req, res);
+      if (!p) return;
+      const workspace = await workspaceFor(req);
+      res.json({ project: p, artifacts: await store.listWorkspaceArtifacts(workspace.id, p.id, 100) });
+    }),
+  );
+
+  app.patch(
+    `${base}/hub/projects/:pid`,
+    requireFacilitator,
+    wrap(async (req, res) => {
+      const p = await ownedProject(req, res);
+      if (!p) return;
+      const body = z
+        .object({
+          name: z.string().trim().min(1).max(80).optional(),
+          summary: z.string().trim().max(400).optional(),
+          archived: z.boolean().optional(),
+        })
+        .safeParse(req.body);
+      if (!body.success) return void res.status(400).json({ error: "That change didn't look right." });
+      res.json({ project: await store.updateProject(p.id, body.data) });
+    }),
+  );
+
+  app.delete(
+    `${base}/hub/projects/:pid`,
+    requireFacilitator,
+    wrap(async (req, res) => {
+      const f = (req as FReq).facilitator;
+      const p = await ownedProject(req, res);
+      if (!p) return;
+      await store.deleteProject(p.id);
+      await store.audit(p.class_id, "facilitator", f.id, "project_deleted", { projectId: p.id, name: p.name });
+      res.json({ ok: true });
+    }),
+  );
+
+  /** File a finished piece of work under a project (or clear it). */
+  app.patch(
+    `${base}/hub/artifacts/:aid/project`,
+    requireFacilitator,
+    wrap(async (req, res) => {
+      const f = (req as FReq).facilitator;
+      const workspace = await workspaceFor(req);
+      const a = await store.getArtifact(Number(req.params.aid));
+      if (!a || a.class_id !== workspace.id) return void res.status(404).json({ error: "Not found." });
+      const projectId = req.body?.projectId === null ? null : Number(req.body?.projectId);
+      if (projectId !== null) {
+        const p = await store.getProject(projectId);
+        if (!p || (p.facilitator_id !== f.id && !f.is_admin)) return void res.status(404).json({ error: "Project not found." });
+      }
+      await store.setArtifactProject(a.id, projectId);
+      res.json({ ok: true });
+    }),
+  );
+
+  /** Run any tool. Same pipeline, same screening, adult-sized limits. */
+  app.post(
+    `${base}/hub/requests`,
+    requireFacilitator,
+    wrap(async (req, res) => {
+      const f = (req as FReq).facilitator;
+      if (!allow(`hreq:${f.id}`, 30)) return void res.status(429).json({ error: "Slow down a moment and try again." });
+      const body = z
+        .object({
+          mode: z.enum(["game", "story", "prompt", "quest", "video", "robot", "homework"]),
+          kind: z.enum(["create", "change", "chat"]),
+          projectArtifactId: z.number().int().optional(),
+          projectId: z.number().int().nullable().optional(),
+          input: z.record(z.any()),
+        })
+        .safeParse(req.body);
+      if (!body.success) return void res.status(400).json({ error: "That request didn't look right." });
+      const mode = getMode(body.data.mode);
+      if (!mode) return void res.status(400).json({ error: "Unknown tool." });
+
+      const workspace = await workspaceFor(req);
+      if (body.data.kind === "change" || (body.data.kind === "chat" && body.data.projectArtifactId)) {
+        const a = body.data.projectArtifactId ? await store.getArtifact(body.data.projectArtifactId) : null;
+        if (!a || a.class_id !== workspace.id) return void res.status(404).json({ error: "Pick one of your own pieces." });
+      }
+
+      const cap = aikConfig.staffFieldChars;
+      const input: Record<string, string> = {};
+      if (body.data.kind === "change") input.change = String(body.data.input.change ?? "").slice(0, cap);
+      else if (body.data.kind === "chat") input.message = String(body.data.input.message ?? "").slice(0, aikConfig.staffChatChars);
+      else for (const fd of mode.createFields) if (body.data.input[fd.key] !== undefined) input[fd.key] = String(body.data.input[fd.key]).slice(0, cap);
+
+      const request = await store.createRequest({
+        classId: workspace.id,
+        childId: null,
+        mode: body.data.mode,
+        kind: body.data.kind,
+        projectArtifactId: body.data.projectArtifactId ?? null,
+        input,
+      });
+      await store.audit(workspace.id, "facilitator", f.id, "hub_request", { requestId: request.id, mode: body.data.mode, kind: body.data.kind });
+      void runRequest(request.id);
+      res.json({ request: toPublicRequest(request), projectId: body.data.projectId ?? null });
+    }),
+  );
+
+  app.get(
+    `${base}/hub/requests/:rid`,
+    requireFacilitator,
+    wrap(async (req, res) => {
+      const workspace = await workspaceFor(req);
+      const r = await store.getRequest(Number(req.params.rid));
+      if (!r || r.class_id !== workspace.id) return void res.status(404).json({ error: "Not found." });
+      res.json({ request: toPublicRequest(r) });
+    }),
+  );
+
+  app.post(
+    `${base}/hub/artifacts/:aid/speak`,
+    requireFacilitator,
+    wrap(async (req, res) => {
+      if (!isTtsConfigured()) return void res.status(503).json({ error: "Read-aloud isn't configured." });
+      const workspace = await workspaceFor(req);
+      const a = await store.getArtifact(Number(req.params.aid));
+      if (!a || a.class_id !== workspace.id) return void res.status(404).json({ error: "Not found." });
+      const text = a.summary || a.title;
+      const audio = await speak(text);
+      res.json({ audio: audio.base64, mime: audio.mime });
+    }),
+  );
+
   /* ---------------- Artifact content (child in class, or owning facilitator) ---------------- */
 
   app.get(

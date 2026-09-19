@@ -55,16 +55,18 @@ const env = process.env;
 const isProduction = env.NODE_ENV === "production";
 
 export type TextProviderId = "anthropic" | "azure" | "oss";
-export type ImageProviderId = "azure" | "fal" | "none";
+export type ImageProviderId = "azure" | "oss" | "fal" | "none";
 export type VideoProviderId = "fal" | "none";
 export type MusicProviderId = "elevenlabs" | "fal" | "none";
-export type TtsProviderId = "elevenlabs" | "none";
+export type TtsProviderId = "azure" | "elevenlabs" | "none";
 
 const anthropicKey = env.AIK_ANTHROPIC_API_KEY || "";
 const ossConfigured = Boolean(env.AIK_OSS_BASE_URL && env.AIK_OSS_API_KEY && env.AIK_OSS_MODEL);
 const azureTextConfigured = Boolean(env.AIK_AZURE_OPENAI_ENDPOINT && env.AIK_AZURE_OPENAI_API_KEY && env.AIK_AZURE_OPENAI_TEXT_DEPLOYMENT);
 const azureImageConfigured = Boolean(env.AIK_AZURE_OPENAI_ENDPOINT && env.AIK_AZURE_OPENAI_API_KEY && env.AIK_AZURE_OPENAI_IMAGE_DEPLOYMENT);
+const ossImageConfigured = Boolean((env.AIK_OSS_IMAGE_BASE_URL || env.AIK_OSS_BASE_URL) && (env.AIK_OSS_IMAGE_API_KEY || env.AIK_OSS_API_KEY) && env.AIK_OSS_IMAGE_MODEL);
 const falConfigured = Boolean(env.AIK_FAL_KEY);
+const azureSpeechConfigured = Boolean(env.AIK_AZURE_SPEECH_KEY && env.AIK_AZURE_SPEECH_REGION);
 const elevenConfigured = Boolean(env.AIK_ELEVENLABS_API_KEY);
 
 function pick<T extends string>(value: string | undefined, allowed: T[], fallback: T): T {
@@ -80,10 +82,10 @@ export const aikConfig = {
   providers: {
     text: pick<TextProviderId>(env.AIK_TEXT_PROVIDER, ["anthropic", "azure", "oss"], anthropicKey ? "anthropic" : azureTextConfigured ? "azure" : "oss"),
     ossText: pick<TextProviderId>(env.AIK_OSS_TEXT_PROVIDER, ["oss", "anthropic", "azure"], ossConfigured ? "oss" : anthropicKey ? "anthropic" : "azure"),
-    image: pick<ImageProviderId>(env.AIK_IMAGE_PROVIDER, ["azure", "fal", "none"], azureImageConfigured ? "azure" : falConfigured ? "fal" : "none"),
+    image: pick<ImageProviderId>(env.AIK_IMAGE_PROVIDER, ["azure", "oss", "fal", "none"], azureImageConfigured ? "azure" : ossImageConfigured ? "oss" : falConfigured ? "fal" : "none"),
     video: pick<VideoProviderId>(env.AIK_VIDEO_PROVIDER, ["fal", "none"], falConfigured ? "fal" : "none"),
     music: pick<MusicProviderId>(env.AIK_MUSIC_PROVIDER, ["elevenlabs", "fal", "none"], elevenConfigured ? "elevenlabs" : falConfigured ? "fal" : "none"),
-    tts: pick<TtsProviderId>(env.AIK_TTS_PROVIDER, ["elevenlabs", "none"], elevenConfigured ? "elevenlabs" : "none"),
+    tts: pick<TtsProviderId>(env.AIK_TTS_PROVIDER, ["azure", "elevenlabs", "none"], azureSpeechConfigured ? "azure" : elevenConfigured ? "elevenlabs" : "none"),
   },
 
   anthropic: {
@@ -97,6 +99,17 @@ export const aikConfig = {
     baseUrl: (env.AIK_OSS_BASE_URL || "").replace(/\/$/, ""),
     apiKey: env.AIK_OSS_API_KEY || "",
     model: env.AIK_OSS_MODEL || "",
+    /** Open-source image model on an OpenAI-compatible endpoint (Azure AI Foundry FLUX, etc.). */
+    imageBaseUrl: (env.AIK_OSS_IMAGE_BASE_URL || env.AIK_OSS_BASE_URL || "").replace(/\/$/, ""),
+    imageApiKey: env.AIK_OSS_IMAGE_API_KEY || env.AIK_OSS_API_KEY || "",
+    imageModel: env.AIK_OSS_IMAGE_MODEL || "",
+  },
+
+  /** Azure AI Speech — available on the same multi-service AIServices resource as Content Safety. */
+  azureSpeech: {
+    key: env.AIK_AZURE_SPEECH_KEY || "",
+    region: env.AIK_AZURE_SPEECH_REGION || "",
+    voice: env.AIK_AZURE_SPEECH_VOICE || "en-US-AvaMultilingualNeural",
   },
 
   azureOpenAI: {
@@ -143,6 +156,9 @@ export const aikConfig = {
   /** Hard cap on characters in any free-text field of a Director's Order or chat message. */
   maxFieldChars: 160,
   maxChatChars: 300,
+  /** Adults working in the Hub are not writing kid-sized orders. */
+  staffFieldChars: 1_200,
+  staffChatChars: 4_000,
   /** Hard cap on generated game size (characters). */
   maxGameChars: 60_000,
   /** Requests per minute per child session. */
@@ -173,7 +189,7 @@ export function isOssTextConfigured(): boolean {
 export function isImageConfigured(): boolean {
   if (aikConfig.mockAI) return true;
   const p = aikConfig.providers.image;
-  return (p === "azure" && azureImageConfigured) || (p === "fal" && falConfigured);
+  return (p === "azure" && azureImageConfigured) || (p === "oss" && ossImageConfigured) || (p === "fal" && falConfigured);
 }
 export function isVideoConfigured(): boolean {
   return aikConfig.mockAI || (aikConfig.providers.video === "fal" && falConfigured);
@@ -184,7 +200,10 @@ export function isMusicConfigured(): boolean {
   return (p === "elevenlabs" && elevenConfigured) || (p === "fal" && falConfigured);
 }
 export function isTtsConfigured(): boolean {
-  return aikConfig.mockAI || (aikConfig.providers.tts === "elevenlabs" && elevenConfigured && Boolean(aikConfig.elevenlabs.voiceId));
+  if (aikConfig.mockAI) return true;
+  const p = aikConfig.providers.tts;
+  if (p === "azure") return azureSpeechConfigured;
+  return p === "elevenlabs" && elevenConfigured && Boolean(aikConfig.elevenlabs.voiceId);
 }
 /** True when the Studio can serve the text modes at all. */
 export function isAiConfigured(): boolean {

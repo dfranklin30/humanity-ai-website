@@ -9,7 +9,7 @@ export default function Scholarships() {
     <>
       <Seo
         title="Scholarships | AI Builders Academy"
-        description="Need-based scholarships cover partial or full tuition for the six-week AI Builders Academy. No student is turned away for cost, and no documentation of hardship is required."
+        description="Need-based scholarships cover partial or full tuition for the eight-week AI Builders Academy. No student is turned away for cost, and no documentation of hardship is required."
         path={`${BASE}/scholarships`}
       />
 

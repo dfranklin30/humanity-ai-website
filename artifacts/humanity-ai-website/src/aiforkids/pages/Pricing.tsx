@@ -10,7 +10,7 @@ export default function Pricing() {
     <>
       <Seo
         title="Pricing & Scholarships | AI Builders Academy"
-        description="Tuition for the six-week AI Builders Academy. Creator tier $399 for the full program. Need-based scholarships available for every session — no student is turned away for cost."
+        description="Tuition for the eight-week AI Builders Academy. Creator tier $399 for the full program. Need-based scholarships available for every session — no student is turned away for cost."
         path={`${BASE}/pricing`}
       />
 
@@ -20,7 +20,7 @@ export default function Pricing() {
           One price, the whole program
         </h1>
         <Lede>
-          Tuition covers all {PROGRAM.weeks} sessions, materials, the certificate and the Week 6
+          Tuition covers all {PROGRAM.weeks} sessions, materials, the certificate and the Week 8
           showcase. There are no add-ons to buy mid-program and nothing required at home.
         </Lede>
       </Section>

@@ -237,11 +237,11 @@ function clean(s: unknown, max: number): string {
     .slice(0, max);
 }
 
-export function validateInput(mode: ModeDef, kind: string, raw: any): ValidatedInput {
-  const max = aikConfig.maxFieldChars;
+export function validateInput(mode: ModeDef, kind: string, raw: any, opts?: { staff?: boolean }): ValidatedInput {
+  const max = opts?.staff ? aikConfig.staffFieldChars : aikConfig.maxFieldChars;
   if (kind === "chat") {
     if (mode.interaction === "form") return { ok: false, error: "This module doesn't have a chat helper." };
-    const message = clean(raw?.message, aikConfig.maxChatChars);
+    const message = clean(raw?.message, opts?.staff ? aikConfig.staffChatChars : aikConfig.maxChatChars);
     if (message.length < 2) return { ok: false, error: "Type a question or an idea for the helper." };
     return { ok: true, kind: "chat", message, text: message };
   }

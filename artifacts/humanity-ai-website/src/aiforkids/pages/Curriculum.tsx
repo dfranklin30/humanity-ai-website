@@ -9,7 +9,7 @@ export default function Curriculum() {
   return (
     <>
       <Seo
-        title="Six-Week AI Curriculum | AI Builders Academy"
+        title="Eight-Week AI Curriculum | AI Builders Academy"
         description="Week by week: introduction to AI, AI creativity, video and voice, programming with AI, AI in the real world with a live ROSIE demonstration, and the final family showcase."
         path={`${BASE}/curriculum`}
       />
@@ -17,7 +17,7 @@ export default function Curriculum() {
       <Section tone="gradient" className="!pb-12">
         <Eyebrow>Curriculum</Eyebrow>
         <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl">
-          Six weeks, six builds, one showcase
+          Eight weeks, eight makes, one showcase
         </h1>
         <Lede>
           Every session is {PROGRAM.minutesPerSession} minutes and ends with something the student

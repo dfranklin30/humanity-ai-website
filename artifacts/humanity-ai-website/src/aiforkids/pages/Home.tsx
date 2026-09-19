@@ -32,7 +32,7 @@ export default function Home() {
     <>
       <Seo
         title="AI for Kids | AI Builders Academy by Humanity + AI"
-        description="A six-week hands-on AI academy for grades 3–12 in Tampa Bay. Students build real AI projects, learn responsible AI, and present at a family showcase. Scholarships available."
+        description="A eight-week hands-on AI academy for grades 3–12 in Tampa Bay. Students build real AI projects, learn responsible AI, and present at a family showcase. Scholarships available."
         path={`${BASE}`}
         jsonLd={[
           {
@@ -76,7 +76,7 @@ export default function Home() {
           >
             <div className="mb-6 flex flex-wrap gap-2">
               <Pill tone="purple">Grades 3–12</Pill>
-              <Pill tone="teal">6 weeks · 90 minutes weekly</Pill>
+              <Pill tone="teal">6 weeks · 60 minutes weekly</Pill>
               <Pill tone="orange">Scholarships available</Pill>
             </div>
             <h1 className="text-4xl font-extrabold leading-[1.05] tracking-tight text-slate-900 sm:text-6xl">
@@ -131,7 +131,7 @@ export default function Home() {
             </Lede>
             <div className="mt-8 grid gap-4 sm:grid-cols-2">
               {[
-                { icon: Rocket, title: "Project based", body: "Six weeks, six builds, one showcase." },
+                { icon: Rocket, title: "Project based", body: "Eight weeks, eight makes, one showcase." },
                 { icon: ShieldCheck, title: "Safety first", body: "Responsible AI taught from Week 1, not bolted on." },
                 { icon: Users, title: "Small classes", body: `${PROGRAM.maxStudents} students maximum, always.` },
                 { icon: Sparkles, title: "Real tools", body: "The same AI tools professionals use, age-appropriately." },
@@ -152,7 +152,7 @@ export default function Home() {
           <Card className="bg-gradient-to-br from-white to-blue-50">
             <Eyebrow>Grade bands</Eyebrow>
             <p className="text-sm text-slate-600">
-              Students are grouped with their own age range. Same six-week arc, different depth.
+              Students are grouped with their own age range. Same eight-week arc, different depth.
             </p>
             <ul className="mt-6 space-y-4">
               {GRADE_BANDS.map((g) => (
@@ -173,7 +173,7 @@ export default function Home() {
       <Section tone="white">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <Eyebrow>The six weeks</Eyebrow>
+            <Eyebrow>The eight weeks</Eyebrow>
             <H2>From "what is AI?" to standing on stage</H2>
           </div>
           <Button href={`${BASE}/curriculum`} variant="ghost">
@@ -208,7 +208,7 @@ export default function Home() {
       {/* Outcomes */}
       <Section tone="tint">
         <Eyebrow>What students leave with</Eyebrow>
-        <H2>Ten things that outlast the six weeks</H2>
+        <H2>Ten things that outlast the eight weeks</H2>
         <ul className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {OUTCOMES.map((o) => (
             <li key={o.title} className="rounded-2xl border border-slate-200 bg-white p-5">

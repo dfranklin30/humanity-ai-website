@@ -53,7 +53,7 @@ export const CONSENTS: ConsentItem[] = [
     required: false,
     label: "Optional: my student may appear in photos or video of the program.",
     detail:
-      "Used for the Week 6 showcase recap, grant reporting and the Humanity + AI website. Students are never identified by full name. Declining changes nothing about your student's participation — we simply keep them out of frame. You can withdraw this at any time.",
+      "Used for the Week 8 showcase recap, grant reporting and the Humanity + AI website. Students are never identified by full name. Declining changes nothing about your student's participation — we simply keep them out of frame. You can withdraw this at any time.",
   },
   {
     id: "updates",

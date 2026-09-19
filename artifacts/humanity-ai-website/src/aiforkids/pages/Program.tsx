@@ -8,7 +8,7 @@ export default function Program() {
     <>
       <Seo
         title="Program Overview | AI Builders Academy"
-        description="Six weeks, 90 minutes a week, 20 students maximum, grades 3–12. Project-based AI learning with a family showcase in Week 6."
+        description="Eight weeks, 60 minutes a week, 20 students maximum, grades 3–12. Project-based AI learning with a family showcase in Week 8."
         path={`${BASE}/program`}
       />
 
@@ -33,7 +33,7 @@ export default function Program() {
       <Section tone="white">
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {[
-            { icon: CalendarClock, title: "Six weeks", body: "One session a week, after school. Long enough to build something real, short enough to finish inside a semester." },
+            { icon: CalendarClock, title: "Eight weeks", body: "One session a week, after school. Long enough to build something real, short enough to finish inside a semester." },
             { icon: Layers, title: "Project based", body: "Every week ends with a student-made artifact. Nothing is graded; everything is presented." },
             { icon: Users, title: "Small classes", body: `Capped at ${PROGRAM.maxStudents} students so every student gets instructor time and stage time.` },
             { icon: MapPin, title: "Hosted locally", body: PROGRAM.format },
@@ -53,7 +53,7 @@ export default function Program() {
         <Eyebrow>Grade bands</Eyebrow>
         <H2>Three bands, one curriculum</H2>
         <Lede>
-          Students are grouped with their own age range. The six-week arc is identical; the projects,
+          Students are grouped with their own age range. The eight-week arc is identical; the projects,
           the vocabulary and the level of independence are not.
         </Lede>
         <ul className="mt-10 grid gap-5 lg:grid-cols-3">
@@ -113,7 +113,7 @@ export default function Program() {
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <Eyebrow>Curriculum</Eyebrow>
-            <H2>The six weeks in brief</H2>
+            <H2>The eight weeks in brief</H2>
           </div>
           <Button href={`${BASE}/curriculum`} variant="ghost">
             Full curriculum <ArrowRight className="h-4 w-4" aria-hidden="true" />

@@ -49,7 +49,7 @@ export default function Schools() {
     <>
       <Seo
         title="Bring AI Builders Academy to Your School | Humanity + AI"
-        description="A turnkey six-week AI enrichment program for grades 3–12. Instructor provided, curriculum provided, no teacher prep, insured and background-checked. Partnership models, requirements and brochures for school administrators in Tampa Bay."
+        description="A turnkey eight-week AI enrichment program for grades 3–12. Instructor provided, curriculum provided, no teacher prep, insured and background-checked. Partnership models, requirements and brochures for school administrators in Tampa Bay."
         path={`${BASE}/schools`}
         jsonLd={{
           "@context": "https://schema.org",
@@ -79,7 +79,7 @@ export default function Schools() {
                 </span>
               </h1>
               <p className="mt-6 max-w-2xl text-lg leading-relaxed text-slate-700">
-                {PROGRAM.name} is a six-week, 90-minute-per-week after-school program for grades 3–12.
+                {PROGRAM.name} is a eight-week, 60-minute-per-week after-school program for grades 3–12.
                 Humanity + AI provides the instructor, the curriculum, the materials and the family
                 showcase. You provide a room and a time slot.
               </p>
@@ -100,7 +100,7 @@ export default function Schools() {
               </h2>
               <ul className="mt-5 space-y-3 text-sm">
                 {[
-                  "A room and a 90-minute after-school block, once a week for six weeks",
+                  "A room and a 60-minute after-school block, once a week for eight weeks",
                   "A point of contact at the school",
                   "Devices your students already use — Chromebooks are fine",
                 ].map((t) => (
@@ -170,7 +170,7 @@ export default function Schools() {
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <Eyebrow>What gets taught</Eyebrow>
-            <H2>The six-week curriculum</H2>
+            <H2>The eight-week curriculum</H2>
           </div>
           <Button href={`${BASE}/curriculum`} variant="ghost">
             Full detail, week by week <ArrowRight className="h-4 w-4" aria-hidden="true" />

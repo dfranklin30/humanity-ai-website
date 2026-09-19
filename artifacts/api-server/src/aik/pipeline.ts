@@ -134,7 +134,8 @@ export async function runRequest(requestId: number): Promise<void> {
     publish(req.class_id, { type: "request", request: toPublicRequest({ ...req, status: "working" }) });
 
     // 1. Validate shape
-    const input = validateInput(mode, req.kind, req.input);
+    const isStaff = klass.kind === "workspace";
+    const input = validateInput(mode, req.kind, req.input, { staff: isStaff });
     if (!input.ok) {
       await finish(req, { status: "blocked", message: input.error, flags: [{ layer: "system", category: "invalid_input" }] });
       return;
@@ -219,6 +220,10 @@ export async function runRequest(requestId: number): Promise<void> {
 }
 
 async function complete(req: RequestRow, artifactInput: NewArtifact, flags: Flag[]): Promise<void> {
+  // In a staff workspace the facilitator is the approver, so there is no one
+  // to hold media for. Screening still ran; only the human gate is skipped.
+  const klass = await store.getClass(req.class_id);
+  const approved = artifactInput.approved || klass?.kind === "workspace";
   const artifact = await store.createArtifact({
     classId: req.class_id,
     childId: req.child_id,
@@ -227,7 +232,7 @@ async function complete(req: RequestRow, artifactInput: NewArtifact, flags: Flag
     content: artifactInput.content,
     mime: artifactInput.mime,
     summary: artifactInput.summary,
-    approved: artifactInput.approved,
+    approved,
     parentArtifactId: req.project_artifact_id,
   });
   await finish(req, { status: "done", message: artifactInput.kidNote ?? null, flags, resultArtifactId: artifact.id });

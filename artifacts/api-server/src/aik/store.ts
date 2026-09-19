@@ -31,8 +31,27 @@ export type Facilitator = {
   created_at: string;
 };
 
+export type ClassKind = "class" | "workspace";
+
+export type ProjectKind = "org" | "program" | "class";
+
+export type ProjectRow = {
+  id: number;
+  facilitator_id: number;
+  class_id: number | null;
+  name: string;
+  summary: string;
+  kind: ProjectKind;
+  week: number | null;
+  archived: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ClassRow = {
   id: number;
+  /** 'class' = children; 'workspace' = one facilitator's own Hub space. */
+  kind: ClassKind;
   facilitator_id: number;
   name: string;
   code: string;
@@ -94,6 +113,7 @@ export type ArtifactRow = {
   published: boolean; // visible in class Arcade
   version: number;
   parent_artifact_id: number | null;
+  project_id?: number | null;
   created_at: string;
 };
 
@@ -195,6 +215,33 @@ export function ensureTables(): Promise<void> {
         )`);
       await db.execute(sql`
         CREATE INDEX IF NOT EXISTS aik_audit_class_idx ON aik_audit (class_id, id)`);
+
+      /* ---- Hub: staff workspaces and projects -------------------------- *
+       * A workspace is a class row with kind = 'workspace': one per
+       * facilitator, no children, no class code in use. Staff work runs
+       * through exactly the same screened pipeline as a child's, so nothing
+       * bypasses Content Safety. Projects group artifacts in the Hub.       */
+      await db.execute(sql`
+        ALTER TABLE aik_classes ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'class'`);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS aik_projects (
+          id serial PRIMARY KEY,
+          facilitator_id integer NOT NULL REFERENCES aik_facilitators(id) ON DELETE CASCADE,
+          class_id integer REFERENCES aik_classes(id) ON DELETE CASCADE,
+          name text NOT NULL,
+          summary text NOT NULL DEFAULT '',
+          kind text NOT NULL DEFAULT 'org',
+          week integer,
+          archived boolean NOT NULL DEFAULT false,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          updated_at timestamptz NOT NULL DEFAULT now()
+        )`);
+      await db.execute(sql`
+        ALTER TABLE aik_artifacts ADD COLUMN IF NOT EXISTS project_id integer`);
+      await db.execute(sql`
+        CREATE INDEX IF NOT EXISTS aik_artifacts_project_idx ON aik_artifacts (project_id, created_at)`);
+      await db.execute(sql`
+        CREATE INDEX IF NOT EXISTS aik_projects_facilitator_idx ON aik_projects (facilitator_id, archived)`);
     })().catch((err) => {
       ready = null;
       throw err;
@@ -292,8 +339,8 @@ export async function createClass(facilitatorId: number, name: string, ticketLim
 
 export async function listClasses(facilitatorId: number, isAdmin: boolean): Promise<ClassRow[]> {
   await ensureTables();
-  if (isAdmin) return rows<ClassRow>(await db.execute(sql`SELECT * FROM aik_classes ORDER BY created_at DESC`));
-  return rows<ClassRow>(await db.execute(sql`SELECT * FROM aik_classes WHERE facilitator_id = ${facilitatorId} ORDER BY created_at DESC`));
+  if (isAdmin) return rows<ClassRow>(await db.execute(sql`SELECT * FROM aik_classes WHERE kind = 'class' ORDER BY created_at DESC`));
+  return rows<ClassRow>(await db.execute(sql`SELECT * FROM aik_classes WHERE kind = 'class' AND facilitator_id = ${facilitatorId} ORDER BY created_at DESC`));
 }
 
 export async function getClass(id: number): Promise<ClassRow | null> {
@@ -632,6 +679,128 @@ export async function audit(
   await db.execute(sql`
     INSERT INTO aik_audit (class_id, actor_type, actor_id, action, detail)
     VALUES (${classId}, ${actorType}, ${actorId}, ${action}, ${detail === undefined ? null : JSON.stringify(detail)}::jsonb)`);
+}
+
+/* ------------------------------------------------------------------ *
+ * Hub: the staff workspace
+ *
+ * Every facilitator has exactly one workspace. It is an ordinary class row
+ * with kind = 'workspace' and no children, which means staff requests reuse
+ * the whole screened pipeline — Content Safety, prompt shields, output
+ * screening and the audit log all apply to adult work exactly as they do to
+ * a child's. The difference is only in the limits: no ticket meter, all
+ * modules unlocked, media approved on arrival.
+ * ------------------------------------------------------------------ */
+
+export async function ensureWorkspace(facilitatorId: number, displayName: string): Promise<ClassRow> {
+  await ensureTables();
+  const existing = one<ClassRow>(
+    await db.execute(sql`SELECT * FROM aik_classes WHERE kind = 'workspace' AND facilitator_id = ${facilitatorId} LIMIT 1`),
+  );
+  if (existing) return existing;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = newClassCode();
+    try {
+      const r = one<ClassRow>(
+        await db.execute(sql`
+          INSERT INTO aik_classes (facilitator_id, name, code, kind, modes, ticket_limit, chat_turn_limit, sound_enabled)
+          VALUES (${facilitatorId}, ${`${displayName}'s workspace`}, ${code}, 'workspace', ${ALL_MODES.join(",")}, 9999, 9999, true)
+          RETURNING *`),
+      );
+      return r!;
+    } catch (err: any) {
+      if (!String(err?.message).includes("unique")) throw err;
+    }
+  }
+  throw new Error("Could not create a workspace");
+}
+
+/* ------------------------------------------------------------------ *
+ * Hub: projects
+ * ------------------------------------------------------------------ */
+
+export async function listProjects(facilitatorId: number, includeArchived = false): Promise<(ProjectRow & { artifacts: number })[]> {
+  await ensureTables();
+  return rows(
+    await db.execute(sql`
+      SELECT p.*, (SELECT count(*) FROM aik_artifacts a WHERE a.project_id = p.id)::int AS artifacts
+        FROM aik_projects p
+       WHERE p.facilitator_id = ${facilitatorId}
+         AND (${includeArchived} OR p.archived = false)
+       ORDER BY p.kind, p.week NULLS LAST, p.updated_at DESC`),
+  );
+}
+
+export async function getProject(id: number): Promise<ProjectRow | null> {
+  await ensureTables();
+  return one<ProjectRow>(await db.execute(sql`SELECT * FROM aik_projects WHERE id = ${id} LIMIT 1`));
+}
+
+export async function createProject(input: {
+  facilitatorId: number;
+  classId: number | null;
+  name: string;
+  summary: string;
+  kind: ProjectKind;
+  week: number | null;
+}): Promise<ProjectRow> {
+  await ensureTables();
+  return one<ProjectRow>(
+    await db.execute(sql`
+      INSERT INTO aik_projects (facilitator_id, class_id, name, summary, kind, week)
+      VALUES (${input.facilitatorId}, ${input.classId}, ${input.name}, ${input.summary}, ${input.kind}, ${input.week})
+      RETURNING *`),
+  )!;
+}
+
+export async function updateProject(
+  id: number,
+  patch: { name?: string; summary?: string; archived?: boolean },
+): Promise<ProjectRow | null> {
+  await ensureTables();
+  return one<ProjectRow>(
+    await db.execute(sql`
+      UPDATE aik_projects SET
+        name = COALESCE(${patch.name ?? null}, name),
+        summary = COALESCE(${patch.summary ?? null}, summary),
+        archived = COALESCE(${patch.archived ?? null}, archived),
+        updated_at = now()
+      WHERE id = ${id}
+      RETURNING *`),
+  );
+}
+
+export async function deleteProject(id: number): Promise<void> {
+  await ensureTables();
+  await db.execute(sql`UPDATE aik_artifacts SET project_id = NULL WHERE project_id = ${id}`);
+  await db.execute(sql`DELETE FROM aik_projects WHERE id = ${id}`);
+}
+
+export async function setArtifactProject(artifactId: number, projectId: number | null): Promise<void> {
+  await ensureTables();
+  await db.execute(sql`UPDATE aik_artifacts SET project_id = ${projectId} WHERE id = ${artifactId}`);
+  if (projectId !== null) await db.execute(sql`UPDATE aik_projects SET updated_at = now() WHERE id = ${projectId}`);
+}
+
+/** Latest version of each artifact chain in a workspace, newest first. */
+export async function listWorkspaceArtifacts(
+  classId: number,
+  projectId: number | null,
+  limit = 100,
+): Promise<Omit<ArtifactRow, "content">[]> {
+  await ensureTables();
+  return rows<Omit<ArtifactRow, "content">>(
+    await db.execute(sql`
+      SELECT a.id, a.class_id, a.child_id, a.kind, a.title, a.mime, a.summary, a.approved, a.published,
+             a.version, a.parent_artifact_id, a.project_id, a.created_at
+        FROM aik_artifacts a
+       WHERE a.class_id = ${classId}
+         AND a.child_id IS NULL
+         AND (${projectId === null} OR a.project_id = ${projectId})
+         AND NOT EXISTS (SELECT 1 FROM aik_artifacts b WHERE b.parent_artifact_id = a.id)
+       ORDER BY a.created_at DESC
+       LIMIT ${limit}`),
+  );
 }
 
 export async function exportClass(classId: number): Promise<any> {

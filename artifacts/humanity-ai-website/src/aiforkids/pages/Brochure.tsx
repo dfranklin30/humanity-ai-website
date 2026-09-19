@@ -24,12 +24,12 @@ type Variant = "schools" | "curriculum" | "parents";
 const TITLES: Record<Variant, { title: string; subtitle: string; description: string }> = {
   schools: {
     title: "School Partner Brochure",
-    subtitle: "A turnkey six-week AI enrichment program for grades 3–12",
+    subtitle: "A turnkey eight-week AI enrichment program for grades 3–12",
     description:
       "Printable one-page overview of AI Builders Academy for school and district leaders — partnership models, site requirements, insurance and screening.",
   },
   curriculum: {
-    title: "Six-Week Curriculum Outline",
+    title: "Eight-Week Curriculum Outline",
     subtitle: "Week-by-week topics, projects and student outcomes",
     description:
       "Printable week-by-week curriculum outline for AI Builders Academy, suitable for attaching to a district enrichment proposal.",
@@ -116,7 +116,7 @@ export default function Brochure({ variant }: { variant: Variant }) {
                 {PROGRAM.name} is a {PROGRAM.weeks}-week, {PROGRAM.minutesPerSession}-minute-per-week
                 after-school program for grades 3–12, capped at {PROGRAM.maxStudents} students.{" "}
                 {ORG.shortName} provides the instructor, the curriculum, the materials and a family
-                showcase in Week 6. The host site provides a room, a weekly time slot and a point of
+                Creator Expo in Week 8. The host site provides a room, a weekly time slot and a point of
                 contact. No teacher preparation is required.
               </p>
             </Block>
@@ -227,8 +227,8 @@ export default function Brochure({ variant }: { variant: Variant }) {
           <>
             <Block title="What your student will do">
               <p>
-                Six weeks, six builds, one showcase. Students work in small groups on real AI tools with
-                an instructor present, and every student presents their project to families in Week 6.
+                Eight weeks, eight makes, one showcase. Students work in small groups on real AI tools with
+                an instructor present, and every student presents their project to families in Week 8.
               </p>
               <ol className="mt-2 space-y-1">
                 {CURRICULUM.map((w) => (

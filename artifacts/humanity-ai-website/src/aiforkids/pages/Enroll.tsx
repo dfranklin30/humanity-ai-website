@@ -129,7 +129,7 @@ export default function Enroll() {
     <>
       <Seo
         title="Enroll | AI Builders Academy"
-        description="Parent-initiated enrollment for the six-week AI Builders Academy. Takes about five minutes. Scholarships available."
+        description="Parent-initiated enrollment for the eight-week AI Builders Academy. Takes about five minutes. Scholarships available."
         path={`${BASE}/enroll`}
         noIndex
       />

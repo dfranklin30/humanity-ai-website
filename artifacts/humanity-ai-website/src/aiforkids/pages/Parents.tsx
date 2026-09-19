@@ -32,7 +32,7 @@ export default function Parents() {
         <Lede>
           Most parents arrive with the same two feelings: this matters, and I don't know how to help.
           The academy is built for exactly that — no prior experience needed at home, no homework, and
-          a showcase in Week 6 where you get to see what your student actually made.
+          a Creator Expo in Week 8 where you get to see what your student actually made.
         </Lede>
         <div className="mt-8 flex flex-wrap gap-3">
           <Button href={`${BASE}/enroll`} size="lg">
@@ -56,7 +56,7 @@ export default function Parents() {
               from, and who can explain their reasoning to a human being.
             </p>
             <p>
-              That's what these six weeks are pointed at. Students build real things, and every build is
+              That's what these eight weeks are pointed at. Students build real things, and every build is
               followed by the same question: how do you know this is right, and who might it fail?
             </p>
             <p>

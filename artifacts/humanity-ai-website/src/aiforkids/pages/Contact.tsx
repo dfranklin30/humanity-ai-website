@@ -9,7 +9,7 @@ const KINDS: { id: InquiryKind; label: string; blurb: string }[] = [
   { id: "general", label: "General inquiry", blurb: "Questions about the program, sessions or enrollment." },
   { id: "school_partnership", label: "School partnership", blurb: "Bring the academy to your school or district." },
   { id: "instructor", label: "Instructor application", blurb: "Teach the academy. Background check required." },
-  { id: "volunteer", label: "Volunteer", blurb: "Help at sessions or at the Week 6 showcase." },
+  { id: "volunteer", label: "Volunteer", blurb: "Help at sessions or at the Week 8 showcase." },
   { id: "sponsor", label: "Sponsor", blurb: "Fund a classroom, scholarships or equipment." },
 ];
 

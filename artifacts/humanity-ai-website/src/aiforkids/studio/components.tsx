@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Link } from "wouter";
 import { cx } from "../components/ui";
 import { getArtifact, type Artifact, type ArtifactMeta, type FieldDef, type ModeDef, type StudioRequest } from "./api";
 
@@ -13,6 +14,7 @@ export function BigButton({
   disabled,
   type = "button",
   className,
+  href,
 }: {
   children: ReactNode;
   onClick?: () => void;
@@ -20,6 +22,8 @@ export function BigButton({
   disabled?: boolean;
   type?: "button" | "submit";
   className?: string;
+  /** Render as an in-app link with the same styling. */
+  href?: string;
 }) {
   const styles = {
     primary: "bg-violet-600 text-white hover:bg-violet-700 shadow-md shadow-violet-200",
@@ -27,6 +31,18 @@ export function BigButton({
     ghost: "bg-transparent text-slate-600 hover:bg-slate-100",
     danger: "bg-rose-600 text-white hover:bg-rose-700",
   } as const;
+  const classes = cx(
+    "inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-lg font-bold transition focus:outline-none focus-visible:ring-4 focus-visible:ring-amber-300 disabled:cursor-not-allowed disabled:opacity-50",
+    styles[variant],
+    className,
+  );
+  if (href) {
+    return (
+      <Link href={href} className={classes}>
+        {children}
+      </Link>
+    );
+  }
   return (
     <button
       type={type}

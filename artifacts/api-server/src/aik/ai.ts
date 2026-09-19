@@ -131,10 +131,40 @@ export async function generateImage(prompt: string): Promise<MediaResult> {
     if (!url) throw new Error("fal: no image returned");
     return { ...(await download(url)), provider: "fal", model: aikConfig.fal.imageModel };
   }
+  if (aikConfig.providers.image === "oss") return generateImageOpenAICompatible(prompt);
   const res = await azure().images.generate({ model: aikConfig.azureOpenAI.imageDeployment, prompt, n: 1, size: "1024x1024" });
   const b64 = res.data?.[0]?.b64_json;
   if (!b64) throw new Error("Azure: no image returned");
   return { base64: b64, mime: "image/png", provider: "azure", model: aikConfig.azureOpenAI.imageDeployment };
+}
+
+/**
+ * Open-source image models served over the OpenAI-compatible images API.
+ * Covers Azure AI Foundry (FLUX.1 and friends) and any self-hosted equivalent.
+ * Accepts either a base64 payload or a URL in the response, since hosts differ.
+ */
+async function generateImageOpenAICompatible(prompt: string): Promise<MediaResult> {
+  const { imageBaseUrl, imageApiKey, imageModel } = aikConfig.oss;
+  const res = await fetchWithTimeout(
+    `${imageBaseUrl}/images/generations`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${imageApiKey}`,
+        "api-key": imageApiKey,
+      },
+      body: JSON.stringify({ model: imageModel, prompt, n: 1, size: "1024x1024" }),
+    },
+    aikConfig.mediaTimeoutMs,
+  );
+  if (!res.ok) throw new Error(`OSS image ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
+  const data: any = await res.json();
+  const item = data?.data?.[0];
+  const b64 = item?.b64_json;
+  if (b64) return { base64: b64, mime: "image/png", provider: "oss", model: imageModel };
+  if (item?.url) return { ...(await download(item.url)), provider: "oss", model: imageModel };
+  throw new Error("OSS image: no image returned");
 }
 
 export async function generateVideo(prompt: string): Promise<MediaResult> {
@@ -167,6 +197,7 @@ export async function generateMusic(prompt: string, seconds = 30): Promise<Media
 export async function speak(text: string): Promise<MediaResult> {
   if (aikConfig.mockAI) return { base64: MOCK_MP3, mime: "audio/mpeg", provider: "mock", model: "mock" };
   if (!isTtsConfigured()) throw new Error("TTS provider not configured");
+  if (aikConfig.providers.tts === "azure") return speakAzure(text);
   const res = await fetchWithTimeout(`https://api.elevenlabs.io/v1/text-to-speech/${aikConfig.elevenlabs.voiceId}`, {
     method: "POST",
     headers: { "content-type": "application/json", "xi-api-key": aikConfig.elevenlabs.apiKey, accept: "audio/mpeg" },
@@ -174,6 +205,33 @@ export async function speak(text: string): Promise<MediaResult> {
   }, 60_000);
   if (!res.ok) throw new Error(`ElevenLabs tts ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
   return { base64: Buffer.from(await res.arrayBuffer()).toString("base64"), mime: "audio/mpeg", provider: "elevenlabs", model: "eleven_multilingual_v2" };
+}
+
+/**
+ * Azure AI Speech text-to-speech. Runs on the same multi-service AIServices
+ * resource that already serves Content Safety, so "Read it to me" needs no new
+ * vendor and no new bill. One-way only: the Studio never records a child.
+ */
+async function speakAzure(text: string): Promise<MediaResult> {
+  const { key, region, voice } = aikConfig.azureSpeech;
+  const safe = text.slice(0, 2500).replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" })[c] as string);
+  const ssml = `<speak version="1.0" xml:lang="en-US"><voice name="${voice}"><prosody rate="-8%">${safe}</prosody></voice></speak>`;
+  const res = await fetchWithTimeout(
+    `https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/ssml+xml",
+        "x-microsoft-outputformat": "audio-24khz-48kbitrate-mono-mp3",
+        "ocp-apim-subscription-key": key,
+        "user-agent": "humanityplusai-kids-studio",
+      },
+      body: ssml,
+    },
+    60_000,
+  );
+  if (!res.ok) throw new Error(`Azure Speech ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
+  return { base64: Buffer.from(await res.arrayBuffer()).toString("base64"), mime: "audio/mpeg", provider: "azure", model: voice };
 }
 
 /* ------------------------------------------------------------------ *

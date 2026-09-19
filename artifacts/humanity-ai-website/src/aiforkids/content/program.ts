@@ -21,15 +21,17 @@ export const ORG = {
 } as const;
 
 export const PROGRAM = {
-  name: "AI Builders Academy",
-  tagline: "Build the Future with AI",
+  name: "Make It With AI",
+  tagline: "Kids are the directors. AI is the fast helper.",
   subheadline:
-    "A six-week hands-on Artificial Intelligence Academy where students create real AI projects, learn responsible AI, and build the skills they'll use for the rest of their lives.",
-  weeks: 6,
-  minutesPerSession: 90,
+    "An eight-week creator club where children design games, comics, art, music and passion projects \u2014 directing AI inside a guarded studio built for their age group, and presenting what they made to their families.",
+  weeks: 8,
+  minutesPerSession: 60,
   sessionsPerWeek: 1,
   maxStudents: 20,
-  format: "In person, after school — hosted at partner schools and community sites",
+  format: "After school \u2014 hosted at partner schools and community sites",
+  /** The studio children use. Nothing else touches AI. */
+  studioUrl: "/aiforkids/studio",
 } as const;
 
 export type GradeBand = {
@@ -45,7 +47,7 @@ export const GRADE_BANDS: GradeBand[] = [
     label: "Grades 3–5",
     ages: "Ages 8–11",
     blurb:
-      "Playful, guided discovery. Students work on instructor-operated accounts, explore how AI sees and creates, and build a first AI helper with plenty of support.",
+      "The home band for Make It With AI. Children direct AI inside the Kids AI Studio on facilitator-created accounts \u2014 no email, no real names \u2014 and make a game, a comic and a passion project of their own.",
   },
   {
     id: "6-8",
@@ -63,110 +65,19 @@ export const GRADE_BANDS: GradeBand[] = [
   },
 ];
 
-export type Week = {
-  n: number;
-  title: string;
-  summary: string;
-  topics: string[];
-  build: string;
-};
+/* ------------------------------------------------------------------ */
+/* Curriculum — the eight weeks live in content/weeks.ts               */
+/* ------------------------------------------------------------------ */
 
-export const CURRICULUM: Week[] = [
-  {
-    n: 1,
-    title: "Introduction to AI",
-    summary:
-      "What artificial intelligence actually is, how a model like ChatGPT produces an answer, and the ground rules we'll use all six weeks.",
-    topics: [
-      "What is AI, and what is it not",
-      "How large language models work, in plain language",
-      "AI ethics: fairness, bias and who gets left out",
-      "Staying safe: privacy, personal information and never trusting blindly",
-      "Prompt engineering fundamentals",
-    ],
-    build: "Students build their first AI assistant.",
-  },
-  {
-    n: 2,
-    title: "AI Creativity",
-    summary:
-      "Images, stories and design — plus the harder question of what it means to make something with a machine.",
-    topics: [
-      "AI image generation",
-      "Storytelling and character building",
-      "Comic creation",
-      "Graphic design with AI tools",
-      "Copyright, credit and attribution",
-      "Responsible use of generated work",
-    ],
-    build: "Students create an illustrated story or comic they wrote themselves.",
-  },
-  {
-    n: 3,
-    title: "Video, Voice, Music and Digital Media",
-    summary:
-      "Turning ideas into media — and learning to recognise synthetic media when they see it.",
-    topics: [
-      "AI video tools",
-      "Voice and narration",
-      "Music generation",
-      "Podcast creation",
-      "Digital media literacy and spotting deepfakes",
-    ],
-    build: "Students produce their own multimedia project.",
-  },
-  {
-    n: 4,
-    title: "Programming with AI",
-    summary:
-      "Using AI as a coding partner — and understanding enough of the code to stay in charge of it.",
-    topics: [
-      "Building a website with AI assistance",
-      "Making a simple game",
-      "Introduction to Python",
-      "No-code and low-code AI tools",
-      "Debugging: why the AI's first answer is often wrong",
-    ],
-    build: "Students create an interactive application.",
-  },
-  {
-    n: 5,
-    title: "AI in the Real World",
-    summary:
-      "Where AI already lives outside a browser tab — including a live demonstration of ROSIE and TalkingDOG.",
-    topics: [
-      "Robotics and sensors",
-      "Computer vision",
-      "AI in healthcare",
-      "AI for animals — a live ROSIE and TalkingDOG demonstration",
-      "Autonomous systems",
-      "AI careers in the Tampa Bay region",
-    ],
-    build: "Students connect their project idea to a real-world problem.",
-  },
-  {
-    n: 6,
-    title: "Final Showcase",
-    summary:
-      "Families come in. Students present. This is the part they remember.",
-    topics: [
-      "Presentation coaching",
-      "Student project presentations",
-      "Parents and guardians attend",
-      "Certificates awarded",
-      "Builder awards",
-      "Networking with instructors and partners",
-    ],
-    build: "Students present their portfolio to a real audience.",
-  },
-];
+export type { Week, WeekModule, AgendaBlock } from "./weeks";
+export { CURRICULUM, WEEK_MODULES, weekModule, SESSION_RHYTHM, PROGRAM_PRINCIPLES } from "./weeks";
 
 export const OUTCOMES: { title: string; body: string }[] = [
   { title: "Confidence using AI", body: "Students stop being intimidated by the blank prompt box." },
   { title: "AI ethics literacy", body: "They can explain bias, sourcing and consent in their own words." },
   { title: "Prompt engineering", body: "Structured, iterative prompting — not guesswork." },
   { title: "Portfolio projects", body: "Real artifacts they built and can show to anyone." },
-  { title: "Presentation skills", body: "Every student presents at the showcase in Week 6." },
+  { title: "Presentation skills", body: "Every student presents at the Creator Expo in Week 8." },
   { title: "Teamwork", body: "Small groups, shared critique, real collaboration." },
   { title: "Critical thinking", body: "Checking an AI's answer instead of accepting it." },
   { title: "Creativity", body: "AI as an instrument, not an autopilot." },
@@ -197,10 +108,10 @@ export const TIERS: Tier[] = [
     id: "explorer",
     name: "Explorer",
     price: null, // NEEDS_REVIEW: Humanity + AI to confirm the Explorer price
-    cadence: "for the full 6-week program",
+    cadence: "for the full 8-week program",
     summary: "The complete academy experience.",
     features: [
-      "All six weekly 90-minute sessions",
+      "All eight weekly 60-minute sessions",
       "Full AI Builders curriculum",
       "Small class — 20 students maximum",
       "Final showcase presentation",
@@ -214,7 +125,7 @@ export const TIERS: Tier[] = [
     name: "Creator",
     emoji: "⭐",
     price: 399,
-    cadence: "for the full 6-week program",
+    cadence: "for the full 8-week program",
     summary: "Everything in Explorer, plus the portfolio extras.",
     recommended: true,
     features: [
@@ -270,7 +181,7 @@ export const HERITAGE = {
       },
       {
         title: "Military and veteran families",
-        body: "Frequent moves break continuity in enrichment programs. A six-week format finishes inside a single semester.",
+        body: "Frequent moves break continuity in enrichment programs. A eight-week format finishes inside a single semester.",
       },
       {
         title: "Homeschool co-ops and community sites",
@@ -327,7 +238,7 @@ export const PARTNERSHIP_MODELS: PartnershipModel[] = [
     points: [
       "One invoice, no family-level billing",
       "Every seat free to the student",
-      "Sponsor recognition at the Week 6 showcase",
+      "Sponsor recognition at the Week 8 showcase",
       "Enrollment priority controlled by the school",
     ],
   },
@@ -338,8 +249,8 @@ export const PARTNERSHIP_MODELS: PartnershipModel[] = [
     body:
       "The academy slots into an existing after-school enrichment block alongside your other providers, on your calendar and your registration process where required.",
     points: [
-      "Fits a standard 90-minute enrichment block",
-      "Six-week term aligns to a single semester",
+      "Fits a standard 60-minute enrichment block",
+      "Eight-week term aligns to a single semester",
       "Vendor paperwork and certificates of insurance provided",
       "Can run consecutive terms for multiple grade bands",
     ],
@@ -365,8 +276,8 @@ export const SCHOOL_REQUIREMENTS = {
     { title: "A room", body: "A classroom, media center or lab. A dedicated computer lab is optional." },
     { title: "Devices", body: "One device per student or per pair. Chromebooks are perfectly acceptable — no high-end hardware required." },
     { title: "Internet", body: "Standard school broadband. We provide the list of domains to allow ahead of the first session." },
-    { title: "A display", body: "A projector or large screen for demonstrations and the Week 6 showcase." },
-    { title: "A 90-minute block", body: "One session per week for six weeks, after school." },
+    { title: "A display", body: "A projector or large screen for demonstrations and the Week 8 showcase." },
+    { title: "A 60-minute block", body: "One session per week for eight weeks, after school." },
   ],
 } as const;
 
@@ -442,7 +353,7 @@ export const FAQS: Faq[] = [
   },
   {
     q: "What if my child misses a class?",
-    a: "We send a catch-up summary and the session materials, and instructors work with the student at the start of the next session so nobody falls behind on their project. The six-week arc is designed to survive one missed week.",
+    a: "We send a catch-up summary and the session materials, and instructors work with the student at the start of the next session so nobody falls behind on their project. The eight-week arc is designed to survive one missed week.",
     audience: "parents",
   },
   {
@@ -452,7 +363,7 @@ export const FAQS: Faq[] = [
   },
   {
     q: "How much does it cost, and what if we can't afford it?",
-    a: "The Creator tier is $399 for the full six-week program. Need-based scholarships cover partial or full tuition and are available for every session — no family is turned away for cost, and no documentation of hardship is required.",
+    a: "The Creator tier is $399 for the full eight-week program. Need-based scholarships cover partial or full tuition and are available for every session — no family is turned away for cost, and no documentation of hardship is required.",
     audience: "parents",
   },
   {
@@ -534,7 +445,7 @@ export const INSTRUCTORS: Instructor[] = [
 export const INSTRUCTOR_STANDARD = [
   "Criminal background check completed before working with students",
   "Direct professional experience with AI systems, not just curriculum delivery",
-  "Trained on the full six-week curriculum before leading a cohort",
+  "Trained on the full eight-week curriculum before leading a cohort",
   "District-specific screening or badging completed on request",
 ] as const;
 
@@ -626,7 +537,7 @@ export const DOWNLOADS: Download[] = [
   },
   {
     id: "curriculum-outline",
-    title: "Six-Week Curriculum Outline",
+    title: "Eight-Week Curriculum Outline",
     description:
       "Week-by-week topics, projects and student outcomes, suitable for attaching to a district enrichment proposal.",
     audience: "schools",
