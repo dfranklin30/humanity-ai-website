@@ -33,11 +33,11 @@ export default function ProfilePage() {
   if (error || !data) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-20 text-center">
-        <UserIcon className="h-12 w-12 text-white/30 mx-auto mb-4" />
-        <h2 className="font-serif text-2xl font-bold mb-2 text-white">Profile not found</h2>
-        <p className="text-white/70 mb-6">We couldn't find that author.</p>
+        <UserIcon className="h-12 w-12 text-[#8A9A92] mx-auto mb-4" />
+        <h2 className="font-serif text-2xl font-bold mb-2 text-[#14201B]">Profile not found</h2>
+        <p className="text-[#4B5F55] mb-6">We couldn't find that author.</p>
         <Link href="/blog">
-          <Button variant="outline" className="gap-2 text-white hover:text-white border-white/25">
+          <Button variant="outline" className="gap-2 text-[#14201B] hover:text-[#14201B] border-black/15">
             <ArrowLeft className="h-4 w-4" />
             Back to Blog
           </Button>
@@ -141,10 +141,10 @@ export default function ProfilePage() {
 
       <section className="py-12">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="font-serif text-xl font-bold mb-6 flex items-center gap-2 text-white">
-            <BookOpen className="h-4 w-4 text-emerald-300" />
+          <h2 className="font-serif text-xl font-bold mb-6 flex items-center gap-2 text-[#14201B]">
+            <BookOpen className="h-4 w-4 text-emerald-700" />
             Articles by {profile.displayName || profile.username}
-            <span className="text-sm text-white/60 font-normal">({posts.length})</span>
+            <span className="text-sm text-[#5B6F65] font-normal">({posts.length})</span>
           </h2>
 
           {posts.length === 0 ? (

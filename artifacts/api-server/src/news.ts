@@ -1,5 +1,5 @@
 // AI News aggregator — pulls free, no-key sources (arXiv + Google News RSS across
-// AI, frontier models, and markets) and returns normalized items for the homepage
+// AI, frontier models, and ethics & policy) and returns normalized items for the homepage
 // "AI News" ticker plus an arXiv "latest research & models" feed. Results are
 // cached in memory so page loads never hammer the upstreams. Fails soft: a dead
 // source is skipped, and on total failure we serve the last good cache.
@@ -9,7 +9,7 @@ export interface NewsItem {
   source: string;
   url: string;
   publishedAt: string | null;
-  category: "news" | "markets" | "research";
+  category: "news" | "policy" | "research";
 }
 export interface ArxivItem {
   title: string;
@@ -28,7 +28,7 @@ const CACHE_TTL_MS = 20 * 60 * 1000; // 20 minutes
 let cache: { at: number; data: NewsPayload } | null = null;
 let inflight: Promise<NewsPayload> | null = null;
 
-async function fetchText(url: string, timeoutMs = 9000): Promise<string | null> {
+async function fetchText(url: string, timeoutMs = 15000): Promise<string | null> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
@@ -116,20 +116,29 @@ function gnews(query: string): string {
   return `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
 }
 
+// The three headline queries are chosen to match what this organization is for.
+// The third slot used to track chip stocks and semiconductor prices; it now
+// follows ethics, governance, regulation, safety, bias, literacy and access —
+// the subjects the board actually works on. arXiv still supplies the research
+// tail, unchanged.
 async function build(): Promise<NewsPayload> {
-  const [aiNews, modelNews, marketNews, arxivXml] = await Promise.all([
+  const [aiNews, modelNews, policyNews, arxivXml] = await Promise.all([
     fetchText(gnews("artificial intelligence when:7d")),
     fetchText(gnews("(OpenAI OR Anthropic OR \"Google DeepMind\" OR \"Meta AI\" OR Mistral OR xAI) AI model when:7d")),
-    fetchText(gnews("(Nvidia OR \"AI stock\" OR \"AI chips\" OR semiconductor) stock market when:7d")),
     fetchText(
-      "http://export.arxiv.org/api/query?search_query=cat:cs.AI+OR+cat:cs.LG+OR+cat:cs.CL&sortBy=submittedDate&sortOrder=descending&max_results=12",
+      gnews(
+        '("AI ethics" OR "AI governance" OR "responsible AI" OR "AI regulation" OR "AI safety" OR "algorithmic bias" OR "AI literacy" OR "AI accessibility") when:7d',
+      ),
+    ),
+    fetchText(
+      "https://export.arxiv.org/api/query?search_query=cat:cs.AI+OR+cat:cs.LG+OR+cat:cs.CL&sortBy=submittedDate&sortOrder=descending&max_results=12",
     ),
   ]);
 
   const news = [
     ...(aiNews ? parseRss(aiNews, "AI News", "news", 12) : []),
     ...(modelNews ? parseRss(modelNews, "Models", "news", 8) : []),
-    ...(marketNews ? parseRss(marketNews, "Markets", "markets", 8) : []),
+    ...(policyNews ? parseRss(policyNews, "Ethics & Policy", "policy", 10) : []),
   ];
   const arxiv = arxivXml ? parseArxiv(arxivXml, 10) : [];
 

@@ -3,6 +3,17 @@ import { blogPosts, events, users, campaigns } from "@workspace/db";
 import { sql, like, eq, and } from "drizzle-orm";
 
 export async function seedDatabase() {
+  // Retired from the calendar: the Sep 18 Quick Hacks kickoff. Dropping it from
+  // the seed above stops it being re-created; this clears the row already in the
+  // database. Guarded so a failure here can never block startup.
+  try {
+    await db.execute(
+      sql`DELETE FROM events WHERE title LIKE 'Humanity + AI Quick Hacks Ep. 06%'`,
+    );
+  } catch (err) {
+    console.error("[seed] could not retire the Sep 18 Quick Hacks kickoff:", err);
+  }
+
   await db.update(users)
     .set({ email: "danielle@humanityplusai.org" })
     .where(eq(users.email, "danielle@humanityplusai.og"));
@@ -836,7 +847,182 @@ Read the full piece on JourneyBytes.`,
       speakerName: "William Zhu",
       speakerProfileUrl: "/about/board/william-zhu",
     },
+
+    // ── Humanity + AI Quick Hacks — fall special ──────────────────────────
+    // The live, multi-person follow-on to Claude Hacks (which ended at Ep. 05
+    // as solo recordings), so the numbering continues rather than restarting.
+    // Fridays 5pm ET, Sept 18 - Dec 18. Nov 27 is skipped (Thanksgiving).
+    // Ep. 11 is the Doug (developers.net) guest episode and runs 15 min longer.
+    {
+      title: "Humanity + AI Quick Hacks Ep. 07 — Prompting That Survives Contact With Reality",
+      description: "The gap between a prompt that works once and instructions that work every time. We take a request someone on the team actually sends every week and turn it into something repeatable — with examples, constraints, and a way to tell when it has gone wrong. Bring a task you have explained to an AI more than twice.",
+      date: "2026-09-25",
+      time: "5:00 PM - 6:00 PM ET",
+      location: "Online — Join Virtually",
+      type: "Podcast",
+      imageUrl: "/uploads/quick-hacks-ep07.webp",
+      secondaryImageUrl: null,
+      link: "https://riverside.com/studio/danielle-franklins-studio-dy1Ck?t=ad2d1c7c94b95c266294",
+      recordingUrl: null,
+      speakerName: "Danielle Franklin",
+      speakerProfileUrl: null,
+    },
+    {
+      title: "Humanity + AI Quick Hacks Ep. 08 — Your First Agent: Automate One Weekly Chore",
+      description: "Pick a recurring task that eats an hour a week and hand it over, live on the call. The hack is in the scoping rather than the cleverness: deciding what to automate, what stays human, and how to make the handoff safe enough to leave running.",
+      date: "2026-10-02",
+      time: "5:00 PM - 6:00 PM ET",
+      location: "Online — Join Virtually",
+      type: "Podcast",
+      imageUrl: "/uploads/quick-hacks-ep08.webp",
+      secondaryImageUrl: null,
+      link: "https://riverside.com/studio/danielle-franklins-studio-dy1Ck?t=ad2d1c7c94b95c266294",
+      recordingUrl: null,
+      speakerName: "Danielle Franklin",
+      speakerProfileUrl: null,
+    },
+    {
+      title: "Humanity + AI Quick Hacks Ep. 09 — Reading the Machine: Confident vs. Guessing",
+      description: "AI rarely volunteers that it is unsure. We show how to make it say so — hedging, confidence thresholds, and why a system that abstains when it cannot tell is worth more than one that always produces an answer. Drawn from the confidence work behind our own models.",
+      date: "2026-10-09",
+      time: "5:00 PM - 6:00 PM ET",
+      location: "Online — Join Virtually",
+      type: "Podcast",
+      imageUrl: "/uploads/quick-hacks-ep09.webp",
+      secondaryImageUrl: null,
+      link: "https://riverside.com/studio/danielle-franklins-studio-dy1Ck?t=ad2d1c7c94b95c266294",
+      recordingUrl: null,
+      speakerName: "Danielle Franklin",
+      speakerProfileUrl: null,
+    },
+    {
+      title: "Humanity + AI Quick Hacks Ep. 10 — The Data You Already Have",
+      description: "Most organisations are sitting on answers inside a spreadsheet nobody opens. We take a real file on the call and get useful answers out of it — no database, no engineer, no migration project. Bring a messy export and we will work with it.",
+      date: "2026-10-16",
+      time: "5:00 PM - 6:00 PM ET",
+      location: "Online — Join Virtually",
+      type: "Podcast",
+      imageUrl: "/uploads/quick-hacks-ep10.webp",
+      secondaryImageUrl: null,
+      link: "https://riverside.com/studio/danielle-franklins-studio-dy1Ck?t=ad2d1c7c94b95c266294",
+      recordingUrl: null,
+      speakerName: "Danielle Franklin",
+      speakerProfileUrl: null,
+    },
+    {
+      title: "Humanity + AI Quick Hacks Ep. 11 — Guest: Doug — Being a Tech CEO in the AI Era, and a Live Product Demo",
+      description: "A special guest episode. Doug from developers.net gives an honest breakdown of what it actually takes to run a technology startup in the AI era right now — what the job consists of day to day, what it costs, and what separates the companies that make it from the ones that quietly do not. He then demonstrates their product live, with open questions from the room afterwards.",
+      date: "2026-10-23",
+      time: "5:00 PM - 6:15 PM ET",
+      location: "Online — Join Virtually",
+      type: "Podcast",
+      imageUrl: "/uploads/quick-hacks-ep11.webp",
+      secondaryImageUrl: null,
+      link: "https://riverside.com/studio/danielle-franklins-studio-dy1Ck?t=ad2d1c7c94b95c266294",
+      recordingUrl: null,
+      speakerName: "Doug (developers.net)",
+      speakerProfileUrl: null,
+    },
+    {
+      title: "Humanity + AI Quick Hacks Ep. 12 — Build In Public: Ship a Tool Before the Hour Is Up",
+      description: "No slides. We start from an empty folder and finish with something people can click, live. Everything that breaks along the way stays in the recording, because watching someone recover from a mistake teaches more than watching a polished demo.",
+      date: "2026-10-30",
+      time: "5:00 PM - 6:00 PM ET",
+      location: "Online — Join Virtually",
+      type: "Podcast",
+      imageUrl: "/uploads/quick-hacks-ep12.webp",
+      secondaryImageUrl: null,
+      link: "https://riverside.com/studio/danielle-franklins-studio-dy1Ck?t=ad2d1c7c94b95c266294",
+      recordingUrl: null,
+      speakerName: "Danielle Franklin",
+      speakerProfileUrl: null,
+    },
+    {
+      title: "Humanity + AI Quick Hacks Ep. 13 — AI and Animals: Reading Emotion From Signals",
+      description: "A working case study from ROSIE, our canine emotion engine: how posture, sound and movement become a read on how a dog actually feels, and how the system says so in plain language. What transfers to any domain where the subject cannot tell you what is wrong.",
+      date: "2026-11-06",
+      time: "5:00 PM - 6:00 PM ET",
+      location: "Online — Join Virtually",
+      type: "Podcast",
+      imageUrl: "/uploads/quick-hacks-ep13.webp",
+      secondaryImageUrl: null,
+      link: "https://riverside.com/studio/danielle-franklins-studio-dy1Ck?t=ad2d1c7c94b95c266294",
+      recordingUrl: null,
+      speakerName: "Danielle Franklin",
+      speakerProfileUrl: null,
+    },
+    {
+      title: "Humanity + AI Quick Hacks Ep. 14 — Guardrails: What to Never Let an AI Decide",
+      description: "Which decisions must stay with a person, and how to build a system that enforces that rather than trusting everyone to remember. We write real guardrails live, then spend the back half of the session trying to break them.",
+      date: "2026-11-13",
+      time: "5:00 PM - 6:00 PM ET",
+      location: "Online — Join Virtually",
+      type: "Podcast",
+      imageUrl: "/uploads/quick-hacks-ep14.webp",
+      secondaryImageUrl: null,
+      link: "https://riverside.com/studio/danielle-franklins-studio-dy1Ck?t=ad2d1c7c94b95c266294",
+      recordingUrl: null,
+      speakerName: "Danielle Franklin",
+      speakerProfileUrl: null,
+    },
+    {
+      title: "Humanity + AI Quick Hacks Ep. 15 — Cheap By Design: AI Without Burning the Budget",
+      description: "What actually drives an AI bill, and the design choices that cut it by an order of magnitude — open models, scale-to-zero, caching, and knowing the moments when the expensive option genuinely earns its price. Real numbers from our own infrastructure.",
+      date: "2026-11-20",
+      time: "5:00 PM - 6:00 PM ET",
+      location: "Online — Join Virtually",
+      type: "Podcast",
+      imageUrl: "/uploads/quick-hacks-ep15.webp",
+      secondaryImageUrl: null,
+      link: "https://riverside.com/studio/danielle-franklins-studio-dy1Ck?t=ad2d1c7c94b95c266294",
+      recordingUrl: null,
+      speakerName: "Danielle Franklin",
+      speakerProfileUrl: null,
+    },
+    {
+      title: "Humanity + AI Quick Hacks Ep. 16 — Voice and Access: Making AI Speak Everyone's Language",
+      description: "Translation, speech and reading level are the difference between a tool that is technically available and one people can actually use. We take a single interface and widen who can work with it, then look honestly at what machine translation still gets wrong.",
+      date: "2026-12-04",
+      time: "5:00 PM - 6:00 PM ET",
+      location: "Online — Join Virtually",
+      type: "Podcast",
+      imageUrl: "/uploads/quick-hacks-ep16.webp",
+      secondaryImageUrl: null,
+      link: "https://riverside.com/studio/danielle-franklins-studio-dy1Ck?t=ad2d1c7c94b95c266294",
+      recordingUrl: null,
+      speakerName: "Danielle Franklin",
+      speakerProfileUrl: null,
+    },
+    {
+      title: "Humanity + AI Quick Hacks Ep. 17 — From Demo to Durable: What Breaks With Real Users",
+      description: "Every demo works. This session is about day two — the failures that only appear once strangers arrive: the empty state nobody designed, the input nobody expected, the silent error that looks like success.",
+      date: "2026-12-11",
+      time: "5:00 PM - 6:00 PM ET",
+      location: "Online — Join Virtually",
+      type: "Podcast",
+      imageUrl: "/uploads/quick-hacks-ep17.webp",
+      secondaryImageUrl: null,
+      link: "https://riverside.com/studio/danielle-franklins-studio-dy1Ck?t=ad2d1c7c94b95c266294",
+      recordingUrl: null,
+      speakerName: "Danielle Franklin",
+      speakerProfileUrl: null,
+    },
+    {
+      title: "Humanity + AI Quick Hacks Ep. 18 — Fall Wrap: Best Hacks, and What We Build Next",
+      description: "The fall special closes out. We revisit which hacks actually stuck, which ones flopped and why, and set the build list going into the new year. All board members join for this one.",
+      date: "2026-12-18",
+      time: "5:00 PM - 6:00 PM ET",
+      location: "Online — Join Virtually",
+      type: "Podcast",
+      imageUrl: "/uploads/quick-hacks-ep18.webp",
+      secondaryImageUrl: null,
+      link: "https://riverside.com/studio/danielle-franklins-studio-dy1Ck?t=ad2d1c7c94b95c266294",
+      recordingUrl: null,
+      speakerName: "Danielle Franklin",
+      speakerProfileUrl: null,
+    },
   ];
+
 
   for (const seedEvent of eventSeed) {
     const [existing] = await db

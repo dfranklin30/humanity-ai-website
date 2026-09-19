@@ -1236,7 +1236,7 @@ export default function Training() {
                     <div className="w-11 h-11 rounded-lg bg-primary/10 flex items-center justify-center">
                       <p.icon className="h-5 w-5 text-primary" />
                     </div>
-                    <span className="font-serif text-2xl text-muted-foreground/40">{p.num}</span>
+                    <span className="font-serif text-2xl text-muted-foreground/70">{p.num}</span>
                   </div>
                   <h3 className="font-serif text-xl font-bold mb-2">{p.label}</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed flex-1 mb-4">{p.desc}</p>
@@ -1287,13 +1287,13 @@ export default function Training() {
       <section className="py-16" id="ai-journey">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <motion.div {...fadeIn} className="text-center max-w-3xl mx-auto mb-12">
-                <h2 className="font-serif text-3xl font-bold mb-4 text-white" data-testid="text-ai-journey">The AI Journey</h2>
-                <p className="text-white/75 leading-relaxed">
+                <h2 className="font-serif text-3xl font-bold mb-4 text-[#14201B]" data-testid="text-ai-journey">The AI Journey</h2>
+                <p className="text-[#4B5F55] leading-relaxed">
                   All organizations are in an ongoing process of moving from a current state of using data and AI to a desired next state. Resources are organized according to four phases: <strong>Curiosity</strong>, <strong>Exploration</strong>, <strong>Adoption</strong>, and <strong>Impact</strong>.
                 </p>
-                <p className="text-sm text-white/70 mt-3">
+                <p className="text-sm text-[#4B5F55] mt-3">
                   Content curated from the{" "}
-                  <a href="https://learn.mcgovern.org" target="_blank" rel="noopener noreferrer" className="text-emerald-300 hover:underline">
+                  <a href="https://learn.mcgovern.org" target="_blank" rel="noopener noreferrer" className="text-emerald-700 hover:underline">
                     Patrick J. McGovern Foundation Learning Hub
                   </a>
                 </p>
@@ -1410,7 +1410,7 @@ export default function Training() {
 
               {!activePhase && (
                 <motion.div {...fadeIn} className="text-center py-4">
-                  <p className="text-sm text-white/70">Click a phase above to explore its modules and resources</p>
+                  <p className="text-sm text-[#4B5F55]">Click a phase above to explore its modules and resources</p>
                 </motion.div>
               )}
             </div>
@@ -1517,11 +1517,11 @@ export default function Training() {
           <section className="py-12 bg-muted/30">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <motion.div {...fadeIn} className="text-center max-w-2xl mx-auto mb-8">
-                <h2 className="font-serif text-2xl font-bold mb-3 text-white" data-testid="text-about-pjmf">About the PJMF Learning Hub</h2>
-                <p className="text-sm text-white/75 leading-relaxed">
-                  The <a href="https://www.mcgovern.org/" target="_blank" rel="noopener noreferrer" className="text-emerald-300 hover:underline">Patrick J. McGovern Foundation</a> believes that all civil society organizations will benefit from deep knowledge sharing and skill building. The pace of AI and digital transformation is accelerating, and no organization should have to figure it all out on their own.
+                <h2 className="font-serif text-2xl font-bold mb-3 text-[#14201B]" data-testid="text-about-pjmf">About the PJMF Learning Hub</h2>
+                <p className="text-sm text-[#4B5F55] leading-relaxed">
+                  The <a href="https://www.mcgovern.org/" target="_blank" rel="noopener noreferrer" className="text-emerald-700 hover:underline">Patrick J. McGovern Foundation</a> believes that all civil society organizations will benefit from deep knowledge sharing and skill building. The pace of AI and digital transformation is accelerating, and no organization should have to figure it all out on their own.
                 </p>
-                <p className="text-sm text-white/75 leading-relaxed mt-3">
+                <p className="text-sm text-[#4B5F55] leading-relaxed mt-3">
                   Through their Hub, PJMF makes resources and learning experiences available to all nonprofits wherever they are in their journey towards becoming a data and AI-enabled organization — by vetting and curating the strongest resources from across the web and creating hands-on learning opportunities.
                 </p>
               </motion.div>
@@ -1541,12 +1541,12 @@ export default function Training() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div {...fadeIn} className="grid lg:grid-cols-12 gap-10 mb-14 items-end">
             <div className="lg:col-span-8">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/20 text-primary text-[11px] font-bold uppercase tracking-widest mb-5">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-400/20 text-emerald-300 text-[11px] font-bold uppercase tracking-widest mb-5">
                 <ShieldCheck className="h-3 w-3" />
                 Responsible AI Hub · Led by Jofiah Jose Prakash
               </div>
               <h2 className="font-serif text-3xl md:text-5xl font-bold tracking-tight leading-[1.05] mb-4" data-testid="text-responsible-ai-title">
-                The ethics backbone of <span className="italic font-light text-primary">everything we teach.</span>
+                The ethics backbone of <span className="italic font-light text-emerald-300">everything we teach.</span>
               </h2>
               <p className="text-base text-background/70 leading-relaxed font-serif max-w-2xl">
                 Responsible AI isn't a chapter at the end. It's the operating system underneath every learning path, every builder template, and every shipped system. Curated and led by our Director of AI Ethics & Governance.
@@ -1561,7 +1561,7 @@ export default function Training() {
                   <p className="text-sm font-bold">Jofiah Jose Prakash</p>
                   <p className="text-[11px] text-background/60 uppercase tracking-widest">Director of AI Ethics</p>
                   <Link href="/about/board/jofia-jose-prakash">
-                    <button className="text-[11px] text-primary hover:underline mt-1 inline-flex items-center gap-1" data-testid="link-jofia-profile-rai">
+                    <button className="text-[11px] text-emerald-300 hover:underline mt-1 inline-flex items-center gap-1" data-testid="link-jofia-profile-rai">
                       Board Profile <ArrowRight className="h-3 w-3" />
                     </button>
                   </Link>
@@ -1726,15 +1726,15 @@ export default function Training() {
                 <SiYoutube className="h-5 w-5 text-red-500" />
               </div>
               <div>
-                <h2 className="font-serif text-2xl font-bold text-white" data-testid="text-video-courses">Free Video Courses & Channels</h2>
-                <p className="text-sm text-white/70">Curated YouTube channels with verified, high-quality AI education</p>
+                <h2 className="font-serif text-2xl font-bold text-[#14201B]" data-testid="text-video-courses">Free Video Courses & Channels</h2>
+                <p className="text-sm text-[#4B5F55]">Curated YouTube channels with verified, high-quality AI education</p>
               </div>
             </motion.div>
 
             {filteredResources.length === 0 ? (
               <div className="text-center py-12">
-                <Search className="h-10 w-10 text-white/30 mx-auto mb-3" />
-                <p className="text-white/70">No courses match your current filters. Try adjusting your search.</p>
+                <Search className="h-10 w-10 text-[#8A9A92] mx-auto mb-3" />
+                <p className="text-[#4B5F55]">No courses match your current filters. Try adjusting your search.</p>
               </div>
             ) : (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1856,8 +1856,8 @@ export default function Training() {
       <section className="py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div {...fadeIn} className="text-center max-w-2xl mx-auto mb-12">
-            <h2 className="font-serif text-2xl font-bold mb-4 text-white" data-testid="text-learning-paths">Recommended Learning Paths</h2>
-            <p className="text-white/70">Not sure where to start? Follow one of our curated paths based on your experience level.</p>
+            <h2 className="font-serif text-2xl font-bold mb-4 text-[#14201B]" data-testid="text-learning-paths">Recommended Learning Paths</h2>
+            <p className="text-[#4B5F55]">Not sure where to start? Follow one of our curated paths based on your experience level.</p>
           </motion.div>
 
           <div className="grid md:grid-cols-3 gap-6">
