@@ -114,13 +114,32 @@ const wrap = (fn: (req: Request, res: Response) => Promise<any>) => (req: Reques
  * Bootstrap
  * ------------------------------------------------------------------ */
 
+/**
+ * AIK_BOOTSTRAP_FACILITATOR = "email:password".
+ *
+ * Creates that facilitator when they do not exist, and **resets their
+ * password when they do**. The reset matters because the password is set
+ * through a shell, where a stray `$`, `!` or quote silently changes it — and
+ * without a reset the account is then unreachable forever.
+ *
+ * This makes the variable a standing password reset for as long as it is set,
+ * which is why it is logged loudly and must be removed after first sign-in.
+ */
 async function bootstrap(): Promise<void> {
   await store.ensureTables();
-  const [email, ...rest] = aikConfig.bootstrapFacilitator.split(":");
-  const password = rest.join(":");
-  if (email && password && (await store.countFacilitators()) === 0) {
-    await store.createFacilitator(email, await hashPassword(password), "Facilitator", true);
-    logger.info({ email }, "[aik] bootstrap facilitator created");
+  const raw = aikConfig.bootstrapFacilitator;
+  const idx = raw.indexOf(":");
+  const email = idx === -1 ? "" : raw.slice(0, idx).trim();
+  const password = idx === -1 ? "" : raw.slice(idx + 1);
+  if (email && password) {
+    const existing = await store.getFacilitatorByEmail(email);
+    if (existing) {
+      await store.updateFacilitatorPassword(existing.id, await hashPassword(password));
+      logger.warn({ email }, "[aik] bootstrap facilitator password RESET — remove AIK_BOOTSTRAP_FACILITATOR now");
+    } else {
+      await store.createFacilitator(email, await hashPassword(password), "Facilitator", true);
+      logger.info({ email }, "[aik] bootstrap facilitator created");
+    }
   }
   logger.info(capabilitySummary(), "[aik] Kids AI Studio API mounted at /api/aik");
 }
