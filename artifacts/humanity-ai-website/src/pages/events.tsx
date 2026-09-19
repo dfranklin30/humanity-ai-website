@@ -17,6 +17,33 @@ function isExternalUrl(url: string): boolean {
   return /^https?:\/\//i.test(url);
 }
 
+/**
+ * Pull the video id out of any shape of YouTube link people actually paste:
+ * watch?v=, youtu.be/, /embed/, /live/ and /shorts/. Returns null for anything
+ * that is not YouTube, which is what keeps the old link-out button working for
+ * recordings hosted elsewhere.
+ */
+function youTubeId(url: string): string | null {
+  const m = url.match(
+    /(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|live\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/,
+  );
+  return m ? m[1] : null;
+}
+
+/**
+ * Was this event only ever in the room?
+ *
+ * Walks, museum discussions and demo nights were never filmed, so promising a
+ * recording for them is a promise the site cannot keep. We infer it from the
+ * location because the events table has no "was this recorded" column, and the
+ * distinction is reliable here: everything we record online carries "Online",
+ * "Virtual" or "Riverside" in its location, and everything physical carries a
+ * street address or venue name.
+ */
+function isInPersonOnly(location: string): boolean {
+  return !/online|virtual|riverside/i.test(location);
+}
+
 const fadeIn = {
   initial: { opacity: 0, y: 20 },
   whileInView: { opacity: 1, y: 0 },
@@ -51,6 +78,7 @@ export default function Events() {
   const renderEvent = (event: Event, i: number, isPast: boolean) => {
     const eventDate = new Date(event.date + "T00:00:00");
     const isLumaRsvp = !!event.link && /^https?:\/\/(www\.)?(luma\.com|lu\.ma)\//.test(event.link);
+    const recordingYouTubeId = event.recordingUrl ? youTubeId(event.recordingUrl) : null;
     const month = eventDate
       .toLocaleString("en-US", { month: "short" })
       .toUpperCase();
@@ -138,6 +166,26 @@ export default function Events() {
                 {event.location}
               </span>
             </div>
+            {/* Recordings play HERE rather than sending people to another site.
+                Anything that is not a YouTube link still falls through to the
+                link-out button below. youtube-nocookie keeps the tracking
+                cookie off the page until someone actually presses play. */}
+            {isPast && recordingYouTubeId && (
+              <div
+                className="relative w-full mb-5 rounded-lg overflow-hidden bg-black"
+                style={{ aspectRatio: "16 / 9" }}
+                data-testid={`embed-event-recording-${event.id}`}
+              >
+                <iframe
+                  className="absolute inset-0 w-full h-full"
+                  src={`https://www.youtube-nocookie.com/embed/${recordingYouTubeId}?rel=0`}
+                  title={`Recording: ${event.title}`}
+                  loading="lazy"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                />
+              </div>
+            )}
             <div className="flex flex-wrap items-center gap-3">
               {!isPast && isLumaRsvp && event.link && (
                 <a href={event.link} target="_blank" rel="noopener noreferrer">
@@ -165,7 +213,17 @@ export default function Events() {
                   </Button>
                 </a>
               )}
-              {isPast && event.recordingUrl && (
+              {/* Already embedded above — offer the YouTube page instead of a
+                  second play button that does the same thing. */}
+              {isPast && event.recordingUrl && recordingYouTubeId && (
+                <a href={event.recordingUrl} target="_blank" rel="noopener noreferrer">
+                  <Button variant="outline" className="gap-1.5" data-testid={`button-event-recording-${event.id}`}>
+                    <ExternalLink className="h-4 w-4" />
+                    Watch on YouTube
+                  </Button>
+                </a>
+              )}
+              {isPast && event.recordingUrl && !recordingYouTubeId && (
                 <a href={event.recordingUrl} target="_blank" rel="noopener noreferrer">
                   <Button className="gap-1.5" data-testid={`button-event-recording-${event.id}`}>
                     <PlayCircle className="h-4 w-4" />
@@ -173,9 +231,13 @@ export default function Events() {
                   </Button>
                 </a>
               )}
+              {/* No recording: say which of the two reasons it is, rather than
+                  telling everyone a video is on its way when none was filmed. */}
               {isPast && !event.recordingUrl && (
-                <span className="text-xs text-muted-foreground italic">
-                  Recording coming soon.
+                <span className="text-xs text-muted-foreground italic" data-testid={`text-event-norecording-${event.id}`}>
+                  {isInPersonOnly(event.location)
+                    ? "This was an in-person event."
+                    : "Recording coming soon."}
                 </span>
               )}
               {/* Board members link to their profile page here on the site; guests
