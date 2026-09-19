@@ -22,14 +22,43 @@ import { db } from "../db";
 export type ModeId = "game" | "story" | "prompt" | "quest" | "video" | "robot" | "homework";
 export const ALL_MODES: ModeId[] = ["game", "story", "prompt", "quest", "video", "robot", "homework"];
 
+/**
+ * Accounts.
+ *
+ * `member`      — anyone who signs up. Gets their own Hub workspace and
+ *                 projects and nothing else: no class, no child, no other
+ *                 person's work is reachable. This is the default, on purpose:
+ *                 the platform holds children's records, so nobody touches
+ *                 them by merely registering.
+ * `facilitator` — may create classes, add children and record consent.
+ *                 Granted by an admin to someone trained and cleared.
+ * `admin`       — the above, plus managing people.
+ */
+export type Role = "member" | "facilitator" | "admin";
+
 export type Facilitator = {
   id: number;
   email: string;
+  /** Empty string for accounts that only sign in with Google. */
   password_hash: string;
   display_name: string;
   is_admin: boolean;
+  role: Role;
+  email_verified: boolean;
+  /** Google's stable subject id, set once an account signs in with Google. */
+  google_sub: string | null;
   created_at: string;
 };
+
+export type TokenKind = "verify" | "reset";
+
+export function canRunClasses(f: Facilitator): boolean {
+  return f.role === "facilitator" || f.role === "admin" || f.is_admin;
+}
+
+export function isAdminRole(f: Facilitator): boolean {
+  return f.role === "admin" || f.is_admin;
+}
 
 export type ClassKind = "class" | "workspace";
 
@@ -216,6 +245,34 @@ export function ensureTables(): Promise<void> {
       await db.execute(sql`
         CREATE INDEX IF NOT EXISTS aik_audit_class_idx ON aik_audit (class_id, id)`);
 
+      /* ---- Accounts: roles, email verification, Google, tokens ---------- *
+       * Additive only. Existing rows were all hand-created admins, so they
+       * are backfilled to role 'admin' and treated as verified.             */
+      await db.execute(sql`
+        ALTER TABLE aik_facilitators ADD COLUMN IF NOT EXISTS role text NOT NULL DEFAULT 'member'`);
+      await db.execute(sql`
+        ALTER TABLE aik_facilitators ADD COLUMN IF NOT EXISTS email_verified boolean NOT NULL DEFAULT false`);
+      await db.execute(sql`
+        ALTER TABLE aik_facilitators ADD COLUMN IF NOT EXISTS google_sub text`);
+      await db.execute(sql`
+        CREATE UNIQUE INDEX IF NOT EXISTS aik_facilitators_google_idx ON aik_facilitators (google_sub) WHERE google_sub IS NOT NULL`);
+      // Backfill: anyone who existed before roles did was an admin.
+      await db.execute(sql`
+        UPDATE aik_facilitators SET role = 'admin', email_verified = true
+         WHERE is_admin = true AND role = 'member'`);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS aik_tokens (
+          id serial PRIMARY KEY,
+          facilitator_id integer NOT NULL REFERENCES aik_facilitators(id) ON DELETE CASCADE,
+          kind text NOT NULL,
+          token_hash text NOT NULL,
+          expires_at timestamptz NOT NULL,
+          used_at timestamptz,
+          created_at timestamptz NOT NULL DEFAULT now()
+        )`);
+      await db.execute(sql`
+        CREATE INDEX IF NOT EXISTS aik_tokens_hash_idx ON aik_tokens (token_hash)`);
+
       /* ---- Hub: staff workspaces and projects -------------------------- *
        * A workspace is a class row with kind = 'workspace': one per
        * facilitator, no children, no class code in use. Staff work runs
@@ -288,15 +345,83 @@ export async function countFacilitators(): Promise<number> {
   return Number(r?.n ?? 0);
 }
 
-export async function createFacilitator(email: string, passwordHash: string, displayName: string, isAdmin: boolean): Promise<Facilitator> {
+export async function createFacilitator(
+  email: string,
+  passwordHash: string,
+  displayName: string,
+  isAdmin: boolean,
+  opts?: { role?: Role; emailVerified?: boolean; googleSub?: string | null },
+): Promise<Facilitator> {
   await ensureTables();
+  const role: Role = opts?.role ?? (isAdmin ? "admin" : "member");
   const r = one<Facilitator>(
     await db.execute(sql`
-      INSERT INTO aik_facilitators (email, password_hash, display_name, is_admin)
-      VALUES (${email.toLowerCase().trim()}, ${passwordHash}, ${displayName}, ${isAdmin})
+      INSERT INTO aik_facilitators (email, password_hash, display_name, is_admin, role, email_verified, google_sub)
+      VALUES (${email.toLowerCase().trim()}, ${passwordHash}, ${displayName}, ${isAdmin}, ${role},
+              ${opts?.emailVerified ?? isAdmin}, ${opts?.googleSub ?? null})
       RETURNING *`),
   );
   return r!;
+}
+
+export async function getFacilitatorByGoogleSub(sub: string): Promise<Facilitator | null> {
+  await ensureTables();
+  return one<Facilitator>(await db.execute(sql`SELECT * FROM aik_facilitators WHERE google_sub = ${sub} LIMIT 1`));
+}
+
+export async function linkGoogleSub(id: number, sub: string): Promise<void> {
+  await ensureTables();
+  await db.execute(sql`UPDATE aik_facilitators SET google_sub = ${sub}, email_verified = true WHERE id = ${id}`);
+}
+
+export async function markEmailVerified(id: number): Promise<void> {
+  await ensureTables();
+  await db.execute(sql`UPDATE aik_facilitators SET email_verified = true WHERE id = ${id}`);
+}
+
+export async function setRole(id: number, role: Role): Promise<Facilitator | null> {
+  await ensureTables();
+  return one<Facilitator>(
+    await db.execute(sql`
+      UPDATE aik_facilitators SET role = ${role}, is_admin = ${role === "admin"} WHERE id = ${id} RETURNING *`),
+  );
+}
+
+export async function listAccounts(): Promise<Facilitator[]> {
+  await ensureTables();
+  return rows<Facilitator>(await db.execute(sql`SELECT * FROM aik_facilitators ORDER BY created_at DESC LIMIT 500`));
+}
+
+/* ------------------------------------------------------------------ *
+ * One-time tokens (email verification, password reset)
+ *
+ * Only the SHA-256 of the token is stored, so a database leak does not
+ * hand over working reset links. Single use, and short-lived.
+ * ------------------------------------------------------------------ */
+
+export async function createToken(facilitatorId: number, kind: TokenKind, tokenHash: string, ttlMinutes: number): Promise<void> {
+  await ensureTables();
+  // A new token of a kind retires any earlier unused one.
+  await db.execute(sql`
+    UPDATE aik_tokens SET used_at = now()
+     WHERE facilitator_id = ${facilitatorId} AND kind = ${kind} AND used_at IS NULL`);
+  await db.execute(sql`
+    INSERT INTO aik_tokens (facilitator_id, kind, token_hash, expires_at)
+    VALUES (${facilitatorId}, ${kind}, ${tokenHash}, now() + (${ttlMinutes} * interval '1 minute'))`);
+}
+
+/** Returns the account if the token is valid, and burns the token. */
+export async function consumeToken(kind: TokenKind, tokenHash: string): Promise<Facilitator | null> {
+  await ensureTables();
+  const row = one<{ id: number; facilitator_id: number }>(
+    await db.execute(sql`
+      SELECT id, facilitator_id FROM aik_tokens
+       WHERE kind = ${kind} AND token_hash = ${tokenHash} AND used_at IS NULL AND expires_at > now()
+       LIMIT 1`),
+  );
+  if (!row) return null;
+  await db.execute(sql`UPDATE aik_tokens SET used_at = now() WHERE id = ${row.id}`);
+  return getFacilitator(row.facilitator_id);
 }
 
 export async function getFacilitatorByEmail(email: string): Promise<Facilitator | null> {

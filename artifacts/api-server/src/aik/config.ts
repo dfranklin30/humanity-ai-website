@@ -141,6 +141,21 @@ export const aikConfig = {
     blockAtSeverity: 2,
   },
 
+  /** Absolute base URL used in emailed links. */
+  publicUrl: (env.AIK_PUBLIC_URL || "https://humanityplusai.org").replace(/\/$/, ""),
+
+  /** Sign in with Google. Both values come from a Google Cloud OAuth client. */
+  google: {
+    clientId: env.AIK_GOOGLE_CLIENT_ID || "",
+    clientSecret: env.AIK_GOOGLE_CLIENT_SECRET || "",
+  },
+
+  /** Self-service accounts. */
+  signupsOpen: env.AIK_SIGNUPS_OPEN !== "false",
+  verifyTokenMinutes: 60 * 24,
+  resetTokenMinutes: 60,
+  signupsPerHourPerIp: 5,
+
   /** Child sessions expire after this many minutes regardless of activity. */
   childSessionMinutes: 75,
   /** Facilitator sessions expire after this many minutes of inactivity. */
@@ -209,6 +224,10 @@ export function isTtsConfigured(): boolean {
 export function isAiConfigured(): boolean {
   return isTextConfigured();
 }
+export function isGoogleConfigured(): boolean {
+  return Boolean(aikConfig.google.clientId && aikConfig.google.clientSecret);
+}
+
 export function isContentSafetyConfigured(): boolean {
   const c = aikConfig.contentSafety;
   return Boolean(c.endpoint && c.key);
@@ -224,6 +243,7 @@ export function capabilitySummary() {
     music: { provider: aikConfig.providers.music, ready: isMusicConfigured() },
     tts: { provider: aikConfig.providers.tts, ready: isTtsConfigured() },
     screening: { configured: isContentSafetyConfigured(), required: aikConfig.contentSafety.required },
+    google: { configured: isGoogleConfigured(), ready: isGoogleConfigured() },
     mock: aikConfig.mockAI,
   };
 }

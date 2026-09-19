@@ -22,6 +22,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   ApiError,
+  adminAccounts,
+  adminSetRole,
+  authForgot,
+  authReset,
+  authSignup,
+  authVerify,
   fLogin,
   fLogout,
   fMe,
@@ -34,6 +40,8 @@ import {
   hubProject,
   hubRequest,
   hubSubmit,
+  getConfig,
+  googleStartUrl,
   waitForRequest,
   type Artifact,
   type ArtifactMeta,
@@ -42,6 +50,8 @@ import {
   type ModeDef,
   type ModeId,
   type Project,
+  type Role,
+  type StudioConfig,
   type StudioRequest,
 } from "./api";
 import { ArtifactView, BigButton, Card, ChangeBox, ModeForm, Notice, RequestStatus, Spinner, kindEmoji } from "./components";
@@ -51,7 +61,7 @@ import { WEEK_MODULES, SESSION_RHYTHM, type WeekModule } from "../content/weeks"
 const STAFF_FIELD_CHARS = 1200;
 const STAFF_CHAT_CHARS = 4000;
 
-type Tab = "tools" | "projects" | "program" | "classes";
+type Tab = "tools" | "projects" | "program" | "classes" | "people";
 
 export default function HubApp() {
   const [location] = useLocation();
@@ -113,44 +123,214 @@ export default function HubApp() {
  * Sign-in
  * ------------------------------------------------------------------ */
 
+type AuthMode = "signin" | "signup" | "forgot" | "reset" | "sent" | "verifying";
+
+/**
+ * One card for every way in: sign in, create an account, forget a password,
+ * choose a new one, and Google.
+ *
+ * Verification and reset links land on this page as ?verify= / ?reset=, so
+ * there is no second page to keep in step.
+ */
 function HubLogin({ onDone }: { onDone: (f: Facilitator) => void }) {
+  const [config, setConfig] = useState<StudioConfig | null>(null);
+  const [mode, setMode] = useState<AuthMode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [token, setToken] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    getConfig().then(setConfig).catch(() => setConfig(null));
+  }, []);
+
+  // A link from an email, or an error bounced back from Google.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const verify = q.get("verify");
+    const reset = q.get("reset");
+    const err = q.get("error");
+    if (err) setError(err);
+    if (reset) {
+      setToken(reset);
+      setMode("reset");
+      clean();
+    } else if (verify) {
+      setMode("verifying");
+      authVerify(verify)
+        .then((r) => onDone(r.facilitator))
+        .catch((e) => {
+          setError(e instanceof ApiError ? e.message : "That link didn't work.");
+          setMode("signin");
+        })
+        .finally(clean);
+    }
+    function clean() {
+      window.history.replaceState({}, "", `${BASE}/hub`);
+    }
+  }, [onDone]);
+
+  const heading =
+    mode === "signup" ? "Create your account"
+    : mode === "forgot" ? "Reset your password"
+    : mode === "reset" ? "Choose a new password"
+    : mode === "sent" ? "Check your email"
+    : mode === "verifying" ? "Confirming your email…"
+    : "Sign in to the Hub";
+
+  async function run(fn: () => Promise<void>) {
+    setBusy(true);
+    setError(null);
+    try {
+      await fn();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "That didn't work. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (mode === "verifying") {
+    return (
+      <Card className="mx-auto max-w-md text-center">
+        <h1 className="text-2xl font-extrabold">{heading}</h1>
+        <div className="mt-6"><Spinner /></div>
+      </Card>
+    );
+  }
+
+  if (mode === "sent") {
+    return (
+      <Card className="mx-auto max-w-md">
+        <p className="text-5xl">📬</p>
+        <h1 className="mt-2 text-2xl font-extrabold">{heading}</h1>
+        <p className="mt-2 text-slate-700">{note}</p>
+        <p className="mt-4 text-sm text-slate-500">
+          Nothing after a few minutes? Check spam, and make sure the address is right — for your safety we don't say whether an
+          address has an account here.
+        </p>
+        <BigButton variant="ghost" className="mt-6 w-full" onClick={() => { setMode("signin"); setNote(null); }}>
+          ← Back to sign in
+        </BigButton>
+      </Card>
+    );
+  }
+
   return (
     <Card className="mx-auto max-w-md">
-      <h1 className="text-2xl font-extrabold">Sign in to the Hub</h1>
-      <p className="mt-1 text-sm text-slate-600">
-        For Humanity + AI staff and trained facilitators. Children have their own door at{" "}
-        <Link href={`${BASE}/studio`} className="font-semibold text-violet-700 underline">
-          /aiforkids/studio
-        </Link>
-        .
-      </p>
+      <h1 className="text-2xl font-extrabold">{heading}</h1>
+      {mode === "signin" && (
+        <p className="mt-1 text-sm text-slate-600">
+          Children have their own door at{" "}
+          <Link href={`${BASE}/studio`} className="font-semibold text-violet-700 underline">/aiforkids/studio</Link>.
+        </p>
+      )}
+      {mode === "signup" && (
+        <p className="mt-1 text-sm text-slate-600">
+          You'll get your own private workspace and the AI tools. Working with a class of children needs separate approval from a
+          Humanity + AI admin.
+        </p>
+      )}
+      {mode === "forgot" && <p className="mt-1 text-sm text-slate-600">We'll email you a link that works once, for an hour.</p>}
+
+      {config?.googleReady && (mode === "signin" || mode === "signup") && (
+        <>
+          <a
+            href={googleStartUrl}
+            className="mt-5 flex w-full items-center justify-center gap-3 rounded-2xl border-2 border-slate-200 bg-white px-5 py-3 text-base font-bold text-slate-700 transition hover:border-violet-300 hover:bg-slate-50"
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+              <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5a5.6 5.6 0 0 1-2.4 3.7v3h3.9c2.3-2.1 3.5-5.2 3.5-8.9z" />
+              <path fill="#34A853" d="M12 24c3.2 0 5.9-1.1 7.9-2.9l-3.9-3c-1.1.7-2.4 1.2-4 1.2-3.1 0-5.7-2.1-6.6-4.9H1.4v3.1A12 12 0 0 0 12 24z" />
+              <path fill="#FBBC05" d="M5.4 14.4a7.2 7.2 0 0 1 0-4.6V6.7H1.4a12 12 0 0 0 0 10.8l4-3.1z" />
+              <path fill="#EA4335" d="M12 4.8c1.8 0 3.3.6 4.5 1.8l3.4-3.4C17.9 1.2 15.2 0 12 0A12 12 0 0 0 1.4 6.7l4 3.1C6.3 6.9 8.9 4.8 12 4.8z" />
+            </svg>
+            Continue with Google
+          </a>
+          <div className="my-4 flex items-center gap-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <span className="h-px flex-1 bg-slate-200" /> or <span className="h-px flex-1 bg-slate-200" />
+          </div>
+        </>
+      )}
+
       <form
-        className="mt-5 space-y-3"
-        onSubmit={async (e) => {
+        className="space-y-3"
+        onSubmit={(e) => {
           e.preventDefault();
-          setBusy(true);
-          setError(null);
-          try {
-            const r = await fLogin(email, password);
-            onDone(r.facilitator);
-          } catch (err) {
-            setError(err instanceof ApiError ? err.message : "Sign-in failed.");
-          } finally {
-            setBusy(false);
-          }
+          if (busy) return;
+          void run(async () => {
+            if (mode === "signin") {
+              const r = await fLogin(email, password);
+              onDone(r.facilitator);
+            } else if (mode === "signup") {
+              await authSignup({ email, password, displayName });
+              setNote(`If that address can take mail, a confirmation link is on its way to ${email}. Click it and you're in.`);
+              setMode("sent");
+            } else if (mode === "forgot") {
+              await authForgot(email);
+              setNote(`If an account exists for ${email}, a reset link is on its way.`);
+              setMode("sent");
+            } else if (mode === "reset") {
+              const r = await authReset(token, password);
+              onDone(r.facilitator);
+            }
+          });
         }}
       >
-        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" autoComplete="username" className={inputCls} />
-        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" autoComplete="current-password" className={inputCls} />
+        {mode === "signup" && (
+          <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Your name" autoComplete="name" className={inputCls} maxLength={80} />
+        )}
+        {mode !== "reset" && (
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" autoComplete="username" className={inputCls} />
+        )}
+        {mode !== "forgot" && (
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder={mode === "signin" ? "Password" : "New password — at least 10 characters"}
+            autoComplete={mode === "signin" ? "current-password" : "new-password"}
+            className={inputCls}
+          />
+        )}
         {error && <Notice>{error}</Notice>}
-        <BigButton type="submit" disabled={busy || !email || !password} className="w-full">
-          {busy ? "Signing in…" : "Sign in"}
+        <BigButton
+          type="submit"
+          disabled={
+            busy ||
+            (mode === "signin" && (!email || !password)) ||
+            (mode === "signup" && (!email || password.length < 10 || displayName.trim().length < 2)) ||
+            (mode === "forgot" && !email) ||
+            (mode === "reset" && password.length < 10)
+          }
+          className="w-full"
+        >
+          {busy ? "Working…" : mode === "signin" ? "Sign in" : mode === "signup" ? "Create account" : mode === "forgot" ? "Email me a link" : "Set new password"}
         </BigButton>
       </form>
+
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-4 text-sm">
+        {mode === "signin" && (
+          <>
+            <button onClick={() => { setMode("forgot"); setError(null); }} className="font-semibold text-violet-700 hover:underline">
+              Forgot your password?
+            </button>
+            {config?.signupsOpen !== false && (
+              <button onClick={() => { setMode("signup"); setError(null); }} className="font-semibold text-violet-700 hover:underline">
+                Create an account
+              </button>
+            )}
+          </>
+        )}
+        {mode !== "signin" && (
+          <button onClick={() => { setMode("signin"); setError(null); }} className="font-semibold text-violet-700 hover:underline">
+            ← Back to sign in
+          </button>
+        )}
+      </div>
     </Card>
   );
 }
@@ -196,6 +376,7 @@ function HubShell() {
             ["projects", `📁 Projects · ${state.projects.length}`],
             ["program", "🗓️ 8-week program"],
             ["classes", `👋 Classes · ${state.classes.length}`],
+            ...(state.facilitator.isAdmin ? ([["people", "🔑 People"]] as [Tab, string][]) : []),
           ] as [Tab, string][]
         ).map(([id, label]) => (
           <button
@@ -216,6 +397,7 @@ function HubShell() {
       {tab === "projects" && <ProjectsTab state={state} onOpen={setProjectId} onChanged={load} />}
       {tab === "program" && <ProgramTab />}
       {tab === "classes" && <ClassesTab state={state} />}
+      {tab === "people" && <PeopleTab me={state.facilitator} />}
     </div>
   );
 }
@@ -900,10 +1082,109 @@ function WeekView({ week }: { week: WeekModule }) {
 }
 
 /* ------------------------------------------------------------------ *
+ * People (admins only)
+ * ------------------------------------------------------------------ */
+
+const ROLE_BLURB: Record<Role, string> = {
+  member: "Own workspace and tools. No access to any class or child.",
+  facilitator: "Can create classes, add children and record consent.",
+  admin: "Everything, plus managing people.",
+};
+
+function PeopleTab({ me }: { me: Facilitator }) {
+  const [accounts, setAccounts] = useState<Facilitator[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<number | null>(null);
+
+  const load = useCallback(
+    () => adminAccounts().then((r) => setAccounts(r.accounts)).catch((e) => setError(e instanceof ApiError ? e.message : "Could not load accounts.")),
+    [],
+  );
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function change(id: number, role: Role) {
+    setBusyId(id);
+    setError(null);
+    try {
+      await adminSetRole(id, role);
+      await load();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Could not change that role.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card tone="tint">
+        <h2 className="text-lg font-extrabold">Who can do what</h2>
+        <p className="mt-2 text-sm text-slate-700">
+          Anyone may sign up, and a new account is a <strong>member</strong>: its own workspace and the AI tools, and nothing
+          else. Granting <strong>facilitator</strong> gives access to children's records — nicknames, work and consent. Grant it
+          only to people you have trained and cleared.
+        </p>
+      </Card>
+      {error && <Notice>{error}</Notice>}
+      {!accounts && <Spinner />}
+      <div className="space-y-2">
+        {accounts?.map((a) => (
+          <div key={a.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+            <div className="min-w-0">
+              <p className="truncate text-base font-extrabold">
+                {a.displayName}
+                {a.id === me.id && <span className="ml-2 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-bold text-violet-800">you</span>}
+              </p>
+              <p className="truncate text-sm text-slate-600">{a.email}</p>
+              <p className="mt-1 text-xs text-slate-500">
+                {a.emailVerified ? "✓ email confirmed" : "○ email not confirmed"}
+                {a.usesGoogle ? " · Google" : ""}
+                {!a.hasPassword ? " · no password set" : ""}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="hidden max-w-xs text-xs text-slate-500 sm:block">{ROLE_BLURB[a.role]}</span>
+              <select
+                value={a.role}
+                disabled={busyId === a.id || a.id === me.id}
+                onChange={(e) => void change(a.id, e.target.value as Role)}
+                className="rounded-xl border-2 border-slate-200 px-3 py-2 text-sm font-semibold focus:border-violet-500 focus:outline-none disabled:opacity-50"
+              >
+                <option value="member">Member</option>
+                <option value="facilitator">Facilitator</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ *
  * Classes
  * ------------------------------------------------------------------ */
 
 function ClassesTab({ state }: { state: HubState }) {
+  if (!state.facilitator.canRunClasses) {
+    return (
+      <div className="space-y-4">
+        <Card tone="tint">
+          <h2 className="text-lg font-extrabold">Classes need facilitator access</h2>
+          <p className="mt-2 text-sm text-slate-700">
+            Your account has the full Hub — every tool, your own workspace, your own projects. What it doesn't have is any child's
+            record, and that's deliberate: nobody reaches a child's nickname, work or consent form just by signing up.
+          </p>
+          <p className="mt-2 text-sm text-slate-700">
+            When you're trained and cleared to run a club, a Humanity + AI admin grants facilitator access and this tab fills in.
+          </p>
+        </Card>
+      </div>
+    );
+  }
   return (
     <div className="space-y-4">
       {state.classes.length === 0 && (

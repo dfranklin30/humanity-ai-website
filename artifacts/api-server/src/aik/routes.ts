@@ -9,7 +9,9 @@
  */
 import type { Express, Request, Response, NextFunction } from "express";
 import { z } from "zod";
-import { aikConfig, isAiConfigured, isContentSafetyConfigured, isImageConfigured, isTtsConfigured, capabilitySummary } from "./config";
+import { randomBytes, createHash } from "node:crypto";
+import { aikConfig, isAiConfigured, isContentSafetyConfigured, isImageConfigured, isTtsConfigured, isGoogleConfigured, capabilitySummary } from "./config";
+import { sendVerification, sendReset } from "./mail";
 import { speak } from "./ai";
 import * as store from "./store";
 import { hashPassword, verifyPassword } from "../auth";
@@ -73,6 +75,29 @@ async function requireFacilitator(req: Request, res: Response, next: NextFunctio
   s.at = Date.now();
   (req as FReq).facilitator = f;
   next();
+}
+
+/**
+ * Anything that touches a class, a child or consent. Signing up does not get
+ * you here — an admin has to grant the facilitator role first.
+ */
+async function requireRunClasses(req: Request, res: Response, next: NextFunction) {
+  await requireFacilitator(req, res, () => {
+    const f = (req as FReq).facilitator;
+    if (!store.canRunClasses(f)) {
+      return void res.status(403).json({
+        error: "Your account can use the Hub tools, but running a class needs facilitator access. Ask a Humanity + AI admin to grant it.",
+      });
+    }
+    next();
+  });
+}
+
+async function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  await requireFacilitator(req, res, () => {
+    if (!store.isAdminRole((req as FReq).facilitator)) return void res.status(403).json({ error: "Admins only." });
+    next();
+  });
 }
 
 async function requireChild(req: Request, res: Response, next: NextFunction) {
@@ -168,10 +193,238 @@ export function registerAikRoutes(app: Express): void {
       screeningReady: isContentSafetyConfigured() || !aikConfig.contentSafety.required,
       modes: publicModes(),
       avatars: AVATARS,
+      googleReady: isGoogleConfigured(),
+      signupsOpen: aikConfig.signupsOpen,
       maxFieldChars: aikConfig.maxFieldChars,
       maxChatChars: aikConfig.maxChatChars,
     });
   });
+
+
+  /* ================================================================== *
+   * Accounts — sign up, confirm, reset, Google
+   *
+   * Signing up gets you a MEMBER account: your own Hub workspace and
+   * projects, and nothing else. No class, no child, no other person's work
+   * is reachable. Children's records are behind the facilitator role, which
+   * only an admin grants. That split is the whole safety story here.
+   *
+   * Two habits worth keeping: no endpoint reveals whether an address has an
+   * account, and tokens are stored only as SHA-256 hashes.
+   * ================================================================== */
+
+  function tokenPair(): { token: string; hash: string } {
+    const token = randomBytes(32).toString("base64url");
+    return { token, hash: createHash("sha256").update(token).digest("hex") };
+  }
+
+  const hashToken = (t: string) => createHash("sha256").update(t).digest("hex");
+
+  app.post(
+    `${base}/auth/signup`,
+    wrap(async (req, res) => {
+      if (!aikConfig.signupsOpen) return void res.status(403).json({ error: "New accounts are closed right now." });
+      if (!allow(`signup:${ip(req)}`, aikConfig.signupsPerHourPerIp)) return void res.status(429).json({ error: "Too many sign-ups from here. Try again later." });
+      const body = z
+        .object({
+          email: z.string().email().max(200),
+          password: z.string().min(10).max(200),
+          displayName: z.string().trim().min(2).max(80),
+        })
+        .safeParse(req.body);
+      if (!body.success) {
+        return void res.status(400).json({ error: "Name, a valid email and a password of at least 10 characters, please." });
+      }
+      const email = body.data.email.toLowerCase().trim();
+      const existing = await store.getFacilitatorByEmail(email);
+
+      if (existing) {
+        // Never confirm that an address is taken. If it is genuinely theirs
+        // and unconfirmed, quietly re-send the confirmation.
+        if (!existing.email_verified) {
+          const { token, hash } = tokenPair();
+          await store.createToken(existing.id, "verify", hash, aikConfig.verifyTokenMinutes);
+          await sendVerification(existing.email, existing.display_name, token);
+        }
+        return void res.json({ ok: true, check: "email" });
+      }
+
+      const account = await store.createFacilitator(email, await hashPassword(body.data.password), body.data.displayName, false, {
+        role: "member",
+        emailVerified: false,
+      });
+      const { token, hash } = tokenPair();
+      await store.createToken(account.id, "verify", hash, aikConfig.verifyTokenMinutes);
+      await sendVerification(account.email, account.display_name, token);
+      await store.audit(null, "system", account.id, "account_signup", { email });
+      res.json({ ok: true, check: "email" });
+    }),
+  );
+
+  app.post(
+    `${base}/auth/verify`,
+    wrap(async (req, res) => {
+      const token = String(req.body?.token ?? "");
+      if (!token) return void res.status(400).json({ error: "Missing token." });
+      const account = await store.consumeToken("verify", hashToken(token));
+      if (!account) return void res.status(400).json({ error: "That link has expired or was already used. Ask for a new one." });
+      await store.markEmailVerified(account.id);
+      delete req.session.aikChild;
+      req.session.aikFacilitator = { id: account.id, at: Date.now() };
+      await store.audit(null, "facilitator", account.id, "email_verified");
+      res.json({ facilitator: publicFacilitator({ ...account, email_verified: true }) });
+    }),
+  );
+
+  app.post(
+    `${base}/auth/forgot`,
+    wrap(async (req, res) => {
+      if (!allow(`forgot:${ip(req)}`, 5)) return void res.status(429).json({ error: "Too many requests. Wait a minute." });
+      const body = z.object({ email: z.string().email().max(200) }).safeParse(req.body);
+      // Same answer whether or not the account exists.
+      if (body.success) {
+        const account = await store.getFacilitatorByEmail(body.data.email);
+        if (account) {
+          const { token, hash } = tokenPair();
+          await store.createToken(account.id, "reset", hash, aikConfig.resetTokenMinutes);
+          await sendReset(account.email, account.display_name, token);
+          await store.audit(null, "system", account.id, "password_reset_requested", { ip: ip(req) });
+        }
+      }
+      res.json({ ok: true });
+    }),
+  );
+
+  app.post(
+    `${base}/auth/reset`,
+    wrap(async (req, res) => {
+      const body = z.object({ token: z.string().min(1), password: z.string().min(10).max(200) }).safeParse(req.body);
+      if (!body.success) return void res.status(400).json({ error: "Pick a password of at least 10 characters." });
+      const account = await store.consumeToken("reset", hashToken(body.data.token));
+      if (!account) return void res.status(400).json({ error: "That link has expired or was already used. Ask for a new one." });
+      await store.updateFacilitatorPassword(account.id, await hashPassword(body.data.password));
+      // A successful reset proves control of the inbox.
+      if (!account.email_verified) await store.markEmailVerified(account.id);
+      delete req.session.aikChild;
+      req.session.aikFacilitator = { id: account.id, at: Date.now() };
+      await store.audit(null, "facilitator", account.id, "password_reset_completed");
+      res.json({ facilitator: publicFacilitator({ ...account, email_verified: true }) });
+    }),
+  );
+
+  /* ---------------- Sign in with Google ---------------- */
+
+  app.get(
+    `${base}/auth/google/start`,
+    wrap(async (req, res) => {
+      if (!isGoogleConfigured()) return void res.status(503).send("Google sign-in isn't configured.");
+      const state = randomBytes(16).toString("base64url");
+      (req.session as any).aikOauthState = state;
+      const params = new URLSearchParams({
+        client_id: aikConfig.google.clientId,
+        redirect_uri: `${aikConfig.publicUrl}/api/aik/auth/google/callback`,
+        response_type: "code",
+        scope: "openid email profile",
+        state,
+        prompt: "select_account",
+      });
+      res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
+    }),
+  );
+
+  app.get(
+    `${base}/auth/google/callback`,
+    wrap(async (req, res) => {
+      const fail = (why: string) => res.redirect(`/aiforkids/hub?error=${encodeURIComponent(why)}`);
+      if (!isGoogleConfigured()) return void fail("Google sign-in isn't configured.");
+      const expected = (req.session as any).aikOauthState;
+      delete (req.session as any).aikOauthState;
+      if (!expected || req.query.state !== expected) return void fail("That sign-in attempt expired. Try again.");
+      const code = String(req.query.code ?? "");
+      if (!code) return void fail("Google didn't return a sign-in code.");
+
+      const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          code,
+          client_id: aikConfig.google.clientId,
+          client_secret: aikConfig.google.clientSecret,
+          redirect_uri: `${aikConfig.publicUrl}/api/aik/auth/google/callback`,
+          grant_type: "authorization_code",
+        }),
+      });
+      if (!tokenRes.ok) {
+        logger.error({ status: tokenRes.status }, "[aik] google token exchange failed");
+        return void fail("Google sign-in failed. Try again.");
+      }
+      const tokens: any = await tokenRes.json();
+      // The id_token came straight from Google over TLS in exchange for our
+      // client secret, so the payload is trustworthy without re-verifying
+      // the signature.
+      const payloadPart = String(tokens.id_token ?? "").split(".")[1];
+      if (!payloadPart) return void fail("Google sign-in failed. Try again.");
+      let claims: any;
+      try {
+        claims = JSON.parse(Buffer.from(payloadPart, "base64url").toString("utf8"));
+      } catch {
+        return void fail("Google sign-in failed. Try again.");
+      }
+      const sub = String(claims.sub ?? "");
+      const email = String(claims.email ?? "").toLowerCase().trim();
+      const emailVerified = claims.email_verified === true || claims.email_verified === "true";
+      const name = String(claims.name ?? "").trim() || email.split("@")[0];
+      if (!sub || !email) return void fail("Google didn't share an email address.");
+      if (!emailVerified) return void fail("That Google account has an unconfirmed email address.");
+
+      let account = await store.getFacilitatorByGoogleSub(sub);
+      if (!account) {
+        const byEmail = await store.getFacilitatorByEmail(email);
+        if (byEmail) {
+          // Same person arriving by a different door: link, don't duplicate.
+          await store.linkGoogleSub(byEmail.id, sub);
+          account = { ...byEmail, google_sub: sub, email_verified: true };
+        } else {
+          if (!aikConfig.signupsOpen) return void fail("New accounts are closed right now.");
+          account = await store.createFacilitator(email, "", name, false, { role: "member", emailVerified: true, googleSub: sub });
+          await store.audit(null, "system", account.id, "account_signup", { email, via: "google" });
+        }
+      }
+      delete req.session.aikChild;
+      req.session.aikFacilitator = { id: account.id, at: Date.now() };
+      await store.audit(null, "facilitator", account.id, "login", { via: "google" });
+      res.redirect("/aiforkids/hub");
+    }),
+  );
+
+  /* ---------------- Admin: who is in, and what they may do ---------------- */
+
+  app.get(
+    `${base}/admin/accounts`,
+    requireAdmin,
+    wrap(async (_req, res) => {
+      const accounts = await store.listAccounts();
+      res.json({ accounts: accounts.map(publicFacilitator) });
+    }),
+  );
+
+  app.patch(
+    `${base}/admin/accounts/:id`,
+    requireAdmin,
+    wrap(async (req, res) => {
+      const me = (req as FReq).facilitator;
+      const id = Number(req.params.id);
+      const body = z.object({ role: z.enum(["member", "facilitator", "admin"]) }).safeParse(req.body);
+      if (!body.success || !Number.isInteger(id)) return void res.status(400).json({ error: "Pick a role." });
+      if (id === me.id && body.data.role !== "admin") {
+        return void res.status(400).json({ error: "Don't remove your own admin access — you'd lock yourself out." });
+      }
+      const updated = await store.setRole(id, body.data.role);
+      if (!updated) return void res.status(404).json({ error: "No such account." });
+      await store.audit(null, "facilitator", me.id, "role_changed", { target: id, role: body.data.role });
+      res.json({ account: publicFacilitator(updated) });
+    }),
+  );
 
   /* ---------------- Facilitator: auth ---------------- */
 
@@ -182,9 +435,12 @@ export function registerAikRoutes(app: Express): void {
       const body = z.object({ email: z.string().email().max(200), password: z.string().min(1).max(200) }).safeParse(req.body);
       if (!body.success) return void res.status(400).json({ error: "Email and password are required." });
       const f = await store.getFacilitatorByEmail(body.data.email);
-      if (!f || !(await verifyPassword(body.data.password, f.password_hash))) {
+      if (!f || !f.password_hash || !(await verifyPassword(body.data.password, f.password_hash))) {
         await store.audit(null, "system", null, "facilitator_login_failed", { email: body.data.email.toLowerCase(), ip: ip(req) });
         return void res.status(401).json({ error: "That email or password isn't right." });
+      }
+      if (!f.email_verified) {
+        return void res.status(403).json({ error: "Check your email and click the link to confirm your address first.", needsVerification: true });
       }
       delete req.session.aikChild;
       req.session.aikFacilitator = { id: f.id, at: Date.now() };
@@ -219,7 +475,7 @@ export function registerAikRoutes(app: Express): void {
   // Admin: add another facilitator.
   app.post(
     `${base}/facilitator/facilitators`,
-    requireFacilitator,
+    requireAdmin,
     wrap(async (req, res) => {
       const f = (req as FReq).facilitator;
       if (!f.is_admin) return void res.status(403).json({ error: "Admins only." });
@@ -236,7 +492,7 @@ export function registerAikRoutes(app: Express): void {
 
   app.get(
     `${base}/facilitator/classes`,
-    requireFacilitator,
+    requireRunClasses,
     wrap(async (req, res) => {
       const f = (req as FReq).facilitator;
       const classes = await store.listClasses(f.id, f.is_admin);
@@ -246,7 +502,7 @@ export function registerAikRoutes(app: Express): void {
 
   app.post(
     `${base}/facilitator/classes`,
-    requireFacilitator,
+    requireRunClasses,
     wrap(async (req, res) => {
       const f = (req as FReq).facilitator;
       const body = z.object({ name: z.string().min(1).max(80) }).safeParse(req.body);
@@ -259,7 +515,7 @@ export function registerAikRoutes(app: Express): void {
 
   app.get(
     `${base}/facilitator/classes/:id`,
-    requireFacilitator,
+    requireRunClasses,
     wrap(async (req, res) => {
       const klass = await ownedClass(req, res);
       if (!klass) return;
@@ -285,7 +541,7 @@ export function registerAikRoutes(app: Express): void {
 
   app.patch(
     `${base}/facilitator/classes/:id`,
-    requireFacilitator,
+    requireRunClasses,
     wrap(async (req, res) => {
       const klass = await ownedClass(req, res);
       if (!klass) return;
@@ -319,7 +575,7 @@ export function registerAikRoutes(app: Express): void {
 
   app.post(
     `${base}/facilitator/classes/:id/new-session`,
-    requireFacilitator,
+    requireRunClasses,
     wrap(async (req, res) => {
       const klass = await ownedClass(req, res);
       if (!klass) return;
@@ -332,7 +588,7 @@ export function registerAikRoutes(app: Express): void {
 
   app.post(
     `${base}/facilitator/classes/:id/rotate-code`,
-    requireFacilitator,
+    requireRunClasses,
     wrap(async (req, res) => {
       const klass = await ownedClass(req, res);
       if (!klass) return;
@@ -344,7 +600,7 @@ export function registerAikRoutes(app: Express): void {
 
   app.get(
     `${base}/facilitator/classes/:id/export`,
-    requireFacilitator,
+    requireRunClasses,
     wrap(async (req, res) => {
       const klass = await ownedClass(req, res);
       if (!klass) return;
@@ -357,7 +613,7 @@ export function registerAikRoutes(app: Express): void {
 
   app.delete(
     `${base}/facilitator/classes/:id`,
-    requireFacilitator,
+    requireRunClasses,
     wrap(async (req, res) => {
       const klass = await ownedClass(req, res);
       if (!klass) return;
@@ -373,7 +629,7 @@ export function registerAikRoutes(app: Express): void {
 
   app.post(
     `${base}/facilitator/classes/:id/children`,
-    requireFacilitator,
+    requireRunClasses,
     wrap(async (req, res) => {
       const klass = await ownedClass(req, res);
       if (!klass) return;
@@ -398,7 +654,7 @@ export function registerAikRoutes(app: Express): void {
 
   app.patch(
     `${base}/facilitator/classes/:id/children/:cid`,
-    requireFacilitator,
+    requireRunClasses,
     wrap(async (req, res) => {
       const klass = await ownedClass(req, res);
       if (!klass) return;
@@ -443,7 +699,7 @@ export function registerAikRoutes(app: Express): void {
 
   app.delete(
     `${base}/facilitator/classes/:id/children/:cid`,
-    requireFacilitator,
+    requireRunClasses,
     wrap(async (req, res) => {
       const klass = await ownedClass(req, res);
       if (!klass) return;
@@ -459,7 +715,7 @@ export function registerAikRoutes(app: Express): void {
 
   app.get(
     `${base}/facilitator/classes/:id/feed`,
-    requireFacilitator,
+    requireRunClasses,
     wrap(async (req, res) => {
       const klass = await ownedClass(req, res);
       if (!klass) return;
@@ -481,7 +737,7 @@ export function registerAikRoutes(app: Express): void {
 
   app.get(
     `${base}/facilitator/classes/:id/requests`,
-    requireFacilitator,
+    requireRunClasses,
     wrap(async (req, res) => {
       const klass = await ownedClass(req, res);
       if (!klass) return;
@@ -493,7 +749,7 @@ export function registerAikRoutes(app: Express): void {
 
   app.post(
     `${base}/facilitator/artifacts/:aid/approve`,
-    requireFacilitator,
+    requireRunClasses,
     wrap(async (req, res) => {
       const a = await store.getArtifact(Number(req.params.aid));
       if (!a) return void res.status(404).json({ error: "Not found." });
@@ -517,7 +773,7 @@ export function registerAikRoutes(app: Express): void {
   // Projector mode: the facilitator runs any mode from the front of the room, no child account.
   app.post(
     `${base}/facilitator/classes/:id/projector`,
-    requireFacilitator,
+    requireRunClasses,
     wrap(async (req, res) => {
       const klass = await ownedClass(req, res);
       if (!klass) return;
@@ -532,7 +788,7 @@ export function registerAikRoutes(app: Express): void {
 
   app.get(
     `${base}/facilitator/requests/:rid`,
-    requireFacilitator,
+    requireRunClasses,
     wrap(async (req, res) => {
       const r = await store.getRequest(Number(req.params.rid));
       const klass = r ? await store.getClass(r.class_id) : null;
@@ -967,7 +1223,18 @@ export function registerAikRoutes(app: Express): void {
  * ------------------------------------------------------------------ */
 
 function publicFacilitator(f: store.Facilitator) {
-  return { id: f.id, email: f.email, displayName: f.display_name, isAdmin: f.is_admin };
+  return {
+    id: f.id,
+    email: f.email,
+    displayName: f.display_name,
+    isAdmin: store.isAdminRole(f),
+    role: f.role,
+    emailVerified: f.email_verified,
+    canRunClasses: store.canRunClasses(f),
+    hasPassword: Boolean(f.password_hash),
+    usesGoogle: Boolean(f.google_sub),
+    createdAt: f.created_at,
+  };
 }
 
 function publicChild(c: store.ChildRow, ticketsUsed: number, chatTurnsUsed = 0) {

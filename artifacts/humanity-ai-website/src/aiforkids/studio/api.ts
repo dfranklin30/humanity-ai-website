@@ -22,6 +22,8 @@ export type ModeDef = {
 
 export type Capability = { provider: string; ready: boolean };
 export type StudioConfig = {
+  googleReady?: boolean;
+  signupsOpen?: boolean;
   enabled: boolean;
   aiReady: boolean;
   imagesReady: boolean;
@@ -97,7 +99,21 @@ export type ChildSummary = {
   createdAt: string;
 };
 
-export type Facilitator = { id: number; email: string; displayName: string; isAdmin: boolean };
+export type Role = "member" | "facilitator" | "admin";
+
+export type Facilitator = {
+  id: number;
+  email: string;
+  displayName: string;
+  isAdmin: boolean;
+  role: Role;
+  emailVerified: boolean;
+  /** False for a plain member: classes and children are out of reach. */
+  canRunClasses: boolean;
+  hasPassword: boolean;
+  usesGoogle: boolean;
+  createdAt?: string;
+};
 
 export class ApiError extends Error {
   status: number;
@@ -152,6 +168,16 @@ export const childPublish = (id: number, publish: boolean) => call<{ ok: true }>
 export const getArtifact = (id: number) => call<{ artifact: Artifact }>("GET", `/artifacts/${id}`);
 
 /* Facilitator */
+/* Accounts */
+export const authSignup = (body: { email: string; password: string; displayName: string }) =>
+  call<{ ok: true; check: "email" }>("POST", "/auth/signup", body);
+export const authVerify = (token: string) => call<{ facilitator: Facilitator }>("POST", "/auth/verify", { token });
+export const authForgot = (email: string) => call<{ ok: true }>("POST", "/auth/forgot", { email });
+export const authReset = (token: string, password: string) => call<{ facilitator: Facilitator }>("POST", "/auth/reset", { token, password });
+export const googleStartUrl = "/api/aik/auth/google/start";
+export const adminAccounts = () => call<{ accounts: Facilitator[] }>("GET", "/admin/accounts");
+export const adminSetRole = (id: number, role: Role) => call<{ account: Facilitator }>("PATCH", `/admin/accounts/${id}`, { role });
+
 export const fLogin = (email: string, password: string) => call<{ facilitator: Facilitator }>("POST", "/facilitator/login", { email, password });
 export const fLogout = () => call<{ ok: true }>("POST", "/facilitator/logout");
 export const fMe = () => call<{ facilitator: Facilitator }>("GET", "/facilitator/me");
