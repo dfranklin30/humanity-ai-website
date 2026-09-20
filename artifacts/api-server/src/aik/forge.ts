@@ -264,9 +264,16 @@ export async function forgeGame(opts: {
   steps.end("build", "done", `${html.length.toLocaleString()} characters`);
 
   /* 3-4. Verify and repair ---------------------------------------- */
-  let report: VerifyReport = verifyGameHtml(html);
   let repairs = 0;
+  // The step has to WRAP the work, not follow it. Running the check first and
+  // then opening the step measured an empty interval, which is why every build
+  // reported a 0.0s code check and made the whole trace look like theatre.
   steps.begin("verify", "Testing it");
+  let report: VerifyReport = verifyGameHtml(html);
+  logger.info(
+    { ok: report.ok, issues: report.issues.length, drawCalls: report.observed.drawCalls, hasLoop: report.observed.hasLoop, listeners: report.observed.listeners.length },
+    "[forge] verified game",
+  );
   steps.end("verify", report.ok ? "done" : "failed", report.ok ? "runs clean" : `${report.issues.length} problem${report.issues.length === 1 ? "" : "s"} found`);
 
   while (!report.ok && repairs < MAX_REPAIRS) {
@@ -291,7 +298,9 @@ export async function forgeGame(opts: {
       if (nextReport.issues.length <= report.issues.length) {
         html = next;
         report = nextReport;
-        steps.end(`repair${repairs}`, report.ok ? "done" : "done", report.ok ? "all clear" : `${report.issues.length} left`);
+        // A repair that still leaves problems is not success. Reporting "done"
+        // in both branches is how a broken game reached a child under a green tick.
+        steps.end(`repair${repairs}`, report.ok ? "done" : "failed", report.ok ? "all clear" : `${report.issues.length} left`);
       } else {
         steps.end(`repair${repairs}`, "skipped", "the fix made it worse; keeping the previous version");
         break;

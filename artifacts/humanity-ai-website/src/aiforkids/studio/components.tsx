@@ -233,7 +233,11 @@ export function ArtifactView({ artifact, compact }: { artifact: Artifact; compac
             Your browser can't play this song.
           </audio>
         ) : (
-          <Notice tone="info">The words are yours. Music isn't switched on for this class yet — sing it or clap it!</Notice>
+          // Why this says so little: the server already knows WHY there is no
+          // audio -- no provider, or a generation that failed -- and says so in
+          // the piece's own note above. Repeating a guess here is how one state
+          // ended up telling three different stories at once.
+          <Notice tone="info">The words are yours — sing them or clap them!</Notice>
         )}
         <div className="rounded-2xl bg-violet-50 p-4 ring-1 ring-violet-100">
           <p className="text-xs font-bold uppercase tracking-wide text-violet-700">The words</p>

@@ -621,7 +621,24 @@ async function buildArtifact(
     return { ok: true, artifact: { kind: "image", title: fallbackTitle, content: media.base64, mime: media.mime, summary: promptText, approved: false, kidNote: tip } };
   } catch (err) {
     if (err instanceof ContentFilteredError) return { ok: false, retryable: false, blocked: true, message: KID_MESSAGES.unsafe, flags: [{ layer: "content_safety", category: "provider_filter" }] };
-    logger.error({ err }, "[aik] image generation failed");
-    return { ok: false, retryable: false, blocked: false, message: KID_MESSAGES.failed, flags: [{ layer: "system", category: "image_failed" }] };
+    // Log the provider's own words: an image failure is nearly always a wrong
+    // endpoint or an unexpected response shape, and "it failed" tells nobody which.
+    logger.error({ err: String((err as Error)?.message ?? err).slice(0, 500) }, "[aik] image generation failed");
+    // The words survive the picture. Prompt Craft teaches children to write a
+    // description; the description IS the lesson, and losing it because a model
+    // was unreachable turns a bad minute into a lost activity. Video and Music
+    // already behave this way; image was the odd one out.
+    return {
+      ok: true,
+      artifact: {
+        kind: "image",
+        title: fallbackTitle,
+        content: "",
+        mime: "text/plain",
+        summary: promptText,
+        approved: true,
+        kidNote: tip || "Here's your picture description! The drawing didn't come out this time \u2014 your facilitator can draw it, or try again later.",
+      },
+    };
   }
 }

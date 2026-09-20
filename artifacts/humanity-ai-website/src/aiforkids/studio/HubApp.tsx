@@ -419,7 +419,7 @@ function Welcome({ state }: { state: HubState }) {
           <h1 className="text-2xl font-extrabold">Welcome back, {state.facilitator.displayName}.</h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-600">
             Everything here runs through the same safety pipeline the children use — screening on the way in, screening on the way
-            out, and an audit line for every request. Nothing you make is visible to a class unless you put it there.
+            out, and every request recorded. Nothing you make is visible to a class unless you put it there.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -478,7 +478,7 @@ const STAFF_BLURB: Record<ModeId, string> = {
   quest: "A fact list, quiz or outline on a topic, with every claim flagged for checking. Good for Explorer supports and anything you will verify before it reaches a child.",
   video: "A three-shot storyboard, and a short clip when a video model is switched on. Good for promo pieces and Week 3 examples.",
   robot: "A parts list, build steps, micro:bit starter code and a safety note. Good for Robotics Lab planning and the Inventor Quest path.",
-  music: "Lyrics a child can sing on first hearing, plus a sound description for a music model. Held for you to listen to before a class hears it. Good for the Week 3 club anthem.",
+  music: "Lyrics a child can sing on first hearing, plus a sound description for a music model. Listen to it yourself before you play it to a class. Good for the Week 3 club anthem.",
   homework: "Socratic tutoring: it asks questions and works step by step rather than handing over an answer. Good for testing what children will actually get back.",
 };
 
@@ -783,16 +783,22 @@ function ToolRunner({ state, mode, onBack }: { state: HubState; mode: ModeDef; o
         setRequest(done);
         if (done.status === "done" && done.resultArtifactId) {
           const { artifact: a } = await getArtifact(done.resultArtifactId);
-          setArtifact(a);
-          setFiled(false);
-          writeDraft(mode.id, a.id);
-          if (kind === "chat" && a.kind === "chat") {
+          if (kind === "chat" || a.kind === "chat") {
+            // A question to the helper is a conversation ABOUT the piece, never a
+            // replacement for it. Writing the chat into `artifact` used to wipe the
+            // card, the build trace and the File button in one go -- a finished
+            // six-panel story could vanish with no undo. The transcript lives in its
+            // own state and the piece stays exactly where it was.
             try {
               const parsed = JSON.parse(a.content);
               setTurns(parsed.turns ?? []);
             } catch {
               /* leave the transcript as it is */
             }
+          } else {
+            setArtifact(a);
+            setFiled(false);
+            writeDraft(mode.id, a.id);
           }
         }
       } catch (err) {
@@ -836,7 +842,7 @@ function ToolRunner({ state, mode, onBack }: { state: HubState; mode: ModeDef; o
             <Card>
               <h2 className="mb-2 text-lg font-extrabold">Change it</h2>
               <p className="mb-3 text-sm text-slate-600">Describe one change in a sentence. The rest stays as it is.</p>
-              <ChangeBox hint="e.g. make the enemies slower and add a score counter" maxChars={STAFF_FIELD_CHARS} busy={busy} onSubmit={(change) => void run("change", { change })} />
+              <ChangeBox hint={mode.changeHint ? `e.g. ${mode.changeHint}` : "e.g. change one thing and keep the rest"} maxChars={STAFF_FIELD_CHARS} busy={busy} onSubmit={(change) => void run("change", { change })} />
               <div className="mt-4 border-t border-slate-100 pt-4">
                 <BigButton
                   variant="ghost"
