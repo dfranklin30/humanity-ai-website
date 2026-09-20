@@ -770,6 +770,37 @@ export function registerAikRoutes(app: Express): void {
     }),
   );
 
+  /* ---------------- Review queue and audit trail ----------------
+   * The approve endpoint above has existed since the beginning. Nothing ever
+   * listed what was waiting for it, so a child's song held "for your
+   * facilitator to listen to" was held indefinitely by a gate with no handle.
+   * And the audit table has been filling since the first request with nobody
+   * able to read it. Both are reads; approving still goes through the route
+   * above, with its own ownership check.
+   */
+  app.get(
+    `${base}/hub/review`,
+    requireRunClasses,
+    wrap(async (req, res) => {
+      const f = (req as FReq).facilitator;
+      const pending = await store.listPendingApproval(f.id);
+      res.json({
+        pending: pending.map((a) => ({ ...a, createdAt: a.created_at })),
+      });
+    }),
+  );
+
+  app.get(
+    `${base}/hub/audit`,
+    requireRunClasses,
+    wrap(async (req, res) => {
+      const f = (req as FReq).facilitator;
+      const limit = Math.min(Number(req.query.limit) || 200, 500);
+      const entries = await store.listAudit(f.id, limit);
+      res.json({ entries });
+    }),
+  );
+
   // Projector mode: the facilitator runs any mode from the front of the room, no child account.
   app.post(
     `${base}/facilitator/classes/:id/projector`,

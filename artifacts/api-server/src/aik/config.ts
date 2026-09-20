@@ -17,6 +17,10 @@
  *                                     model: oss | anthropic (default oss if configured)
  *   AIK_IMAGE_PROVIDER                azure | fal               (default: whichever is configured)
  *   AIK_VIDEO_PROVIDER                fal | none
+ *   AIK_VIDEO_PROVIDER                oss | fal | none
+ *   AIK_OSS_VIDEO_BASE_URL            e.g. https://<res>.openai.azure.com/openai/v1
+ *   AIK_OSS_VIDEO_API_KEY
+ *   AIK_OSS_VIDEO_MODEL               the deployment name, e.g. sora-2
  *   AIK_MUSIC_PROVIDER                elevenlabs | fal | none
  *   AIK_TTS_PROVIDER                  elevenlabs | none
  *
@@ -56,7 +60,7 @@ const isProduction = env.NODE_ENV === "production";
 
 export type TextProviderId = "anthropic" | "azure" | "oss";
 export type ImageProviderId = "azure" | "oss" | "fal" | "none";
-export type VideoProviderId = "fal" | "none";
+export type VideoProviderId = "oss" | "fal" | "none";
 export type MusicProviderId = "elevenlabs" | "fal" | "none";
 export type TtsProviderId = "azure" | "elevenlabs" | "none";
 
@@ -68,6 +72,7 @@ const ossImageConfigured = Boolean((env.AIK_OSS_IMAGE_BASE_URL || env.AIK_OSS_BA
 const falConfigured = Boolean(env.AIK_FAL_KEY);
 const azureSpeechConfigured = Boolean(env.AIK_AZURE_SPEECH_KEY && env.AIK_AZURE_SPEECH_REGION);
 const elevenConfigured = Boolean(env.AIK_ELEVENLABS_API_KEY);
+const ossVideoConfigured = Boolean(env.AIK_OSS_VIDEO_BASE_URL && env.AIK_OSS_VIDEO_API_KEY && env.AIK_OSS_VIDEO_MODEL);
 
 function pick<T extends string>(value: string | undefined, allowed: T[], fallback: T): T {
   return allowed.includes(value as T) ? (value as T) : fallback;
@@ -83,7 +88,7 @@ export const aikConfig = {
     text: pick<TextProviderId>(env.AIK_TEXT_PROVIDER, ["anthropic", "azure", "oss"], anthropicKey ? "anthropic" : azureTextConfigured ? "azure" : "oss"),
     ossText: pick<TextProviderId>(env.AIK_OSS_TEXT_PROVIDER, ["oss", "anthropic", "azure"], ossConfigured ? "oss" : anthropicKey ? "anthropic" : "azure"),
     image: pick<ImageProviderId>(env.AIK_IMAGE_PROVIDER, ["azure", "oss", "fal", "none"], azureImageConfigured ? "azure" : ossImageConfigured ? "oss" : falConfigured ? "fal" : "none"),
-    video: pick<VideoProviderId>(env.AIK_VIDEO_PROVIDER, ["fal", "none"], falConfigured ? "fal" : "none"),
+    video: pick<VideoProviderId>(env.AIK_VIDEO_PROVIDER, ["oss", "fal", "none"], ossVideoConfigured ? "oss" : falConfigured ? "fal" : "none"),
     music: pick<MusicProviderId>(env.AIK_MUSIC_PROVIDER, ["elevenlabs", "fal", "none"], elevenConfigured ? "elevenlabs" : falConfigured ? "fal" : "none"),
     tts: pick<TtsProviderId>(env.AIK_TTS_PROVIDER, ["azure", "elevenlabs", "none"], azureSpeechConfigured ? "azure" : elevenConfigured ? "elevenlabs" : "none"),
   },
@@ -96,6 +101,9 @@ export const aikConfig = {
   },
 
   oss: {
+    videoBaseUrl: env.AIK_OSS_VIDEO_BASE_URL || "",
+    videoApiKey: env.AIK_OSS_VIDEO_API_KEY || "",
+    videoModel: env.AIK_OSS_VIDEO_MODEL || "",
     baseUrl: (env.AIK_OSS_BASE_URL || "").replace(/\/$/, ""),
     apiKey: env.AIK_OSS_API_KEY || "",
     model: env.AIK_OSS_MODEL || "",
@@ -213,7 +221,11 @@ export function isImageConfigured(): boolean {
   return (p === "azure" && azureImageConfigured) || (p === "oss" && ossImageConfigured) || (p === "fal" && falConfigured);
 }
 export function isVideoConfigured(): boolean {
-  return aikConfig.mockAI || (aikConfig.providers.video === "fal" && falConfigured);
+  return (
+    aikConfig.mockAI ||
+    (aikConfig.providers.video === "fal" && falConfigured) ||
+    (aikConfig.providers.video === "oss" && ossVideoConfigured)
+  );
 }
 export function isMusicConfigured(): boolean {
   if (aikConfig.mockAI) return true;

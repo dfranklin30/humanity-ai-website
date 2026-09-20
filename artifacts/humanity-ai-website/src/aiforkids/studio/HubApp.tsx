@@ -39,6 +39,9 @@ import {
   hubPatchProject,
   hubProject,
   hubRequest,
+  hubReview,
+  hubAudit,
+  fApproveArtifact,
   hubSubmit,
   getConfig,
   googleStartUrl,
@@ -50,6 +53,8 @@ import {
   type ModeDef,
   type ModeId,
   type Project,
+  type PendingItem,
+  type AuditEntry,
   type Role,
   type StudioConfig,
   type StudioRequest,
@@ -61,7 +66,7 @@ import { WEEK_MODULES, SESSION_RHYTHM, type WeekModule } from "../content/weeks"
 const STAFF_FIELD_CHARS = 1200;
 const STAFF_CHAT_CHARS = 4000;
 
-type Tab = "tools" | "projects" | "program" | "classes" | "people";
+type Tab = "tools" | "projects" | "program" | "classes" | "review" | "people";
 
 export default function HubApp() {
   const [location] = useLocation();
@@ -376,6 +381,7 @@ function HubShell() {
             ["projects", `📁 Projects · ${state.projects.length}`],
             ["program", "🗓️ 8-week program"],
             ["classes", `👋 Classes · ${state.classes.length}`],
+            ["review", "🛡️ Review"],
             ...(state.facilitator.isAdmin ? ([["people", "🔑 People"]] as [Tab, string][]) : []),
           ] as [Tab, string][]
         ).map(([id, label]) => (
@@ -397,6 +403,7 @@ function HubShell() {
       {tab === "projects" && <ProjectsTab state={state} onOpen={setProjectId} onChanged={load} />}
       {tab === "program" && <ProgramTab />}
       {tab === "classes" && <ClassesTab state={state} />}
+      {tab === "review" && <ReviewTab />}
       {tab === "people" && <PeopleTab me={state.facilitator} />}
     </div>
   );
@@ -959,6 +966,159 @@ function ToolRunner({ state, mode, onBack }: { state: HubState; mode: ModeDef; o
  * project" is ambiguous in a way that matters: the pieces are kept and become
  * unfiled, not destroyed. A facilitator should not have to guess that.
  */
+
+/* ------------------------------------------------------------------ *
+ * Review — the queue and the trail
+ *
+ * Two promises the product was making without a mechanism behind them.
+ *
+ * Children's media is written with approved = false and waits for a grown-up.
+ * The approve endpoint existed; nothing listed what was waiting, so the wait
+ * never ended. Work made in the Hub is approved on arrival, because the adult
+ * here IS the approver — so everything in this queue came from a child.
+ *
+ * The audit trail has been recording since the first request. This is the first
+ * thing that reads it back.
+ * ------------------------------------------------------------------ */
+
+function ReviewTab() {
+  const [pending, setPending] = useState<PendingItem[] | null>(null);
+  const [entries, setEntries] = useState<AuditEntry[] | null>(null);
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<"queue" | "trail">("queue");
+
+  const load = useCallback(async () => {
+    try {
+      const [p, a] = await Promise.all([hubReview(), hubAudit(200)]);
+      setPending(p.pending);
+      setEntries(a.entries);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Couldn't load the review queue.");
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function decide(id: number, approve: boolean) {
+    setBusyId(id);
+    setError(null);
+    try {
+      await fApproveArtifact(id, approve);
+      await load();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "That didn't go through.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  if (error) return <Notice>{error}</Notice>;
+  if (!pending || !entries) return <Spinner label="Loading the review queue…" />;
+
+  return (
+    <div className="space-y-5">
+      <nav className="flex gap-2">
+        {(
+          [
+            ["queue", `⏳ Waiting for you · ${pending.length}`],
+            ["trail", `📜 What happened · ${entries.length}`],
+          ] as ["queue" | "trail", string][]
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => setView(id)}
+            className={
+              view === id
+                ? "rounded-full bg-violet-700 px-4 py-2 text-sm font-bold text-white"
+                : "rounded-full bg-white px-4 py-2 text-sm font-bold text-slate-700 ring-1 ring-slate-200 hover:ring-violet-300"
+            }
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      {view === "queue" &&
+        (pending.length === 0 ? (
+          <Card tone="tint">
+            <p className="text-sm text-slate-700">
+              Nothing is waiting. Pictures, songs and videos a child makes appear here for you to look at before the class
+              sees them. Anything you make yourself in the Hub is approved as you make it — you're the grown-up.
+            </p>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {pending.map((a) => (
+              <Card key={a.id}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-lg font-extrabold">
+                      {kindEmoji(a.kind)} {a.title}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {a.nickname ? `${a.nickname} · ` : ""}
+                      {a.class_name ?? "a class"} · {new Date(a.created_at).toLocaleString()}
+                    </p>
+                    {a.summary && <p className="mt-2 line-clamp-3 text-sm text-slate-700">{a.summary}</p>}
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <BigButton className="!px-3 !py-1.5 !text-sm" disabled={busyId === a.id} onClick={() => void decide(a.id, true)}>
+                      {busyId === a.id ? "…" : "Approve"}
+                    </BigButton>
+                    <BigButton variant="ghost" className="!px-3 !py-1.5 !text-sm" disabled={busyId === a.id} onClick={() => void decide(a.id, false)}>
+                      Not this one
+                    </BigButton>
+                  </div>
+                </div>
+                <ArtifactView artifact={a as unknown as Artifact} />
+              </Card>
+            ))}
+          </div>
+        ))}
+
+      {view === "trail" && (
+        <Card>
+          <p className="mb-3 text-sm text-slate-600">
+            Every request, screen and decision, newest first. This is what "an audit line for every request" means.
+          </p>
+          <div className="max-h-[32rem] overflow-y-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="sticky top-0 bg-white text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="py-2 pr-3 font-bold">When</th>
+                  <th className="py-2 pr-3 font-bold">Who</th>
+                  <th className="py-2 pr-3 font-bold">What</th>
+                  <th className="py-2 font-bold">Where</th>
+                </tr>
+              </thead>
+              <tbody>
+                {entries.map((e) => (
+                  <tr key={e.id} className="border-t border-slate-100 align-top">
+                    <td className="whitespace-nowrap py-2 pr-3 text-slate-600">{new Date(e.created_at).toLocaleString()}</td>
+                    <td className="py-2 pr-3 text-slate-600">{e.actor_type}</td>
+                    <td className="py-2 pr-3 font-semibold text-slate-800">{e.action.replace(/_/g, " ")}</td>
+                    <td className="py-2 text-slate-600">{e.class_name ?? "—"}</td>
+                  </tr>
+                ))}
+                {entries.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="py-4 text-slate-600">
+                      Nothing recorded yet.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 function ProjectCard({ project, onOpen, onChanged }: { project: Project; onOpen: () => void; onChanged: () => void }) {
   const [mode, setMode] = useState<"view" | "rename" | "confirm">("view");
   const [name, setName] = useState(project.name);

@@ -273,3 +273,24 @@ export async function waitForRequest(id: number, getter: (id: number) => Promise
     delay = Math.min(delay * 1.3, 3000);
   }
 }
+
+/* ------------------------------------------------------------------ *
+ * Review queue and audit trail
+ * ------------------------------------------------------------------ */
+
+export type PendingItem = ArtifactMeta & { class_name: string | null; nickname: string | null; created_at: string };
+export type AuditEntry = {
+  id: number;
+  class_id: number | null;
+  actor_type: string;
+  actor_id: number | null;
+  action: string;
+  detail: any;
+  created_at: string;
+  class_name: string | null;
+};
+
+export const hubReview = () => call<{ pending: PendingItem[] }>("GET", "/hub/review");
+export const hubAudit = (limit = 200) => call<{ entries: AuditEntry[] }>("GET", `/hub/audit?limit=${limit}`);
+export const fApproveArtifact = (artifactId: number, approve: boolean) =>
+  call<{ ok: true }>("POST", `/facilitator/artifacts/${artifactId}/approve`, { approve });

@@ -960,3 +960,64 @@ export async function exportClass(classId: number): Promise<any> {
   const auditRows = rows(await db.execute(sql`SELECT * FROM aik_audit WHERE class_id = ${classId} ORDER BY id`));
   return { exportedAt: new Date().toISOString(), class: klass, children, requests, artifacts, audit: auditRows };
 }
+
+/* ------------------------------------------------------------------ *
+ * Review queue and audit trail
+ *
+ * Two things the product promised and did not have a surface for.
+ *
+ * Media that needs a grown-up's eyes is written with approved = false, and the
+ * approve endpoint has existed all along -- but nothing ever listed what was
+ * waiting, so a song held for a facilitator to hear was held forever. A gate
+ * nobody can open is not a safeguard; it is a leak that happens to be stuck.
+ *
+ * The audit table has been filling up since the first request. Nothing read it.
+ * "An audit line for every request" is only true if someone can read the lines.
+ * ------------------------------------------------------------------ */
+
+/** Everything across a facilitator's classes and workspace that is waiting to be approved. */
+export async function listPendingApproval(
+  facilitatorId: number,
+  limit = 100,
+): Promise<(Omit<ArtifactRow, "content"> & { class_name: string | null; nickname: string | null })[]> {
+  await ensureTables();
+  return rows(
+    await db.execute(sql`
+      SELECT a.id, a.class_id, a.child_id, a.kind, a.title, a.mime, a.summary, a.approved, a.published,
+             a.version, a.parent_artifact_id, a.created_at,
+             k.name AS class_name, c.nickname
+        FROM aik_artifacts a
+        JOIN aik_classes k ON k.id = a.class_id
+        LEFT JOIN aik_children c ON c.id = a.child_id
+       WHERE k.facilitator_id = ${facilitatorId}
+         AND a.approved = false
+         AND NOT EXISTS (SELECT 1 FROM aik_artifacts b WHERE b.parent_artifact_id = a.id)
+       ORDER BY a.created_at ASC
+       LIMIT ${limit}`),
+  );
+}
+
+export type AuditRow = {
+  id: number;
+  class_id: number | null;
+  actor_type: string;
+  actor_id: number | null;
+  action: string;
+  detail: any;
+  created_at: string;
+  class_name: string | null;
+};
+
+/** The audit trail for everything a facilitator is responsible for, newest first. */
+export async function listAudit(facilitatorId: number, limit = 200): Promise<AuditRow[]> {
+  await ensureTables();
+  return rows<AuditRow>(
+    await db.execute(sql`
+      SELECT t.id, t.class_id, t.actor_type, t.actor_id, t.action, t.detail, t.created_at, k.name AS class_name
+        FROM aik_audit t
+        JOIN aik_classes k ON k.id = t.class_id
+       WHERE k.facilitator_id = ${facilitatorId}
+       ORDER BY t.id DESC
+       LIMIT ${limit}`),
+  );
+}

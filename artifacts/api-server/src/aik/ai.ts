@@ -170,10 +170,81 @@ async function generateImageOpenAICompatible(prompt: string): Promise<MediaResul
 export async function generateVideo(prompt: string): Promise<MediaResult> {
   if (aikConfig.mockAI) return { base64: MOCK_MP4, mime: "video/mp4", provider: "mock", model: "mock" };
   if (!isVideoConfigured()) throw new Error("Video provider not configured");
+  if (aikConfig.providers.video === "oss") return generateVideoJobApi(prompt);
   const data = await falRun(aikConfig.fal.videoModel, { prompt, negative_prompt: "scary, violent, blood, weapons, text, watermark, realistic people", aspect_ratio: "16:9" });
   const url = data?.video?.url ?? data?.videos?.[0]?.url;
   if (!url) throw new Error("fal: no video returned");
   return { ...(await download(url)), provider: "fal", model: aikConfig.fal.videoModel };
+}
+
+/**
+ * Video over a job API (Azure AI Foundry / Sora, and anything with the same shape).
+ *
+ * Unlike images, which come back from one call, video is a job: you submit,
+ * you poll, and only then is there a file. That is the whole reason Video Maker
+ * could not simply reuse the image path.
+ *
+ * The polling is bounded in both directions -- a wall-clock budget and a cap on
+ * attempts -- because a child is watching a progress bar, and a job that never
+ * finishes must become an honest "it didn't come out this time" rather than a
+ * request that hangs until the container is reclaimed.
+ */
+async function generateVideoJobApi(prompt: string): Promise<MediaResult> {
+  const { videoBaseUrl, videoApiKey, videoModel } = aikConfig.oss;
+  const headers = {
+    "content-type": "application/json",
+    authorization: `Bearer ${videoApiKey}`,
+    "api-key": videoApiKey,
+  };
+
+  const start = await fetchWithTimeout(
+    `${videoBaseUrl}/videos`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model: videoModel,
+        prompt,
+        seconds: "4",
+        size: "720x1280",
+      }),
+    },
+    60_000,
+  );
+  if (!start.ok) throw new Error(`Video submit ${start.status}: ${(await start.text().catch(() => "")).slice(0, 300)}`);
+  const job: any = await start.json();
+  const jobId = job?.id;
+  if (!jobId) throw new Error("Video job: no id returned");
+
+  const deadline = Date.now() + aikConfig.mediaTimeoutMs;
+  let attempts = 0;
+  let status = String(job?.status ?? "queued");
+  while (Date.now() < deadline && attempts < 120) {
+    if (status === "completed" || status === "succeeded") break;
+    if (status === "failed" || status === "cancelled") {
+      const reason = String(job?.error?.message ?? status);
+      // A provider refusing on content grounds is a screening result, not an outage.
+      if (/content|policy|safety|moderat/i.test(reason)) throw new ContentFilteredError(reason);
+      throw new Error(`Video job ${status}: ${reason.slice(0, 200)}`);
+    }
+    attempts++;
+    await new Promise((r) => setTimeout(r, 4000));
+    const poll = await fetchWithTimeout(`${videoBaseUrl}/videos/${jobId}`, { headers }, 30_000);
+    if (!poll.ok) throw new Error(`Video poll ${poll.status}`);
+    const cur: any = await poll.json();
+    status = String(cur?.status ?? status);
+    if (cur?.error) Object.assign(job, { error: cur.error });
+  }
+  if (status !== "completed" && status !== "succeeded") throw new Error(`Video job did not finish (last status: ${status})`);
+
+  const file = await fetchWithTimeout(`${videoBaseUrl}/videos/${jobId}/content`, { headers }, 120_000);
+  if (!file.ok) throw new Error(`Video download ${file.status}`);
+  return {
+    base64: Buffer.from(await file.arrayBuffer()).toString("base64"),
+    mime: file.headers.get("content-type") || "video/mp4",
+    provider: "oss",
+    model: videoModel,
+  };
 }
 
 export async function generateMusic(prompt: string, seconds = 30): Promise<MediaResult> {
