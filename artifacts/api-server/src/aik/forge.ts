@@ -385,6 +385,8 @@ export async function refineJson(opts: {
    * into MakeCode. Returns problems phrased for the model.
    */
   verify?: (json: string) => string[];
+  /** Extra, kind-specific instruction for the critique pass. */
+  focus?: string;
   onProgress?: ForgeProgress;
 }): Promise<{ json: string; steps: ForgeStep[]; changed: boolean }> {
   const steps = new Steps(opts.onProgress);
@@ -432,7 +434,7 @@ export async function refineJson(opts: {
   let notes: string[] = [];
   try {
     const critique = await completeText({
-      system: `You review ${opts.kind} work for children against the brief it came from. Be specific; do not flatter.${COMMON_RULES}
+      system: `You review ${opts.kind} work for children against the brief it came from. Be specific; do not flatter.${COMMON_RULES}${opts.focus ? `\n\nLOOK HARDEST AT THIS:\n${opts.focus}` : ""}
 Reply with ONLY a JSON array of at most 3 strings, each one concrete improvement. Reply [] if it already delivers the brief.`,
       user: `BRIEF:\n${opts.brief}\n\nCURRENT WORK:\n${current}`,
       maxTokens: 500,

@@ -539,6 +539,201 @@ function ToolsTab({ state, onOpen }: { state: HubState; onOpen: (id: ModeId) => 
 
 type ChatTurn = { role: "user" | "assistant"; text: string };
 
+/* ------------------------------------------------------------------ *
+ * Filing
+ *
+ * A generated piece is already saved on the server the moment it exists —
+ * what used to go missing was only the *pointer* to it. So the draft we keep
+ * in the browser is just an id and the tool it came from: a few bytes that
+ * survive a trip to Projects and back, rather than a copy of the work that
+ * could drift out of step with the real thing.
+ *
+ * The old bar had a dead end in it: a facilitator with no projects saw a
+ * greyed-out button, no explanation, and no way forward without leaving the
+ * screen — which threw away the story they were trying to file. Three things
+ * fix that. You can make a project from right here; there is always an
+ * Unfiled bucket so nothing is ever stranded; and when the button is disabled
+ * it says why.
+ * ------------------------------------------------------------------ */
+
+const DRAFT_KEY = "hpai.hub.draft.v1";
+const DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
+const UNFILED = "Unfiled";
+
+type Draft = { modeId: string; artifactId: number; savedAt: number };
+
+function readDraft(modeId: string): number | null {
+  try {
+    const raw = window.localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const d = JSON.parse(raw) as Draft;
+    if (d.modeId !== modeId) return null;
+    if (Date.now() - d.savedAt > DRAFT_TTL_MS) return null;
+    return typeof d.artifactId === "number" ? d.artifactId : null;
+  } catch {
+    return null; // private mode, blocked storage, corrupt value — all fine, just no draft
+  }
+}
+
+function writeDraft(modeId: string, artifactId: number): void {
+  try {
+    window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ modeId, artifactId, savedAt: Date.now() } satisfies Draft));
+  } catch {
+    /* never let storage break a generation */
+  }
+}
+
+function clearDraft(): void {
+  try {
+    window.localStorage.removeItem(DRAFT_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+type FileTarget = number | "" | "__new__" | "__unfiled__";
+
+function FileItBar({
+  artifact,
+  projects,
+  onRefresh,
+  onFiled,
+}: {
+  artifact: Artifact;
+  projects: Project[];
+  onRefresh: () => Promise<Project[]>;
+  onFiled: (projectName: string) => void;
+}) {
+  const [target, setTarget] = useState<FileTarget>(projects[0]?.id ?? "__unfiled__");
+  const [newName, setNewName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [filedTo, setFiledTo] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // A project made in another tab, or on the Projects screen, has to show up
+  // here without a reload — otherwise the dropdown quietly lies.
+  const refresh = useCallback(async () => {
+    const fresh = await onRefresh().catch(() => null);
+    if (fresh && target === "" && fresh[0]) setTarget(fresh[0].id);
+  }, [onRefresh, target]);
+
+  useEffect(() => {
+    void refresh();
+    const onFocus = () => void refresh();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [artifact.id]);
+
+  const needsName = target === "__new__" && newName.trim().length === 0;
+  const disabled = busy || needsName;
+  const why = needsName ? "Give the new project a name first." : null;
+
+  async function file() {
+    setBusy(true);
+    setError(null);
+    try {
+      let projectId: number;
+      let name: string;
+
+      if (target === "__new__") {
+        const { project } = await hubCreateProject({ name: newName.trim() });
+        projectId = project.id;
+        name = project.name;
+      } else if (target === "__unfiled__") {
+        // Find-or-create, so nothing is ever unreachable just because the
+        // facilitator hasn't decided where it belongs yet.
+        const existing = projects.find((p) => p.name === UNFILED);
+        if (existing) {
+          projectId = existing.id;
+          name = existing.name;
+        } else {
+          const { project } = await hubCreateProject({ name: UNFILED, summary: "Pieces not yet sorted into a project." });
+          projectId = project.id;
+          name = project.name;
+        }
+      } else if (typeof target === "number") {
+        projectId = target;
+        name = projects.find((p) => p.id === target)?.name ?? "that project";
+      } else {
+        setError("Choose where this should go.");
+        return;
+      }
+
+      await hubFileArtifact(artifact.id, projectId);
+      clearDraft();
+      setFiledTo(name);
+      onFiled(name);
+      await onRefresh().catch(() => null);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't file that. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (filedTo) {
+    return (
+      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4 text-sm">
+        <span className="font-semibold text-emerald-700">Filed ✓</span>
+        <span className="text-slate-600">in {filedTo}</span>
+        <button onClick={() => setFiledTo(null)} className="font-semibold text-violet-700 underline underline-offset-2">
+          File somewhere else
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 border-t border-slate-100 pt-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <label htmlFor="file-under" className="text-sm font-semibold text-slate-700">
+          File under
+        </label>
+        <select
+          id="file-under"
+          value={typeof target === "number" ? String(target) : target}
+          onFocus={() => void refresh()}
+          onMouseDown={() => void refresh()}
+          onChange={(e) => {
+            const v = e.target.value;
+            setTarget(v === "__new__" || v === "__unfiled__" || v === "" ? (v as FileTarget) : Number(v));
+          }}
+          className="rounded-xl border-2 border-slate-200 px-3 py-2 text-sm focus:border-violet-500 focus:outline-none"
+        >
+          {projects.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+          <option value="__unfiled__">{UNFILED}</option>
+          <option value="__new__">+ New project…</option>
+        </select>
+
+        {target === "__new__" && (
+          <input
+            autoFocus
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !disabled) void file();
+            }}
+            placeholder="Name it — e.g. Fall cohort"
+            className="min-w-[12rem] flex-1 rounded-xl border-2 border-slate-200 px-3 py-2 text-sm focus:border-violet-500 focus:outline-none"
+          />
+        )}
+
+        <BigButton className="!px-3 !py-1.5 !text-sm" disabled={disabled} onClick={() => void file()}>
+          {busy ? "Filing…" : target === "__new__" ? "Create & file" : "File it"}
+        </BigButton>
+      </div>
+
+      {why && <p className="mt-2 text-sm text-slate-600">{why}</p>}
+      {error && <p className="mt-2 text-sm font-semibold text-rose-700">{error}</p>}
+    </div>
+  );
+}
+
 function ToolRunner({ state, mode, onBack }: { state: HubState; mode: ModeDef; onBack: () => void }) {
   const [request, setRequest] = useState<StudioRequest | null>(null);
   const [artifact, setArtifact] = useState<Artifact | null>(null);
@@ -546,8 +741,31 @@ function ToolRunner({ state, mode, onBack }: { state: HubState; mode: ModeDef; o
   const [error, setError] = useState<string | null>(null);
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [chatText, setChatText] = useState("");
-  const [projectId, setProjectId] = useState<number | "">(state.projects[0]?.id ?? "");
+  const [projects, setProjects] = useState<Project[]>(state.projects);
   const [filed, setFiled] = useState(false);
+  const [restored, setRestored] = useState(false);
+
+  /** The dropdown must never be stale: a project made elsewhere has to appear here. */
+  const refreshProjects = useCallback(async () => {
+    const fresh = await hubLoad();
+    setProjects(fresh.projects);
+    return fresh.projects;
+  }, []);
+
+  /**
+   * Bring back the last piece made with this tool. Only its id is stored —
+   * the piece itself never left the server — so going to Projects to make a
+   * folder and coming back no longer destroys the work.
+   */
+  useEffect(() => {
+    if (artifact || restored) return;
+    const id = readDraft(mode.id);
+    setRestored(true);
+    if (id === null) return;
+    getArtifact(id)
+      .then(({ artifact: a }) => setArtifact(a))
+      .catch(() => clearDraft()); // deleted or not ours any more
+  }, [artifact, restored, mode.id]);
 
   const run = useCallback(
     async (kind: "create" | "change" | "chat", input: Record<string, string>) => {
@@ -567,6 +785,7 @@ function ToolRunner({ state, mode, onBack }: { state: HubState; mode: ModeDef; o
           const { artifact: a } = await getArtifact(done.resultArtifactId);
           setArtifact(a);
           setFiled(false);
+          writeDraft(mode.id, a.id);
           if (kind === "chat" && a.kind === "chat") {
             try {
               const parsed = JSON.parse(a.content);
@@ -708,32 +927,12 @@ function ToolRunner({ state, mode, onBack }: { state: HubState; mode: ModeDef; o
                 <span className="text-xs font-semibold text-slate-500">v{artifact.version}</span>
               </div>
               <ArtifactView artifact={artifact} />
-              <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
-                <label className="text-sm font-semibold text-slate-700">File under</label>
-                <select
-                  value={projectId}
-                  onChange={(e) => setProjectId(e.target.value === "" ? "" : Number(e.target.value))}
-                  className="rounded-xl border-2 border-slate-200 px-3 py-2 text-sm focus:border-violet-500 focus:outline-none"
-                >
-                  <option value="">No project</option>
-                  {state.projects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-                <BigButton
-                  className="!px-3 !py-1.5 !text-sm"
-                  disabled={projectId === "" || filed}
-                  onClick={async () => {
-                    if (projectId === "") return;
-                    await hubFileArtifact(artifact.id, projectId).catch(() => {});
-                    setFiled(true);
-                  }}
-                >
-                  {filed ? "Filed ✓" : "File it"}
-                </BigButton>
-              </div>
+              <FileItBar
+                artifact={artifact}
+                projects={projects}
+                onRefresh={refreshProjects}
+                onFiled={() => setFiled(true)}
+              />
             </Card>
           )}
         </div>
@@ -745,6 +944,107 @@ function ToolRunner({ state, mode, onBack }: { state: HubState; mode: ModeDef; o
 /* ------------------------------------------------------------------ *
  * Projects
  * ------------------------------------------------------------------ */
+
+
+/**
+ * A project card that can be renamed and deleted.
+ *
+ * Delete says plainly what happens to the work inside, because "delete
+ * project" is ambiguous in a way that matters: the pieces are kept and become
+ * unfiled, not destroyed. A facilitator should not have to guess that.
+ */
+function ProjectCard({ project, onOpen, onChanged }: { project: Project; onOpen: () => void; onChanged: () => void }) {
+  const [mode, setMode] = useState<"view" | "rename" | "confirm">("view");
+  const [name, setName] = useState(project.name);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function run(fn: () => Promise<unknown>) {
+    setBusy(true);
+    setError(null);
+    try {
+      await fn();
+      setMode("view");
+      onChanged();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "That didn't work.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (mode === "rename") {
+    return (
+      <div className="rounded-2xl bg-white p-4 ring-1 ring-violet-300">
+        <input
+          autoFocus
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && name.trim()) void run(() => hubPatchProject(project.id, { name: name.trim() }));
+            if (e.key === "Escape") setMode("view");
+          }}
+          className="w-full rounded-xl border-2 border-slate-200 px-3 py-2 text-base focus:border-violet-500 focus:outline-none"
+        />
+        <div className="mt-2 flex gap-2">
+          <BigButton
+            className="!px-3 !py-1.5 !text-sm"
+            disabled={busy || !name.trim()}
+            onClick={() => void run(() => hubPatchProject(project.id, { name: name.trim() }))}
+          >
+            Save
+          </BigButton>
+          <BigButton variant="ghost" className="!px-3 !py-1.5 !text-sm" onClick={() => { setName(project.name); setMode("view"); }}>
+            Cancel
+          </BigButton>
+        </div>
+        {error && <p className="mt-2 text-sm font-semibold text-rose-700">{error}</p>}
+      </div>
+    );
+  }
+
+  if (mode === "confirm") {
+    return (
+      <div className="rounded-2xl bg-white p-4 ring-1 ring-rose-300">
+        <p className="text-sm font-bold text-slate-900">Delete “{project.name}”?</p>
+        <p className="mt-1 text-sm text-slate-600">
+          The {project.artifacts ?? 0} {project.artifacts === 1 ? "piece" : "pieces"} inside will be kept and become unfiled —
+          nothing made here is destroyed. Only the folder goes.
+        </p>
+        <div className="mt-3 flex gap-2">
+          <BigButton className="!px-3 !py-1.5 !text-sm" disabled={busy} onClick={() => void run(() => hubDeleteProject(project.id))}>
+            {busy ? "Deleting…" : "Yes, delete the folder"}
+          </BigButton>
+          <BigButton variant="ghost" className="!px-3 !py-1.5 !text-sm" onClick={() => setMode("view")}>
+            Keep it
+          </BigButton>
+        </div>
+        {error && <p className="mt-2 text-sm font-semibold text-rose-700">{error}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200 transition hover:ring-violet-400">
+      <button onClick={onOpen} className="w-full text-left">
+        <p className="text-lg font-extrabold">{project.name}</p>
+        {project.summary && <p className="mt-1 line-clamp-2 text-sm text-slate-600">{project.summary}</p>}
+        <p className="mt-2 text-xs font-semibold text-slate-500">
+          {project.artifacts ?? 0} {project.artifacts === 1 ? "piece" : "pieces"}
+          {project.week ? ` · Week ${project.week}` : ""}
+        </p>
+      </button>
+      <div className="mt-3 flex gap-3 border-t border-slate-100 pt-2 text-xs font-semibold">
+        <button onClick={() => setMode("rename")} className="text-slate-600 underline underline-offset-2 hover:text-violet-700">
+          Rename
+        </button>
+        <button onClick={() => setMode("confirm")} className="text-slate-600 underline underline-offset-2 hover:text-rose-700">
+          Delete
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function ProjectsTab({ state, onOpen, onChanged }: { state: HubState; onOpen: (id: number) => void; onChanged: () => void }) {
   const [name, setName] = useState("");
@@ -776,18 +1076,7 @@ function ProjectsTab({ state, onOpen, onChanged }: { state: HubState; onOpen: (i
               </h2>
               <div className="grid gap-3 sm:grid-cols-2">
                 {grouped[kind].map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => onOpen(p.id)}
-                    className="rounded-2xl bg-white p-4 text-left ring-1 ring-slate-200 transition hover:ring-violet-400"
-                  >
-                    <p className="text-lg font-extrabold">{p.name}</p>
-                    {p.summary && <p className="mt-1 line-clamp-2 text-sm text-slate-600">{p.summary}</p>}
-                    <p className="mt-2 text-xs font-semibold text-slate-500">
-                      {p.artifacts ?? 0} {p.artifacts === 1 ? "piece" : "pieces"}
-                      {p.week ? ` · Week ${p.week}` : ""}
-                    </p>
-                  </button>
+                  <ProjectCard key={p.id} project={p} onOpen={() => onOpen(p.id)} onChanged={onChanged} />
                 ))}
               </div>
             </div>

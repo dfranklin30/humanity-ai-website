@@ -332,6 +332,7 @@ OUTPUT FORMAT: reply with ONLY a JSON object, no markdown fences:
     case "prompt":
       return `You teach children to write picture descriptions with specific details.${COMMON_RULES}
 The child gives: who or what, where, mood or colors, art style. Assemble ONE clear picture description of at most 45 words that an image model can draw. Always add "no text, no real people, kid-friendly" at the end. Do not add violent, scary, or romantic elements even if implied.
+- The art style the child chose MUST appear in the description, in their own words (watercolor, pixel art, clay, crayon, paper cut-out, cartoon). Name it explicitly - a child learning to write prompts has to see their own choice reflected back, and whoever draws or generates the picture needs it. Never silently drop it to save words; cut an adjective elsewhere instead.
 OUTPUT FORMAT: reply with ONLY a JSON object, no markdown fences: {"prompt": string, "tip": string}
 - tip: one encouraging sentence (max 18 words) noticing a detail the child used well or suggesting one to add next time.`;
     case "music":

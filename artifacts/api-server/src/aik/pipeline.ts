@@ -269,6 +269,7 @@ export async function runRequest(requestId: number): Promise<void> {
         brief: input.text,
         current: built.artifact.content,
         schemaHint: SCHEMA_HINTS[mode.id] ?? "",
+        focus: CRITIQUE_FOCUS[mode.id],
         maxTokens: mode.maxTokens,
         verify: mode.id === "robot" ? verifyRobotJson : undefined,
         onProgress: (steps) => {
@@ -325,13 +326,37 @@ async function complete(req: RequestRow, artifactInput: NewArtifact, flags: Flag
 }
 
 /** Studios whose JSON output gets the critique-and-polish pass. */
-const REFINABLE = new Set(["story", "quest", "robot"]);
+const REFINABLE = new Set(["story", "quest", "robot", "music"]);
 
 /** Enough of the shape for the model to return the same object, corrected. */
 const SCHEMA_HINTS: Record<string, string> = {
   story: '{"title": string, "panels": [{"narration": string, "dialogue": string} x6], "coverPrompt": string}',
   quest: '{"title": string, "items": [{"text": string, "checkMe": boolean, "sourceHint": string}], "nextIdea": string}',
   robot: '{"name": string, "job": string, "parts": [string], "steps": [string], "code": string, "safetyNote": string}',
+  music: '{"title": string, "lyrics": string, "musicPrompt": string, "tip": string}',
+};
+
+/**
+ * What the critique pass should look hardest at, per tool.
+ *
+ * The generic "does this deliver the brief" review is good at surface quality
+ * and bad at two specific failures we have actually seen. A story can contain
+ * a plain contradiction — a prop in a jar in one panel and on the moon in the
+ * next — and sail through, which matters far more once panels are illustrated:
+ * a drawn contradiction is obvious to a five-year-old, and by then seven
+ * images have been paid for. And a song's sound description tends to come back
+ * vague ("a happy tune"), which is the one field a music model actually reads.
+ */
+const CRITIQUE_FOCUS: Record<string, string> = {
+  story:
+    "Continuity. Every prop, place and character introduced in one panel must stay consistent in every later panel that refers to it. " +
+    "Anything a character uses must have been established earlier or be plausibly present in the setting. " +
+    "Flag contradictions in where something is, who has it, or what it can do. Flag objects that appear from nowhere.",
+  music:
+    "The musicPrompt field, which is what a music model performs. It must name a genre, a tempo in words or BPM, the instruments, " +
+    "and how the feeling moves from the verse to the chorus. Reject anything vague like 'a happy song'. " +
+    "The lyrics must keep the child's own chant line exactly as they wrote it, and must be singable out loud at that tempo.",
+  quest: "Whether a child could actually carry out each step alone, and whether the checkable claims are genuinely checkable.",
 };
 
 /** Parse the robot artifact and run its micro:bit code through the checker. */
