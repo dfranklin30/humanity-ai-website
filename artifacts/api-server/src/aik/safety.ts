@@ -66,10 +66,28 @@ export function screenPII(text: string): Flag[] {
  * Terms are matched as whole words, case-insensitive.
  * ------------------------------------------------------------------ */
 
-const BLOCK_TERMS: { terms: string[]; category: string }[] = [
+/**
+ * `terms` are decisive on their own. `soft` terms are words that appear in
+ * perfectly ordinary science as often as in anything unpleasant -- blood,
+ * hearts, hunting, eruptions -- and are only treated as evidence on the way OUT
+ * when a decisive term keeps them company.
+ *
+ * This exists because Quest Helper refused to write about octopuses. Octopuses
+ * have blue blood, the sentence saying so tripped `scary_or_gore`, and a child
+ * researching cephalopods hit a dead end with no reason given. A screen that
+ * blocks biology is not protecting anyone; it just teaches children that the
+ * tool is broken.
+ */
+const BLOCK_TERMS: { terms: string[]; soft?: string[]; category: string }[] = [
   {
     category: "weapons",
-    terms: ["gun", "guns", "pistol", "rifle", "shotgun", "bomb", "bombs", "grenade", "knife fight", "stab", "shoot", "shooting", "kill", "killing", "murder"],
+    terms: [
+      "gun", "guns", "pistol", "rifle", "shotgun", "bomb", "bombs", "grenade", "knife fight", "stab", "shoot", "shooting", "kill", "killing", "murder",
+      // The obvious word was missing. "How to make a weapon at home" passed the
+      // input screen entirely and was only stopped on the way out -- which means
+      // the content was generated before anything objected to it.
+      "weapon", "weapons", "explosive", "explosives", "ammo", "ammunition", "silencer", "molotov", "poison someone", "how to hurt",
+    ],
   },
   {
     category: "adult_or_substances",
@@ -77,7 +95,8 @@ const BLOCK_TERMS: { terms: string[]; category: string }[] = [
   },
   {
     category: "scary_or_gore",
-    terms: ["blood", "bloody", "gore", "corpse", "dead body", "suicide", "self-harm", "cutting myself", "torture", "demon", "possessed", "horror movie"],
+    terms: ["gore", "corpse", "dead body", "suicide", "self-harm", "cutting myself", "torture", "demon", "possessed", "horror movie"],
+    soft: ["blood", "bloody", "heart attack", "hunting", "predator", "eruption", "erupted", "venom", "venomous", "poisonous", "carcass", "prey"],
   },
   {
     category: "hate",
@@ -97,17 +116,31 @@ const BLOCK_TERMS: { terms: string[]; category: string }[] = [
   },
 ];
 
-export function screenBlocklist(text: string): Flag[] {
+/**
+ * @param strictness "input" treats soft terms as decisive, because a child
+ * typing them is stating an intention. "output" requires a decisive term
+ * alongside, because the model writing them is usually writing science.
+ */
+export function screenBlocklist(text: string, strictness: "input" | "output" = "input"): Flag[] {
   const lower = ` ${text.toLowerCase().replace(/[^a-z0-9\s'-]/g, " ")} `;
+  const hit = (term: string) =>
+    new RegExp(`(^|[^a-z0-9])${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9]|$)`, "i").test(lower);
+
   const flags: Flag[] = [];
   for (const group of BLOCK_TERMS) {
-    for (const term of group.terms) {
-      const re = new RegExp(`(^|[^a-z0-9])${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9]|$)`, "i");
-      if (re.test(lower)) {
-        flags.push({ layer: "blocklist", category: group.category, detail: term });
-        break;
-      }
+    const hard = group.terms.find(hit);
+    if (hard) {
+      flags.push({ layer: "blocklist", category: group.category, detail: hard });
+      continue;
     }
+    const soft = group.soft?.find(hit);
+    if (!soft) continue;
+    if (strictness === "input") {
+      flags.push({ layer: "blocklist", category: group.category, detail: soft });
+    }
+    // On the way out a soft term alone is not evidence: "octopuses have blue
+    // blood" is a fact a child asked for, not gore. Azure Content Safety still
+    // sees the same text and will object if there is really something wrong.
   }
   return flags;
 }
@@ -222,7 +255,7 @@ export function stripLinks(text: string): string {
 
 export async function screenOutputText(text: string): Promise<ScreenResult> {
   const flags: Flag[] = [];
-  const blocked = screenBlocklist(text).filter((f) => f.category !== "brands_and_franchises" && f.category !== "real_people");
+  const blocked = screenBlocklist(text, "output").filter((f) => f.category !== "brands_and_franchises" && f.category !== "real_people");
   if (blocked.length) return { ok: false, flags: blocked.map((f) => ({ ...f, layer: "output" as const })), kidMessage: KID_MESSAGES.unsafe };
   if (isContentSafetyConfigured()) {
     try {
@@ -295,12 +328,26 @@ export function hardenGameHtml(html: string): string {
     "navigate-to 'none'",
   ].join("; ");
   const meta = `<meta http-equiv="Content-Security-Policy" content="${csp}">`;
+  /*
+   * Make the game fit whatever it is shown in, without touching the game's own
+   * logic. The canvas keeps its internal coordinate system -- so collision
+   * maths, speeds and positions are untouched -- and is only scaled down
+   * visually when the frame is narrower than it is. Injected here rather than
+   * asked of the model, because a model that forgets produces a game clipped
+   * on the right with its Play Again button below the fold, and children were
+   * seeing that as a broken game.
+   */
+  const fit =
+    "<style>html,body{margin:0;max-width:100%;overflow-x:hidden}" +
+    "canvas{max-width:100%!important;height:auto!important;display:block;margin:0 auto}" +
+    "body{box-sizing:border-box;padding:4px}</style>";
   let out = html.trim();
   if (!/<html[\s>]/i.test(out)) {
     out = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body>${out}</body></html>`;
   }
   if (/<head[^>]*>/i.test(out)) {
     out = out.replace(/<head[^>]*>/i, (m) => `${m}${meta}`);
+    out = out.replace(/<\/head>/i, `${fit}</head>`);
   } else {
     out = out.replace(/<html[^>]*>/i, (m) => `${m}<head>${meta}</head>`);
   }

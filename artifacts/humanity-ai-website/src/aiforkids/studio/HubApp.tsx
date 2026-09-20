@@ -907,7 +907,7 @@ function ToolRunner({ state, mode, onBack }: { state: HubState; mode: ModeDef; o
         </div>
 
         <div className="space-y-4">
-          {request && <RequestStatus request={request} />}
+          {request && <RequestStatus request={request} showReason />}
           {request?.progress && request.progress.length > 0 && (
             <Card>
               <h2 className="mb-1 text-lg font-extrabold">

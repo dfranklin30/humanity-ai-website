@@ -98,7 +98,10 @@ export function GameFrame({ html, title, tall }: { html: string; title: string; 
       sandbox="allow-scripts"
       referrerPolicy="no-referrer"
       srcDoc={html}
-      className={cx("w-full rounded-2xl bg-slate-900 ring-4 ring-violet-200", tall ? "h-[520px]" : "h-[440px]")}
+      // The frame has to fit the card it lives in. A 900x560 canvas inside a
+      // ~570px column clipped the right-hand side and pushed "Play Again" below
+      // the fold, so a finished game looked broken before anyone pressed a key.
+      className={cx("block w-full max-w-full rounded-2xl bg-slate-900 ring-4 ring-violet-200", tall ? "h-[min(520px,70vh)]" : "h-[min(440px,60vh)]")}
     />
   );
 }
@@ -311,15 +314,42 @@ export function kindEmoji(kind: ArtifactMeta["kind"]): string {
 
 export type ChatMsg = { role: "user" | "assistant" | "system"; text: string };
 
+/**
+ * The little bit of markdown a helper actually emits: **bold**, *italic* and
+ * `code`. Models write it whether or not you ask them to, and a child reading
+ * "the answer is **7/8**" sees the asterisks and wonders what they mean.
+ *
+ * Deliberately not a markdown library and deliberately not dangerouslySetInnerHTML:
+ * this builds React nodes from a split, so nothing in a model's reply can ever
+ * become markup.
+ */
+function formatInline(text: string): ReactNode[] {
+  const out: ReactNode[] = [];
+  const re = /(\*\*[^*\n]+\*\*|(?<!\*)\*[^*\n]+\*(?!\*)|`[^`\n]+`)/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  let k = 0;
+  while ((m = re.exec(text))) {
+    if (m.index > last) out.push(text.slice(last, m.index));
+    const tok = m[0];
+    if (tok.startsWith("**")) out.push(<strong key={k++}>{tok.slice(2, -2)}</strong>);
+    else if (tok.startsWith("`")) out.push(<code key={k++} className="rounded bg-slate-100 px-1 text-[0.95em]">{tok.slice(1, -1)}</code>);
+    else out.push(<em key={k++}>{tok.slice(1, -1)}</em>);
+    last = m.index + tok.length;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out;
+}
+
 export function Transcript({ turns, avatar }: { turns: { role: string; text: string }[]; avatar?: string }) {
   return (
     <div className="space-y-2">
       {turns.map((t, i) => (
         <div key={i} className={cx("flex", t.role === "user" ? "justify-end" : "justify-start")}>
-          <div className={cx("max-w-[85%] rounded-2xl px-4 py-2 text-base leading-relaxed", t.role === "user" ? "bg-violet-600 text-white" : t.role === "system" ? "bg-amber-50 text-amber-900 ring-1 ring-amber-200" : "bg-white text-slate-900 ring-2 ring-violet-100")}>
+          <div className={cx("max-w-[85%] whitespace-pre-line break-words rounded-2xl px-4 py-2 text-base leading-relaxed", t.role === "user" ? "bg-violet-600 text-white" : t.role === "system" ? "bg-amber-50 text-amber-900 ring-1 ring-amber-200" : "bg-white text-slate-900 ring-2 ring-violet-100")}>
             {t.role === "assistant" && <span className="mr-1">🤖</span>}
             {t.role === "user" && avatar && <span className="mr-1">{avatar}</span>}
-            {t.text}
+            {formatInline(t.text)}
           </div>
         </div>
       ))}
@@ -541,10 +571,42 @@ export function ForgeSteps({ steps }: { steps: NonNullable<StudioRequest["progre
   );
 }
 
-export function RequestStatus({ request }: { request: StudioRequest }) {
+/**
+ * @param showReason Facilitators see WHY a screen fired; children do not.
+ *
+ * Without this an adult reviewing a block reads the child-facing line -- "your
+ * facilitator can help you think of another idea" -- and they ARE the
+ * facilitator. A screen that fires on a legitimate topic is indistinguishable
+ * from one that fires on something genuinely wrong, so the person responsible
+ * for judging it cannot judge it.
+ */
+export function RequestStatus({ request, showReason }: { request: StudioRequest; showReason?: boolean }) {
   if (request.status === "queued" || request.status === "working") return <Spinner label={request.status === "queued" ? "In line…" : "The helper is working on it…"} />;
-  if (request.status === "blocked") return <Notice>{request.message ?? "Let's try that a different way."}</Notice>;
-  if (request.status === "failed") return <Notice>{request.message ?? "That one didn't work. Try again!"}</Notice>;
+
+  const reason =
+    showReason && request.flags?.length ? (
+      <p className="mt-2 text-xs text-slate-600">
+        <span className="font-semibold">Why: </span>
+        {request.flags
+          .map((f) => [f.layer, f.category, f.detail].filter(Boolean).join(" · "))
+          .join("  |  ")}
+      </p>
+    ) : null;
+
+  if (request.status === "blocked")
+    return (
+      <Notice>
+        {request.message ?? "Let's try that a different way."}
+        {reason}
+      </Notice>
+    );
+  if (request.status === "failed")
+    return (
+      <Notice>
+        {request.message ?? "That one didn't work. Try again!"}
+        {reason}
+      </Notice>
+    );
   return <Notice tone="good">Done! {request.message ?? ""}</Notice>;
 }
 

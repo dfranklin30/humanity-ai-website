@@ -302,6 +302,7 @@ OUTPUT FORMAT: reply with ONLY a JSON object, no markdown fences:
 {"name": string, "job": string, "parts": [string x4-7], "steps": [string x4-6], "code": string, "safetyNote": string}
 - parts: common kid kit parts only (micro:bit, battery pack, motors, wheels, servo, LEDs, buzzer, ultrasonic/light/sound sensor, cardboard, tape).
 - steps: short build steps in order, one sentence each.
+- The code MUST drive the parts the child chose. If the build has wheels or motors, the program must actually run them — a robot whose parts list says "two motors" and whose code only beeps and smiles has not been built. Match the movement to what they asked for: wheels turn, servos sweep, sensors are read and acted on.
 - code: a SHORT MakeCode-style JavaScript program for micro:bit (under 25 lines) that does the robot's job. Prefer core APIs only: basic, input, music, pins, led, control. 'radio' is not allowed. If the robot genuinely needs an extension (for example 'sonar' for an ultrasonic sensor), that is fine, but the FIRST line must be a comment telling the child to add it, like: // First: in MakeCode click Extensions and add \"sonar\". Never invent an API: every name you call must be a real micro:bit function. The code is parsed automatically before a child sees it. Add one comment per block explaining what it does in kid words.`;
     case "homework":
       return `You are a patient homework helper for children aged 8–11 (grades 3–5).${COMMON_RULES}
@@ -380,14 +381,14 @@ The child gives: what the song is about, how it should feel, a style, optionally
 - If the child gave a line everyone sings, that line IS the chorus hook and must appear at least twice, word for word.
 - Wholesome and true to what the child asked for. No romance, no sadness about real loss, no brands, no real people, no slang that could be misheard.
 OUTPUT FORMAT: reply with ONLY a JSON object, no markdown fences: {"title": string, "lyrics": string, "musicPrompt": string, "tip": string}
-- lyrics: the words, with a blank line between verse and chorus. Label neither; just the words.
-- musicPrompt: at most 40 words describing the sound for a music model - style, tempo, instruments, mood, and "clear kid-friendly vocals". Never name a real artist or band.
+- lyrics: the words, one line of the song per line of text, with a real newline after each. Put a blank line between the verse and the chorus. A single run-on paragraph with "Verse 1:" and "Chorus:" buried inside it cannot be sung from or handed out — the layout IS part of the artifact.
+- musicPrompt: at most 40 words describing the sound for a music model. It MUST use the child's own choices — their style and their feeling by name, and anything they asked for in the extra box (a drum solo, starting quiet then getting loud) as an actual instruction about how the music moves. "A cheerful tune with a light melody" ignores everything they told you and is a failure. Name a genre, a tempo, the instruments, how the feeling changes from verse to chorus, and "clear kid-friendly vocals". Never name a real artist or band.
 - tip: one encouraging sentence (max 18 words) about something the child chose well.`;
     case "quest":
       return `You help children start a project about a topic they love. You produce a FIRST DRAFT that the child must check; you are honest that facts need checking.${COMMON_RULES}
 OUTPUT FORMAT: reply with ONLY a JSON object, no markdown fences:
-{"title": string, "items": [{"text": string, "checkMe": true, "sourceHint": string} x5-8], "nextIdea": string}
-- For a fact list: each item is one simple fact (max 20 words). For a quiz: each item is a question followed by " Answer: ..." For a slideshow outline: each item is a slide title plus one line. For an invention pitch: items are Problem, Idea, How it works, Who it helps, What to build first.
+{"title": string, "items": [{"text": string, "checkMe": true, "sourceHint": string, "answer": string} x5-8], "nextIdea": string}
+- For a fact list: each item is one simple fact (max 20 words). For a quiz: "text" is the QUESTION ONLY and the answer goes in the separate "answer" field — never inside the question, so the list can be printed and handed to a child as-is. For anything that is not a quiz, leave "answer" out. For a slideshow outline: each item is a slide title plus one line. For an invention pitch: items are Problem, Idea, How it works, Who it helps, What to build first.
 - sourceHint: a kid-safe place to check (a library book about..., Britannica Kids, National Geographic Kids, a science museum site). Never a URL.
 - nextIdea: one sentence suggesting the next step the child can do themselves.
 - Topics about health, medicine, safety, weapons, or personal problems: reply ONLY with REDIRECT.`;
@@ -413,11 +414,37 @@ export function userPrompt(mode: ModeDef, input: ValidatedInput & { ok: true }, 
     return `The director's order for a new ${mode.name} project:\n${input.text}\n\nMake it now.`;
   }
   if (input.kind === "chat") return input.message;
-  // change request
+  /*
+   * Change requests kept coming back as brand-new work: "make the stars fall
+   * slower" returned a different title, different art and a different HUD. The
+   * cause is a tug of war -- the system prompt says "write a game", so the model
+   * writes one -- and a polite "keep everything else the same" loses that fight.
+   *
+   * So the instruction is now specific about what must survive, and says why.
+   * A child who asked for one small change and got a different game back has
+   * lost the thing they made, and learned that asking for changes is dangerous.
+   */
+  const KEEP = `THIS IS AN EDIT, NOT A NEW PROJECT.
+
+You are changing ONE thing in work that already exists and that someone is proud of.
+
+- Apply only the change asked for. Nothing else moves.
+- Keep the title exactly as it is, unless the change is about the title.
+- Keep every character, name, colour, style and piece of wording that the change
+  does not explicitly concern. Same characters, same look, same voice.
+- Keep the structure: the same sections, the same number of them, in the same order.
+- Do not "improve" anything on the way past. Do not fix what you would have done
+  differently. Do not rewrite text you merely dislike.
+- If you cannot make the change without touching something else, make the
+  smallest touch that works and leave everything further away alone.
+
+Someone should be able to look at the before and after and point at exactly one
+difference.`;
+
   if (mode.id === "game") {
-    return `Here is the current game (a complete HTML document):\n\n${currentContent ?? ""}\n\nThe director's order: make exactly this change and keep everything else the same:\n"${input.change}"\n\nReply with the full updated HTML document only. Update the SUMMARY comment if the game changed meaningfully.`;
+    return `Here is the current game (a complete HTML document):\n\n${currentContent ?? ""}\n\n${KEEP}\n\nThe director's order:\n"${input.change}"\n\nReply with the full updated HTML document only. Update the SUMMARY comment only if the change made it inaccurate.`;
   }
-  return `Here is the current project as JSON:\n${currentContent ?? ""}\n\nThe director's order: make exactly this change and keep everything else the same:\n"${input.change}"\n\nReply with the full updated JSON only.`;
+  return `Here is the current project as JSON:\n${currentContent ?? ""}\n\n${KEEP}\n\nThe director's order:\n"${input.change}"\n\nReply with the full updated JSON only, in exactly the same shape.`;
 }
 
 /* ------------------------------------------------------------------ *
