@@ -364,6 +364,7 @@ export function ChatPanel({
   busy,
   turnsLeft,
   maxChars,
+  onSendPhoto,
   avatar,
 }: {
   mode: ModeDef;
@@ -372,9 +373,14 @@ export function ChatPanel({
   busy?: boolean;
   turnsLeft: number;
   maxChars: number;
+  /** When present, a camera button appears and photos can be asked about. */
+  onSendPhoto?: (text: string, dataUri: string) => void;
   avatar?: string;
 }) {
   const [text, setText] = useState("");
+  const [photo, setPhoto] = useState<{ dataUri: string; name: string } | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -388,19 +394,86 @@ export function ChatPanel({
       </div>
       <div className="flex-1 overflow-y-auto pr-1">
         <Transcript turns={all} avatar={avatar} />
+        {messages.length === 0 && (mode.starters ?? []).some((s) => s.message) && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {(mode.starters ?? [])
+              .filter((s) => s.message)
+              .map((s) => (
+                <button
+                  key={s.label}
+                  type="button"
+                  disabled={busy || turnsLeft <= 0}
+                  onClick={() => onSend(s.message!)}
+                  className="rounded-full bg-white px-3 py-1.5 text-sm font-semibold text-violet-800 ring-1 ring-violet-200 transition hover:ring-violet-400 disabled:opacity-50"
+                >
+                  {s.label}
+                </button>
+              ))}
+          </div>
+        )}
         {busy && <div className="mt-2"><Spinner label="Thinking…" /></div>}
         <div ref={endRef} />
       </div>
+      {photo && (
+        <div className="mt-2 flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm ring-1 ring-violet-200">
+          <span>📎</span>
+          <span className="min-w-0 flex-1 truncate text-slate-700">{photo.name}</span>
+          <span className="hidden text-xs text-slate-500 sm:inline">Looked at once, never saved</span>
+          <button type="button" onClick={() => setPhoto(null)} className="font-semibold text-violet-700 underline underline-offset-2">
+            Remove
+          </button>
+        </div>
+      )}
+      {photoError && <p className="mt-2 text-sm font-semibold text-rose-700">{photoError}</p>}
       <form
         className="mt-3 flex gap-2"
         onSubmit={(e) => {
           e.preventDefault();
           const t = text.trim();
-          if (t.length < 2 || busy || turnsLeft <= 0) return;
+          if (busy || turnsLeft <= 0) return;
+          if (photo && onSendPhoto) {
+            onSendPhoto(t.length >= 2 ? t : "Can you help me with this?", photo.dataUri);
+            setText("");
+            setPhoto(null);
+            return;
+          }
+          if (t.length < 2) return;
           onSend(t);
           setText("");
         }}
       >
+        {onSendPhoto && (
+          <>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (!file) return;
+                setPhotoError(null);
+                // 4MB keeps a phone photo comfortably inside the request limit.
+                if (file.size > 4_000_000) return setPhotoError("That photo is a bit big — try taking it again a little further away.");
+                const reader = new FileReader();
+                reader.onload = () => setPhoto({ dataUri: String(reader.result), name: file.name });
+                reader.onerror = () => setPhotoError("That photo didn't open. Try another one.");
+                reader.readAsDataURL(file);
+              }}
+            />
+            <button
+              type="button"
+              disabled={busy || turnsLeft <= 0}
+              onClick={() => fileRef.current?.click()}
+              title="Take or choose a photo of what you're stuck on"
+              className="shrink-0 rounded-xl bg-white px-3 py-2 text-lg ring-2 ring-violet-200 transition hover:ring-violet-400 disabled:opacity-50"
+            >
+              📷
+            </button>
+          </>
+        )}
         <input
           value={text}
           maxLength={maxChars}
@@ -437,6 +510,7 @@ export function ModeForm({
 }) {
   const [values, setValues] = useState<Record<string, string>>({});
   const missing = useMemo(() => mode.createFields.filter((f) => f.required && !(values[f.key] ?? "").trim()), [mode, values]);
+  const starters = (mode.starters ?? []).filter((s) => s.values);
   return (
     <form
       className="space-y-4"
@@ -446,6 +520,30 @@ export function ModeForm({
         onSubmit(values);
       }}
     >
+      {starters.length > 0 && (
+        <div>
+          <p className="mb-2 text-sm font-semibold text-slate-700">
+            Not sure where to start? Pick one and change it.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {starters.map((s) => (
+              <button
+                key={s.label}
+                type="button"
+                disabled={busy}
+                onClick={() => setValues({ ...(s.values ?? {}) })}
+                className="rounded-full bg-violet-50 px-3 py-1.5 text-sm font-semibold text-violet-800 ring-1 ring-violet-200 transition hover:bg-violet-100 hover:ring-violet-400 disabled:opacity-50"
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-slate-500">
+            These fill the boxes so you can see what a good order looks like. Change anything you want before you press the button —
+            the best ones are the ones you change.
+          </p>
+        </div>
+      )}
       {mode.createFields.map((f) => (
         <Field key={f.key} def={f} value={values[f.key] ?? ""} maxChars={f.maxChars ?? maxChars} onChange={(v) => setValues((s) => ({ ...s, [f.key]: v }))} />
       ))}

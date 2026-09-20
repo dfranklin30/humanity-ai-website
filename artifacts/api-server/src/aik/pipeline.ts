@@ -159,7 +159,7 @@ export async function runRequest(requestId: number): Promise<void> {
 
     // Guided chat turns have their own, shorter path.
     if (input.kind === "chat") {
-      await runChatTurn(req, mode, input.message, flags);
+      await runChatTurn(req, mode, input.message, flags, takePhoto(req.id));
       return;
     }
 
@@ -391,7 +391,43 @@ function projectStateForModel(a: ArtifactRow): string {
 
 type Transcript = { mode: string; turns: { role: "user" | "assistant"; text: string; at: string }[] };
 
-async function runChatTurn(req: RequestRow, mode: ModeDef, message: string, flags: Flag[]): Promise<void> {
+/* ------------------------------------------------------------------ *
+ * Transient photo stash
+ *
+ * A photo a child takes of their homework never goes in the database. The
+ * request row is persisted; the picture is not. It lives here, in memory,
+ * between the route that accepted it and the model call that reads it, and is
+ * deleted the moment it has been used -- or after two minutes if the request
+ * never runs, so a crash cannot leave a child's kitchen table sitting in RAM.
+ *
+ * Deliberately not Redis, not a blob container, not a column. The most
+ * defensible place to keep a picture of a child is nowhere.
+ * ------------------------------------------------------------------ */
+
+const photoStash = new Map<number, { dataUri: string; at: number }>();
+const PHOTO_TTL_MS = 2 * 60 * 1000;
+
+export function stashPhoto(requestId: number, dataUri: string): void {
+  photoStash.set(requestId, { dataUri, at: Date.now() });
+  // Opportunistic sweep: no timer to leak, and the map is never large.
+  for (const [id, v] of photoStash) if (Date.now() - v.at > PHOTO_TTL_MS) photoStash.delete(id);
+}
+
+function takePhoto(requestId: number): string | undefined {
+  const v = photoStash.get(requestId);
+  photoStash.delete(requestId);
+  if (!v) return undefined;
+  return Date.now() - v.at > PHOTO_TTL_MS ? undefined : v.dataUri;
+}
+
+/**
+ * @param photoDataUri A picture the person is asking about. It is screened
+ * before it reaches the model, used for this one call, and then dropped. Only
+ * the words of the conversation are written to the transcript -- a photo of a
+ * worksheet on a kitchen table is a photo of a child's home, and it has no
+ * business persisting in a database.
+ */
+async function runChatTurn(req: RequestRow, mode: ModeDef, message: string, flags: Flag[], photoDataUri?: string): Promise<void> {
   // Find or create the transcript artifact.
   let convo: ArtifactRow | null = req.project_artifact_id ? await store.getArtifact(req.project_artifact_id) : null;
   if (convo && (convo.kind !== "chat" || convo.class_id !== req.class_id || (req.child_id !== null && convo.child_id !== req.child_id))) convo = null;
@@ -412,7 +448,7 @@ async function runChatTurn(req: RequestRow, mode: ModeDef, message: string, flag
 
   let reply: string;
   try {
-    reply = await completeText({ system: chatSystemPrompt(mode), turns, maxTokens: mode.id === "homework" ? mode.maxTokens : 350, temperature: 0.5, tier: mode.tier === "oss" ? "oss" : "fast", mockKind: "chat" });
+    reply = await completeText({ system: chatSystemPrompt(mode), turns, photoDataUri, maxTokens: mode.id === "homework" ? mode.maxTokens : 350, temperature: 0.5, tier: mode.tier === "oss" ? "oss" : "fast", mockKind: "chat" });
   } catch (err) {
     if (err instanceof ContentFilteredError) {
       await finish(req, { status: "blocked", message: KID_MESSAGES.unsafe, flags: [...flags, { layer: "content_safety", category: "provider_filter" }] });

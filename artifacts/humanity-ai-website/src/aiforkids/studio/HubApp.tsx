@@ -18,7 +18,7 @@
  *   Program  — the eight week modules of "Make It With AI", with run-sheets
  *   Classes  — the live children's classes, and the way into the dashboard
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   ApiError,
@@ -748,6 +748,8 @@ function ToolRunner({ state, mode, onBack }: { state: HubState; mode: ModeDef; o
   const [error, setError] = useState<string | null>(null);
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [chatText, setChatText] = useState("");
+  const [photo, setPhoto] = useState<{ dataUri: string; name: string } | null>(null);
+  const photoRef = useRef<HTMLInputElement | null>(null);
   const [projects, setProjects] = useState<Project[]>(state.projects);
   const [filed, setFiled] = useState(false);
   const [restored, setRestored] = useState(false);
@@ -775,13 +777,14 @@ function ToolRunner({ state, mode, onBack }: { state: HubState; mode: ModeDef; o
   }, [artifact, restored, mode.id]);
 
   const run = useCallback(
-    async (kind: "create" | "change" | "chat", input: Record<string, string>) => {
+    async (kind: "create" | "change" | "chat", input: Record<string, string>, photo?: string) => {
       setBusy(true);
       setError(null);
       try {
         const { request: started } = await hubSubmit({
           mode: mode.id,
           kind,
+          photo,
           projectArtifactId: kind !== "create" && artifact ? artifact.id : undefined,
           input,
         });
@@ -886,17 +889,63 @@ function ToolRunner({ state, mode, onBack }: { state: HubState; mode: ModeDef; o
                 ))}
                 {busy && <Spinner label="Thinking…" />}
               </div>
+              {photo && (
+                <div className="mt-2 flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm ring-1 ring-violet-200">
+                  <span>📎</span>
+                  <span className="min-w-0 flex-1 truncate text-slate-700">{photo.name}</span>
+                  <span className="hidden text-xs text-slate-500 sm:inline">Looked at once, never saved</span>
+                  <button type="button" onClick={() => setPhoto(null)} className="font-semibold text-violet-700 underline underline-offset-2">
+                    Remove
+                  </button>
+                </div>
+              )}
               <form
                 className="mt-3 flex gap-2"
                 onSubmit={(e) => {
                   e.preventDefault();
                   const t = chatText.trim();
-                  if (t.length < 2 || busy) return;
+                  if (busy) return;
+                  if (photo) {
+                    const msg = t.length >= 2 ? t : "Can you help me with this?";
+                    setTurns((prev) => [...prev, { role: "user", text: `📷 ${msg}` }]);
+                    setChatText("");
+                    const dataUri = photo.dataUri;
+                    setPhoto(null);
+                    void run("chat", { message: msg }, dataUri);
+                    return;
+                  }
+                  if (t.length < 2) return;
                   setTurns((prev) => [...prev, { role: "user", text: t }]);
                   setChatText("");
                   void run("chat", { message: t });
                 }}
               >
+                <input
+                  ref={photoRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (!file) return;
+                    if (file.size > 4_000_000) return setError("That photo is a bit big — try taking it a little further away.");
+                    const reader = new FileReader();
+                    reader.onload = () => setPhoto({ dataUri: String(reader.result), name: file.name });
+                    reader.onerror = () => setError("That photo didn't open. Try another one.");
+                    reader.readAsDataURL(file);
+                  }}
+                />
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => photoRef.current?.click()}
+                  title="Take or choose a photo of what you're asking about"
+                  className="shrink-0 rounded-xl bg-white px-3 py-2 text-lg ring-2 ring-violet-200 transition hover:ring-violet-400 disabled:opacity-50"
+                >
+                  📷
+                </button>
                 <input
                   value={chatText}
                   maxLength={STAFF_CHAT_CHARS}
@@ -905,7 +954,7 @@ function ToolRunner({ state, mode, onBack }: { state: HubState; mode: ModeDef; o
                   disabled={busy}
                   className="flex-1 rounded-xl border-2 border-slate-200 px-3 py-2 text-base focus:border-violet-500 focus:outline-none disabled:opacity-60"
                 />
-                <BigButton type="submit" disabled={chatText.trim().length < 2 || busy}>
+                <BigButton type="submit" disabled={busy || (!photo && chatText.trim().length < 2)}>
                   Send
                 </BigButton>
               </form>

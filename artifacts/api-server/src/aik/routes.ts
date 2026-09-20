@@ -17,8 +17,8 @@ import * as store from "./store";
 import { hashPassword, verifyPassword } from "../auth";
 import { logger } from "../lib/logger";
 import { publicModes, getMode } from "./modes";
-import { runRequest, subscribe, publish, toPublicRequest, toChildRequest, toPublicClass } from "./pipeline";
-import { KID_MESSAGES } from "./safety";
+import { runRequest, stashPhoto, subscribe, publish, toPublicRequest, toChildRequest, toPublicClass } from "./pipeline";
+import { KID_MESSAGES, contentSafetyImage } from "./safety";
 
 declare module "express-session" {
   interface SessionData {
@@ -1163,6 +1163,9 @@ export function registerAikRoutes(app: Express): void {
           projectId: z.number().int().nullable().optional(),
           quality: z.enum(["fast", "studio"]).optional(),
           input: z.record(z.any()),
+          // A picture the person is asking about, as a data URI. Screened here,
+          // used once, never written anywhere. ~6MB of base64 is roughly a 4MB photo.
+          photo: z.string().max(6_000_000).optional(),
         })
         .safeParse(req.body);
       if (!body.success) return void res.status(400).json({ error: "That request didn't look right." });
@@ -1193,6 +1196,29 @@ export function registerAikRoutes(app: Express): void {
         quality: body.data.quality ?? (body.data.kind === "create" ? "studio" : "fast"),
       });
       await store.audit(workspace.id, "facilitator", f.id, "hub_request", { requestId: request.id, mode: body.data.mode, kind: body.data.kind });
+
+      /*
+       * A photo goes through the same image screening as anything the Studio
+       * generates, before a model ever sees it, and is stashed in memory rather
+       * than stored. If screening refuses it we stop here: the request is
+       * finished as blocked, and nothing is generated from the picture.
+       */
+      if (body.data.photo) {
+        const m = /^data:(image\/(?:png|jpeg|jpg|webp|gif));base64,([A-Za-z0-9+/=]+)$/.exec(body.data.photo);
+        if (!m) return void res.status(400).json({ error: "That photo didn't look like a picture we can read." });
+        if (isContentSafetyConfigured()) {
+          const imgFlags = await contentSafetyImage(m[2]).catch(() => [{ layer: "system" as const, category: "content_safety_unavailable" }]);
+          if (imgFlags.length) {
+            await store.finishRequest(request.id, { status: "blocked", message: KID_MESSAGES.unsafe, flags: imgFlags });
+            await store.audit(workspace.id, "facilitator", f.id, "photo_blocked", { requestId: request.id });
+            return void res.json({ request: toPublicRequest({ ...request, status: "blocked" }), projectId: body.data.projectId ?? null });
+          }
+        } else if (aikConfig.contentSafety.required) {
+          return void res.status(503).json({ error: "Photo screening isn't available right now." });
+        }
+        stashPhoto(request.id, body.data.photo);
+      }
+
       void runRequest(request.id);
       res.json({ request: toPublicRequest(request), projectId: body.data.projectId ?? null });
     }),

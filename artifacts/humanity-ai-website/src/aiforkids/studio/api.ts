@@ -15,6 +15,7 @@ export type ModeDef = {
   interaction: "form" | "chat" | "both";
   createFields: FieldDef[];
   changeHint: string;
+  starters?: { label: string; values?: Record<string, string>; message?: string }[];
   chatGreeting?: string;
   chatPlaceholder?: string;
   needsApproval: boolean;
@@ -255,7 +256,7 @@ export const hubPatchProject = (id: number, patch: Partial<{ name: string; summa
 export const hubDeleteProject = (id: number) => call<{ ok: true }>("DELETE", `/hub/projects/${id}`);
 export const hubFileArtifact = (artifactId: number, projectId: number | null) =>
   call<{ ok: true }>("PATCH", `/hub/artifacts/${artifactId}/project`, { projectId });
-export const hubSubmit = (body: { mode: ModeId; kind: "create" | "change" | "chat"; projectArtifactId?: number; projectId?: number | null; quality?: "fast" | "studio"; input: Record<string, string> }) =>
+export const hubSubmit = (body: { mode: ModeId; kind: "create" | "change" | "chat"; projectArtifactId?: number; projectId?: number | null; quality?: "fast" | "studio"; input: Record<string, string>; photo?: string }) =>
   call<{ request: StudioRequest; projectId: number | null }>("POST", "/hub/requests", body);
 export const hubRequest = (id: number) => call<{ request: StudioRequest }>("GET", `/hub/requests/${id}`);
 export const hubSpeak = (artifactId: number) => call<{ audio: string; mime: string }>("POST", `/hub/artifacts/${artifactId}/speak`);

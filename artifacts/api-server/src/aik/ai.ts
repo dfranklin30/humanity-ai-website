@@ -40,6 +40,15 @@ export type TextCallOptions = {
   tier?: "default" | "oss" | "fast";
   /** Used by the mock to return a plausible canned result. */
   mockKind?: string;
+  /**
+   * A photo the person is asking about, as a data URI.
+   *
+   * It rides along with the newest user turn and is never stored: the picture
+   * of a child's worksheet -- which may also contain their name, their
+   * handwriting, their kitchen table -- exists for the length of one request
+   * and then only the words survive.
+   */
+  photoDataUri?: string;
 };
 
 function messagesOf(opts: TextCallOptions): ChatTurn[] {
@@ -104,9 +113,18 @@ function azure(): AzureOpenAI {
 
 async function completeAzureOpenAI(opts: TextCallOptions): Promise<string> {
   const started = Date.now();
+  const turns = messagesOf(opts);
+  // The photo attaches to the newest user turn, which is the one it belongs to.
+  const withPhoto: any[] = opts.photoDataUri
+    ? turns.map((t, i) =>
+        i === turns.length - 1 && t.role === "user"
+          ? { role: "user", content: [{ type: "text", text: t.content }, { type: "image_url", image_url: { url: opts.photoDataUri, detail: "high" } }] }
+          : t,
+      )
+    : turns;
   const res = await azure().chat.completions.create({
     model: aikConfig.azureOpenAI.textDeployment,
-    messages: [{ role: "system", content: opts.system }, ...messagesOf(opts)],
+    messages: [{ role: "system", content: opts.system }, ...withPhoto] as any,
     max_completion_tokens: opts.maxTokens,
     temperature: opts.temperature,
   });

@@ -42,6 +42,25 @@ export type ModeDef = {
   temperature: number;
   /** Whether results wait for facilitator approval before a child sees them (all generated media does). */
   needsApproval: boolean;
+  /**
+   * Worked examples a person can pick and then edit.
+   *
+   * A blank form is the hardest part of any of these tools. A child who has
+   * never written a prompt does not know that "a shy dragon" beats "a dragon",
+   * and telling them so in a hint is much weaker than letting them start from
+   * one and change it. Picking a starter fills the form; nothing is submitted
+   * until they press the button, so the first thing they do is still edit.
+   */
+  starters?: Starter[];
+};
+
+export type Starter = {
+  /** Short label on the chip. */
+  label: string;
+  /** For form modules: the fields to fill. */
+  values?: Record<string, string>;
+  /** For chat modules: the opening message. */
+  message?: string;
 };
 
 export const COMMON_RULES = `
@@ -80,6 +99,11 @@ export const MODES: Record<ModeId, ModeDef> = {
     changeHint: "One specific change: make the socks slower, add a score counter, make the hero a dinosaur…",
     maxTokens: 6000,
     temperature: 0.4,
+    starters: [
+      { label: "Catch the falling stars", values: { title: "Star Catcher", hero: "a smiling basket on wheels", good: "falling stars that sparkle", bad: "grumpy rain clouds", power: "a shield bubble that lasts 5 seconds", win: "you catch 30 stars", silly: "every tenth star is a tiny cat" } },
+      { label: "Dodge the asteroids", values: { title: "Rocket Run", hero: "a little rocket with a red stripe", good: "fuel cans", bad: "tumbling asteroids", power: "a speed boost", win: "you reach the moon", silly: "the asteroids hum when they get close" } },
+      { label: "Feed the hungry dragon", values: { title: "Dragon Diner", hero: "a hungry green dragon", good: "flying pancakes", bad: "spicy peppers", power: "a bib that blocks one pepper", win: "you eat 25 pancakes", silly: "the dragon hiccups fire when it is full" } },
+    ],
   },
   story: {
     id: "story",
@@ -103,6 +127,11 @@ export const MODES: Record<ModeId, ModeDef> = {
     changeHint: "Rewrite one panel, change the ending, make it funnier, add a twist…",
     maxTokens: 4000,
     temperature: 0.8,
+    starters: [
+      { label: "A shy dragon", values: { hero: "a shy dragon named Pim", place: "a treehouse above a noisy kitchen", problem: "the moon lost its glow", ending: "happy and a little funny", detail: "Pim is afraid of butterflies" } },
+      { label: "A lost robot", values: { hero: "a small robot named Bolt", place: "a library that never closes", problem: "Bolt forgot its own name", ending: "warm and surprising", detail: "Bolt hums when it is thinking" } },
+      { label: "The pancake that ran", values: { hero: "a pancake who wants to see the sea", place: "a busy breakfast kitchen", problem: "everyone keeps trying to eat it", ending: "funny and kind", detail: "it leaves a trail of syrup footprints" } },
+    ],
   },
   prompt: {
     id: "prompt",
@@ -123,6 +152,11 @@ export const MODES: Record<ModeId, ModeDef> = {
     changeHint: "Change one detail: make it nighttime, add a hat, more sparkles…",
     maxTokens: 1200,
     temperature: 0.5,
+    starters: [
+      { label: "Robot gardener", values: { what: "a robot gardener watering a sunflower", where: "on a rooftop garden above a city", mood: "warm golden afternoon", style: "watercolor" } },
+      { label: "Fox inventor", values: { what: "a fox inventor with goggles and a toolbelt", where: "a windy hilltop meadow", mood: "bright spring colors", style: "cartoon" } },
+      { label: "Deep sea library", values: { what: "a friendly octopus reading three books at once", where: "a library at the bottom of the sea", mood: "calm blue and glowing", style: "paper cut-out" } },
+    ],
   },
   music: {
     id: "music",
@@ -144,6 +178,11 @@ export const MODES: Record<ModeId, ModeDef> = {
     changeHint: "Change one thing: make it faster, add a chant, more drums…",
     maxTokens: 900,
     temperature: 0.8,
+    starters: [
+      { label: "Our club anthem", values: { about: "our AI club and the things we built", feeling: "proud and big", style: "marching band", chant: "Make it with AI!", extra: "start quiet then get loud at the chorus" } },
+      { label: "A cat who loves pizza", values: { about: "a cat who loves pizza more than anything", feeling: "silly and funny", style: "pop", chant: "Pizza cat, pizza cat!", extra: "add a drum solo in the middle" } },
+      { label: "Last day of school", values: { about: "the last day of school", feeling: "happy and bouncy", style: "hip-hop beat", chant: "We made it!", extra: "handclaps all the way through" } },
+    ],
   },
   quest: {
     id: "quest",
@@ -165,6 +204,11 @@ export const MODES: Record<ModeId, ModeDef> = {
     changeHint: "Add a fact about ___, make the quiz harder, add a title slide…",
     maxTokens: 3000,
     temperature: 0.5,
+    starters: [
+      { label: "Octopuses", values: { topic: "octopuses", make: "fact list", audience: "my class" } },
+      { label: "Volcanoes quiz", values: { topic: "volcanoes", make: "quiz", audience: "my class" } },
+      { label: "Invent something", values: { topic: "a machine that waters plants while you are away", make: "invention pitch", audience: "my facilitator" } },
+    ],
   },
   video: {
     id: "video",
@@ -185,6 +229,10 @@ export const MODES: Record<ModeId, ModeDef> = {
     tier: "default",
     maxTokens: 2500,
     temperature: 0.7,
+    starters: [
+      { label: "Seed to flower", values: { shots: "three", subject: "a robot gardener", action: "plants a seed and it grows into a sunflower" } },
+      { label: "Paper boat", values: { shots: "three", subject: "a small paper boat", action: "sails down a rainy gutter and reaches a puddle sea" } },
+    ],
     needsApproval: true,
   },
   robot: {
@@ -208,6 +256,10 @@ export const MODES: Record<ModeId, ModeDef> = {
     tier: "default",
     maxTokens: 4000,
     temperature: 0.5,
+    starters: [
+      { label: "Stops before it bumps", values: { name: "Snack Scout", job: "drives around and stops before it bumps into things", senses: "distance", moves: "wheels", extra: "it beeps twice when it stops" } },
+      { label: "Follows the light", values: { name: "Sunny", job: "turns to face the brightest light in the room", senses: "light", moves: "wheels", extra: "it shows a happy face when it finds the light" } },
+    ],
     needsApproval: false,
   },
   homework: {
@@ -225,6 +277,11 @@ export const MODES: Record<ModeId, ModeDef> = {
     tier: "default",
     maxTokens: 2500,
     temperature: 0.4,
+    starters: [
+      { label: "I'm stuck on fractions", message: "I'm stuck on 2/3 + 1/6. I tried adding the tops and the bottoms but it looked wrong." },
+      { label: "I don't get the question", message: "My worksheet says \"estimate the product\" and I don't know what estimate means here." },
+      { label: "Help me plan my writing", message: "I have to write about why recycling matters and I don't know how to start." },
+    ],
     needsApproval: false,
   },
 };
@@ -343,6 +400,17 @@ Shrink the step, don't skip it. Offer a smaller question, a tiny worked example
 with DIFFERENT numbers, or a picture in words. If they are still stuck after a
 few turns, say warmly that this one is worth doing with their facilitator or a
 grown-up — that is help, not failure.
+
+IF THEY SEND A PHOTO:
+Read what is actually in the picture and say what you see, so they know you are
+looking at the right thing: "I can see question 4 — two fractions being added."
+Then carry on exactly as above. A photo does not change the rule. A worksheet
+full of questions is still a worksheet full of questions they have to do, and
+"just tell me what goes in the boxes" is the same request as before.
+If the picture is too blurry or cut off to read, say which part you cannot see
+and ask them to try again — do not guess at the numbers.
+If you can see their name, their school or anything else personal in the photo,
+do not repeat it back. Talk about the work, not the paper.
 
 SUBJECTS AND LIMITS:
 - Math, reading and writing, science, social studies, spelling.
