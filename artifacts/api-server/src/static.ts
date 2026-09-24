@@ -48,14 +48,16 @@ export function serveStatic(app: Express) {
     return;
   }
 
-  app.use(express.static(distPath));
+  // index: false so "/" falls through to the handler below and gets the same
+  // SEO meta and analytics injection as every other route.
+  app.use(express.static(distPath, { index: false }));
 
   app.use("/{*path}", async (req, res) => {
     try {
       const indexPath = path.resolve(distPath, "index.html");
       let html = await fs.promises.readFile(indexPath, "utf-8");
       html = await injectSeoMeta(req.originalUrl, html, storage);
-      html = injectAnalytics(html);
+      html = injectAnalytics(html, req.originalUrl);
       const status = isKnownRoute(req.originalUrl) ? 200 : 404;
       res.status(status).set({ "Content-Type": "text/html" }).end(html);
     } catch {

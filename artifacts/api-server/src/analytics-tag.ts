@@ -2,7 +2,13 @@
 // on or off without rebuilding the site.
 const env = (k: string) => (process.env[k] || "").trim();
 
-export function injectAnalytics(html: string): string {
+// Child-directed pages (AI for Kids) are never tagged: ad measurement there
+// would collect persistent identifiers from children (COPPA).
+const UNTAGGED_PREFIXES = ["/aiforkids"];
+
+export function injectAnalytics(html: string, urlPath = "/"): string {
+  const pathname = urlPath.split("?")[0];
+  if (UNTAGGED_PREFIXES.some((p) => pathname.startsWith(p))) return html;
   const ga = env("GA_MEASUREMENT_ID");
   const aw = env("ADS_CONVERSION_ID");
   if (!ga && !aw) return html;
