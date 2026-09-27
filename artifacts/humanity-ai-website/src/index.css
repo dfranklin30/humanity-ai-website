@@ -416,3 +416,30 @@
     animation: none;
   }
 }
+
+/* Facilitator Claude console (aiforkids/ClaudeConsole.tsx) */
+.aik-console { @apply space-y-4 rounded-2xl bg-white p-5 ring-1 ring-slate-200; }
+.aik-console__head { @apply flex flex-wrap items-start justify-between gap-3; }
+.aik-console__head h2 { @apply text-xl font-bold text-slate-900; }
+.aik-console__head p, .aik-model-blurb, .aik-fineprint, .aik-empty, .aik-starters p, .aik-cascade p { @apply text-sm text-slate-600; }
+.aik-console__controls { @apply flex flex-wrap items-center gap-3 text-sm text-slate-700; }
+.aik-console__controls select { @apply rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm; }
+.aik-budget { @apply font-semibold; }
+.aik-budget--warn { @apply text-amber-700; }
+.aik-btn { @apply rounded-full bg-violet-700 px-4 py-2 text-sm font-bold text-white hover:bg-violet-800 disabled:opacity-50; }
+.aik-btn--ghost { @apply bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 hover:ring-violet-300; }
+.aik-chip { @apply rounded-full bg-violet-50 px-3 py-1 text-sm text-violet-800 ring-1 ring-violet-200 hover:bg-violet-100; }
+.aik-starters { @apply flex flex-wrap gap-2; }
+.aik-starters p { @apply w-full; }
+.aik-cascade { @apply rounded-xl bg-slate-50 p-4 text-sm; }
+.aik-cascade__rows { @apply mt-2 space-y-1; }
+.aik-cascade__row { @apply flex items-center gap-2; }
+.aik-cascade__all { @apply mt-3 flex gap-2; }
+.aik-console__thread { @apply flex max-h-[60vh] flex-col gap-3 overflow-y-auto; }
+.aik-bub { @apply max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-relaxed; }
+.aik-bub--user { @apply self-end bg-violet-700 text-white; }
+.aik-bub--assistant { @apply self-start bg-slate-100 text-slate-900; }
+.aik-console__composer { @apply flex items-end gap-2; }
+.aik-console__composer textarea, .aik-console__composer input { @apply min-h-[3rem] flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-violet-400 focus:outline-none; }
+.aik-notice { @apply rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 ring-1 ring-amber-200; }
+.aik-spinner { @apply inline-block h-4 w-4 animate-pulse rounded-full bg-slate-400; }

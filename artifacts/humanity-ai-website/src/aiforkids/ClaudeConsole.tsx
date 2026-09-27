@@ -84,6 +84,12 @@ export default function ClaudeConsole() {
       }
       if (res.headers.get("content-type")?.includes("application/json")) {
         const d = await res.json();
+      if (typeof d.text === "string") {
+        setTurns([...next, { role: "assistant", content: d.text }]);
+        setMeta({ model: d.model, degraded: d.degraded });
+        setBudget((b) => (b ? { ...b, usedToday: b.usedToday + (d.cost ?? 0) } : b));
+        return;
+      }
         setNotice(d.message ?? "Let's try that a different way.");
         setTurns(next);
         return;
