@@ -57,11 +57,12 @@ import {
 import { ArtifactView, BigButton, Card, ChangeBox, ForgeSteps, ModeForm, Notice, RequestStatus, Spinner, kindEmoji } from "./components";
 import { BASE } from "../content/program";
 import { WEEK_MODULES, SESSION_RHYTHM, type WeekModule } from "../content/weeks";
+import ClaudeConsole from "../ClaudeConsole";
 
 const STAFF_FIELD_CHARS = 1200;
 const STAFF_CHAT_CHARS = 4000;
 
-type Tab = "tools" | "projects" | "program" | "classes" | "people";
+type Tab = "claude" | "tools" | "projects" | "program" | "classes" | "people";
 
 export default function HubApp() {
   const [location] = useLocation();
@@ -372,6 +373,7 @@ function HubShell() {
       <nav className="flex flex-wrap gap-2">
         {(
           [
+            ["claude", "🤖 Claude"],
             ["tools", `🧰 Tools · ${state.tools.length}`],
             ["projects", `📁 Projects · ${state.projects.length}`],
             ["program", "🗓️ 8-week program"],
@@ -393,6 +395,7 @@ function HubShell() {
         ))}
       </nav>
 
+      {tab === "claude" && <ClaudeConsole />}
       {tab === "tools" && <ToolsTab state={state} onOpen={setTool} />}
       {tab === "projects" && <ProjectsTab state={state} onOpen={setProjectId} onChanged={load} />}
       {tab === "program" && <ProgramTab />}
