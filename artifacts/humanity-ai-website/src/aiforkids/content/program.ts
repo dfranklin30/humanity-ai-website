@@ -81,7 +81,7 @@ export const OUTCOMES: { title: string; body: string }[] = [
   { title: "Teamwork", body: "Small groups, shared critique, real collaboration." },
   { title: "Critical thinking", body: "Checking an AI's answer instead of accepting it." },
   { title: "Creativity", body: "AI as an instrument, not an autopilot." },
-  { title: "Digital literacy", body: "Recognising synthetic media and protecting their own data." },
+  { title: "Digital literacy", body: "Recognizing synthetic media and protecting their own data." },
   { title: "Career awareness", body: "What AI jobs actually look like, and how you get one." },
 ];
 

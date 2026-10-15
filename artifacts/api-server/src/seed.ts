@@ -14,6 +14,16 @@ export async function seedDatabase() {
     console.error("[seed] could not retire the Sep 18 Quick Hacks kickoff:", err);
   }
 
+  // Retired from the calendar: Quick Hacks Ep. 13 (Nov 6), replaced by the
+  // Vasu Raj Jain board spotlight episode. Clears the row already in the database.
+  try {
+    await db.execute(
+      sql`DELETE FROM events WHERE title LIKE 'Humanity + AI Quick Hacks Ep. 13%'`,
+    );
+  } catch (err) {
+    console.error("[seed] could not retire Quick Hacks Ep. 13:", err);
+  }
+
   await db.update(users)
     .set({ email: "danielle@humanityplusai.org" })
     .where(eq(users.email, "danielle@humanityplusai.og"));
@@ -897,7 +907,7 @@ Read the full piece on JourneyBytes.`,
     },
     {
       title: "Humanity + AI Quick Hacks Ep. 10 — The Data You Already Have",
-      description: "Most organisations are sitting on answers inside a spreadsheet nobody opens. We take a real file on the call and get useful answers out of it — no database, no engineer, no migration project. Bring a messy export and we will work with it.",
+      description: "Most organizations are sitting on answers inside a spreadsheet nobody opens. We take a real file on the call and get useful answers out of it — no database, no engineer, no migration project. Bring a messy export and we will work with it.",
       date: "2026-10-16",
       time: "5:00 PM - 6:00 PM ET",
       location: "Online — Join Virtually",
@@ -938,18 +948,18 @@ Read the full piece on JourneyBytes.`,
       speakerProfileUrl: null,
     },
     {
-      title: "Humanity + AI Quick Hacks Ep. 13 — AI and Animals: Reading Emotion From Signals",
-      description: "A working case study from ROSIE, our canine emotion engine: how posture, sound and movement become a read on how a dog actually feels, and how the system says so in plain language. What transfers to any domain where the subject cannot tell you what is wrong.",
+      title: "Humanity + AI Podcasts: Meet Vasu Raj Jain — Responsible AI for Advertising & Media",
+      description: "Danielle A. Franklin sits down with Vasu Raj Jain, Humanity + AI, Inc. board director and Chief of AI in Advertising & Media, to talk about his role on the board and the work he is most passionate about. Vasu leads large-scale ad-serving infrastructure at Amazon Ads across Prime Video, live sports, and digital out-of-home, and he'll share why the AI that funds the open internet has to be efficient, transparent, and accountable, how agentic systems built on MCP servers and RAG earn trust, and what responsible governance looks like for ad-funded platforms. They'll also talk about mentorship and engineering leadership, his work with the Forbes Technology Council and IAB Tech Lab, and how Humanity + AI is helping shape the next generation of advertising and media AI. Join us live on Riverside.",
       date: "2026-11-06",
       time: "5:00 PM - 6:00 PM ET",
       location: "Online — Join Virtually",
       type: "Podcast",
-      imageUrl: "/uploads/quick-hacks-ep13.webp",
+      imageUrl: "/uploads/vasu-raj-jain-podcast.webp",
       secondaryImageUrl: null,
       link: "https://riverside.com/studio/danielle-franklins-studio-dy1Ck?t=ad2d1c7c94b95c266294",
       recordingUrl: null,
-      speakerName: "Danielle Franklin",
-      speakerProfileUrl: null,
+      speakerName: "Vasu Raj Jain",
+      speakerProfileUrl: "/about/board/vasu-raj-jain",
     },
     {
       title: "Humanity + AI Quick Hacks Ep. 14 — Guardrails: What to Never Let an AI Decide",
