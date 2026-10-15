@@ -24,6 +24,16 @@ export async function seedDatabase() {
     console.error("[seed] could not retire Quick Hacks Ep. 13:", err);
   }
 
+  // Retired: Quick Hacks Ep. 11 (Oct 23, Doug) duplicated the Doug Loyo podcast
+  // listing on the same day.
+  try {
+    await db.execute(
+      sql`DELETE FROM events WHERE title LIKE 'Humanity + AI Quick Hacks Ep. 11%'`,
+    );
+  } catch (err) {
+    console.error("[seed] could not retire Quick Hacks Ep. 11:", err);
+  }
+
   await db.update(users)
     .set({ email: "danielle@humanityplusai.org" })
     .where(eq(users.email, "danielle@humanityplusai.og"));
@@ -917,20 +927,6 @@ Read the full piece on JourneyBytes.`,
       link: "https://riverside.com/studio/danielle-franklins-studio-dy1Ck?t=ad2d1c7c94b95c266294",
       recordingUrl: null,
       speakerName: "Danielle Franklin",
-      speakerProfileUrl: null,
-    },
-    {
-      title: "Humanity + AI Quick Hacks Ep. 11 — Guest: Doug — Being a Tech CEO in the AI Era, and a Live Product Demo",
-      description: "A special guest episode. Doug from developers.net gives an honest breakdown of what it actually takes to run a technology startup in the AI era right now — what the job consists of day to day, what it costs, and what separates the companies that make it from the ones that quietly do not. He then demonstrates their product live, with open questions from the room afterwards.",
-      date: "2026-10-23",
-      time: "5:00 PM - 6:15 PM ET",
-      location: "Online — Join Virtually",
-      type: "Podcast",
-      imageUrl: "/uploads/quick-hacks-ep11.webp",
-      secondaryImageUrl: null,
-      link: "https://riverside.com/studio/danielle-franklins-studio-dy1Ck?t=ad2d1c7c94b95c266294",
-      recordingUrl: null,
-      speakerName: "Doug (developers.net)",
       speakerProfileUrl: null,
     },
     {
