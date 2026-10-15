@@ -14,11 +14,11 @@ export async function seedDatabase() {
     console.error("[seed] could not retire the Sep 18 Quick Hacks kickoff:", err);
   }
 
-  // Retired from the calendar: Quick Hacks Ep. 13 (Nov 6), replaced by the
+  // Quick Hacks Ep. 13 moved from Nov 6 to Jan 8, 2027 to make room for the
   // Vasu Raj Jain board spotlight episode. Clears the row already in the database.
   try {
     await db.execute(
-      sql`DELETE FROM events WHERE title LIKE 'Humanity + AI Quick Hacks Ep. 13%'`,
+      sql`DELETE FROM events WHERE title LIKE 'Humanity + AI Quick Hacks Ep. 13%' AND date = '2026-11-06'`,
     );
   } catch (err) {
     console.error("[seed] could not retire Quick Hacks Ep. 13:", err);
@@ -960,6 +960,20 @@ Read the full piece on JourneyBytes.`,
       recordingUrl: null,
       speakerName: "Vasu Raj Jain",
       speakerProfileUrl: "/about/board/vasu-raj-jain",
+    },
+    {
+      title: "Humanity + AI Quick Hacks Ep. 13 — AI and Animals: Reading Emotion From Signals",
+      description: "A working case study from ROSIE, our canine emotion engine: how posture, sound and movement become a read on how a dog actually feels, and how the system says so in plain language. What transfers to any domain where the subject cannot tell you what is wrong.",
+      date: "2027-01-08",
+      time: "5:00 PM - 6:00 PM ET",
+      location: "Online — Join Virtually",
+      type: "Podcast",
+      imageUrl: "/uploads/quick-hacks-ep13-jan8.webp",
+      secondaryImageUrl: null,
+      link: "https://riverside.com/studio/danielle-franklins-studio-dy1Ck?t=ad2d1c7c94b95c266294",
+      recordingUrl: null,
+      speakerName: "Danielle Franklin",
+      speakerProfileUrl: null,
     },
     {
       title: "Humanity + AI Quick Hacks Ep. 14 — Guardrails: What to Never Let an AI Decide",
