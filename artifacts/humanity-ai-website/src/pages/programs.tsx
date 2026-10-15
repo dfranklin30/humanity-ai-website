@@ -14,7 +14,6 @@ import daniellePhoto from "@assets/image_1775903656206.png";
 import jofiaPhoto from "@assets/image_1775903668936.png";
 import williamPhoto from "@assets/business_portrait_1775934336460.png";
 import nirmalPhoto from "@assets/1profile-pic_1776517679611.jpg";
-import mikePhoto from "@assets/image_1777566222402.png";
 import davidWoodPhoto from "@assets/David_Wood212_-_edit_may_2026_1779893283704.jpg";
 
 import imgRosie from "@assets/generated_images/initiative-rosie.png";
@@ -44,7 +43,6 @@ const peopleBySlug: Record<string, Person> = {
   "jofia-jose-prakash": { name: "Jofiah Jose Prakash", photo: jofiaPhoto },
   "nirmal-jingar": { name: "Nirmal Jingar", photo: nirmalPhoto },
   "william-kreitzer": { name: "William Kreitzer", photo: williamPhoto },
-  "mike-klyce": { name: "Mike Klyce", photo: mikePhoto },
   "david-wood": { name: "David Wood", photo: davidWoodPhoto },
 };
 
@@ -148,7 +146,7 @@ const programs: Program[] = [
     subtitle: "Keeping People at the Center of AI",
     desc: "An initiative championing human-centered AI — ensuring the most capable, trustworthy systems learn from the full depth and diversity of real human expertise. Led by Chief Legal & AI Governance Officer Mike Klyce (Founder & CEO of EnscribeAI and founder of the nonprofit Artist in the Model), the program advances rights-clear, human-authored training data, full data lineage, and transparent provenance — keeping verified humans as the ground-truth anchor, oracle, and control signal for AI rather than letting models drift toward closed synthetic self-reference.",
     highlights: ["Rights-clear, human-authored training data", "Provenance, lineage & transparency standards", "Human-in-the-loop as ground-truth signal", "Reducing bias & synthetic contamination"],
-    people: [{ slug: "mike-klyce", role: "Chief Legal & AI Governance Officer" }, { slug: "danielle-franklin", role: "Founder & Executive Director" }],
+    people: [{ slug: "danielle-franklin", role: "Founder & Executive Director" }],
     color: "from-rose-500/10 to-red-500/10 dark:from-rose-500/20 dark:to-red-500/20",
     iconColor: "text-rose-600 dark:text-rose-400",
     bgColor: "bg-rose-500/10 dark:bg-rose-500/20",

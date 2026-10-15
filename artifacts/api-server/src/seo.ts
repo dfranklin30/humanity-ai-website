@@ -191,12 +191,6 @@ const BOARD_MEMBERS: Record<string, { name: string; title: string; shortBio: str
     shortBio:
       "Assistant Dean for Artificial Intelligence and Learning Integrity at Eckerd College, focused on critical AI literacy and the ethical integration of AI in liberal arts education. Chair of the Academic Honor Council and Director of Writing Excellence. PhD in Rhetoric and Composition, Purdue University.",
   },
-  "mike-klyce": {
-    name: "Mike Klyce",
-    title: "Chief AI Storytelling & Creative Officer",
-    shortBio:
-      "AI Creative Technologist and researcher exploring where artificial intelligence meets human expression, storytelling, and cognitive science.",
-  },
   "david-wood": {
     name: "David Wood",
     title: "Chief Consciousness & Human Flourishing Officer",

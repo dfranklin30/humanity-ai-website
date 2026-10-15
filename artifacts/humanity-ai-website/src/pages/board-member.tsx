@@ -14,7 +14,6 @@ import jofiaPhoto from "@assets/image_1775903668936.png";
 import williamPhoto from "@assets/william_portrait_opt.webp";
 import nirmalPhoto from "@assets/1profile-pic_1776517679611.jpg";
 import williamZhuPhoto from "@assets/william_zhu_portrait_opt.webp";
-import mikePhoto from "@assets/mike_portrait_opt.webp";
 import davidWoodPhoto from "@assets/David_Wood212_-_edit_may_2026_1779893283704.jpg";
 import vasuPhoto from "@assets/headshot_Vasu_AI_Advertisting_1779900210920.jpeg";
 import vinaPhoto from "@assets/image_1780429062430.png";
@@ -235,46 +234,11 @@ const boardMembers: Record<string, {
       }
     ]
   },
-  "mike-klyce": {
-    name: "Mike Klyce",
-    slug: "mike-klyce",
-    title: "Chief Legal & AI Governance Officer (CLAGO)",
-    seat: "Seat 5",
-    seatLabel: "Chief Legal & AI Governance Officer",
-    photo: mikePhoto,
-    badgeColor: "bg-rose-500/5 text-rose-300 border-rose-500/20",
-    linkedin: "https://www.linkedin.com/in/mike-klyce-521b8b318",
-    shortBio: "Founder & CEO of EnscribeAI and Artist in the Model. Duke Law-trained attorney and former Katten Muchin Rosenman partner focused on rights-clear human training data, AI governance, and human-AI alignment at global scale.",
-    fullBio: [
-      "Mike Klyce is a Washington, D.C.-based attorney, AI governance leader, and entrepreneur working at the intersection of law, frontier AI, and human creativity. He is Founder & CEO of EnscribeAI and Founder of the nonprofit research entity Artist in the Model, both dedicated to ensuring artificial intelligence evolves in genuine alignment with human values, judgment, and creativity rather than drifting toward closed synthetic self-reference.",
-      "As Humanity + AI's Chief Legal & AI Governance Officer (CLAGO), Mike leads the organization's legal posture and AI governance strategy. He advises the board on emerging AI law and policy, regulatory developments, transparency and provenance standards, training-data rights, contractual safeguards, and the governance frameworks our programs and partners adopt. His work helps ensure that everything Humanity + AI publishes, teaches, and operationalizes meets a high bar for legal rigor and responsible AI practice.",
-      "At EnscribeAI, Mike has built a model designed to scale a global platform of approximately 100,000 vetted human experts to provide a continuous stream of human-authored, rights-clear data — usable both as direct training data and as ground-truth anchor, oracle, and control signal for large-scale synthetic data pipelines. As regulators and courts move toward higher standards of transparency, EnscribeAI's clear contractual terms and full data lineage allow labs to demonstrate compliance while improving training outcomes, minimizing bias and contamination, and unlocking scientifically defined control datasets at scale.",
-      "Through Artist in the Model (AIM), Mike investigates whether incorporating original human-created art and music into training pipelines — as deliberate human expression rather than as raw pixels and waveforms — produces measurable gains in model alignment, interpretability, and benchmark performance. AIM also draws on neuroscience, psycholinguistics, musicology, and computational aesthetics to study the structure of learning itself, positioning artists and creators as central rather than peripheral to next-generation AI development.",
-      "Mike previously served as a Partner at Katten Muchin Rosenman LLP in Washington, D.C., where he practiced for over a decade. He earned his J.D. from Duke University School of Law. The throughline across his work — from law firm partnership to frontier AI infrastructure — is a conviction that the most capable and trustworthy AI systems will be those that learn from the full depth and diversity of real human expertise, governed by clear rights, transparent provenance, and rigorous accountability."
-    ],
-    credentials: [
-      "Founder & CEO — EnscribeAI",
-      "Founder — Artist in the Model (AIM)",
-      "Former Partner — Katten Muchin Rosenman LLP",
-      "J.D. — Duke University School of Law",
-      "Focus: AI Governance · Human-AI Alignment · Global AI Policy"
-    ],
-    focus: [
-      "AI Governance, Policy & Regulatory Strategy",
-      "Training-Data Rights, Provenance & Transparency",
-      "Human-AI Alignment & Frontier Lab Partnerships",
-      "Legal Frameworks for Responsible AI Deployment",
-      "Art, Creativity & Human Expression as AI Signal"
-    ],
-    links: [
-      { label: "LinkedIn", url: "https://www.linkedin.com/in/mike-klyce-521b8b318", icon: "linkedin" }
-    ]
-  },
   "david-wood": {
     name: "David Wood",
     slug: "david-wood",
     title: "Board Director, Strategic Partnerships & Human-Centered AI",
-    seat: "Seat 6",
+    seat: "Seat 5",
     seatLabel: "Strategic Partnerships & Human-Centered AI",
     photo: davidWoodPhoto,
     badgeColor: "bg-indigo-500/5 text-indigo-300 border-indigo-500/20",
@@ -322,7 +286,7 @@ const boardMembers: Record<string, {
     name: "Vasu Raj Jain",
     slug: "vasu-raj-jain",
     title: "Chief of AI in Advertising & Media",
-    seat: "Seat 7",
+    seat: "Seat 6",
     seatLabel: "Chief of AI in Advertising & Media",
     photo: vasuPhoto,
     badgeColor: "bg-teal-500/5 text-teal-300 border-teal-500/20",
@@ -370,7 +334,7 @@ const boardMembers: Record<string, {
     name: "Vina Torossian",
     slug: "vina-torossian",
     title: "Director, Human Authenticity, Leadership, Consciousness & AI, and Board Treasurer",
-    seat: "Seat 8",
+    seat: "Seat 7",
     seatLabel: "Director, Human Authenticity, Leadership, Consciousness & AI, and Board Treasurer",
     photo: vinaPhoto,
     badgeColor: "bg-fuchsia-500/5 text-fuchsia-300 border-fuchsia-500/20",
@@ -417,7 +381,7 @@ const boardMembers: Record<string, {
     name: "William Zhu",
     slug: "william-zhu",
     title: "Board Director, Applied AI & Community Strategy",
-    seat: "Seat 9",
+    seat: "Seat 8",
     seatLabel: "Applied AI & Community Strategy",
     photo: williamZhuPhoto,
     badgeColor: "bg-sky-500/5 text-sky-300 border-sky-500/20",
@@ -471,7 +435,7 @@ const boardMembers: Record<string, {
     name: "Alexis Ramsey-Tobienne, PhD",
     slug: "alexis-ramsey-tobienne",
     title: "Director, AI Literacy & Academic Integrity",
-    seat: "Seat 10",
+    seat: "Seat 9",
     seatLabel: "AI Literacy & Academic Integrity",
     photo: alexisPhoto,
     badgeColor: "bg-amber-500/5 text-amber-300 border-amber-500/20",

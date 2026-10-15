@@ -143,7 +143,6 @@ export async function registerRoutes(
     "jofia-jose-prakash",
     "william-kreitzer",
     "nirmal-jingar",
-    "mike-klyce",
     "david-wood",
     "vasu-raj-jain",
     "vina-torossian",
