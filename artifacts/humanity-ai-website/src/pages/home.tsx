@@ -110,7 +110,7 @@ const board: Array<{
   {
     name: "David Wood",
     title: "Strategic Partnerships & Human-Centered AI",
-    seat: "Seat 6",
+    seat: "Seat 5",
     slug: "david-wood",
     photo: davidWoodPhoto,
     highlight: "USMC Veteran · Gladwood Founder",
@@ -119,7 +119,7 @@ const board: Array<{
   {
     name: "Vasu Raj Jain",
     title: "Chief of AI in Advertising & Media",
-    seat: "Seat 7",
+    seat: "Seat 6",
     slug: "vasu-raj-jain",
     photo: vasuPhoto,
     highlight: "Amazon Ads · Forbes Tech Council",
@@ -128,7 +128,7 @@ const board: Array<{
   {
     name: "Vina Torossian",
     title: "Director, Human Authenticity, Leadership, Consciousness & AI, and Board Treasurer",
-    seat: "Seat 8",
+    seat: "Seat 7",
     slug: "vina-torossian",
     photo: vinaPhoto,
     highlight: "Northern Bank VP · TEDx Speaker",
@@ -137,17 +137,16 @@ const board: Array<{
   {
     name: "William Zhu",
     title: "Board Director, Applied AI & Community Strategy",
-    seat: "Seat 9",
+    seat: "Seat 8",
     slug: "william-zhu",
     photo: williamZhuPhoto,
     highlight: "Choice Hotels · AI Discussion Club DC",
     bio: "Senior Data Scientist & Applied AI Engineer at Choice Hotels International, shipping ML and AI products across thousands of properties. Founding organizer of Washington, DC's AI Discussion Club (900+ builders) and a 2026 Technical.ly RealLIST Connector. M.A. Computational Social Science, University of Chicago.",
-    isNew: true,
   },
   {
     name: "Alexis Ramsey-Tobienne, PhD",
     title: "Director, AI Literacy & Academic Integrity",
-    seat: "Seat 10",
+    seat: "Seat 9",
     slug: "alexis-ramsey-tobienne",
     photo: alexisPhoto,
     highlight: "Eckerd College · Assistant Dean for AI",
@@ -706,27 +705,24 @@ export default function Home() {
                 className="w-full h-full object-cover object-top grayscale hover:grayscale-0 transition-all duration-500"
                 data-testid="img-welcome-william-zhu"
               />
-              <div className="absolute top-3 left-3 bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-widest px-2 py-1 shadow-md">
-                Newly Appointed
-              </div>
             </div>
             <div>
               <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary mb-4 flex items-center gap-2">
                 <Sparkles className="h-3 w-3" />
-                Welcome to the Board · Seat 9
+                Board of Directors · Seat 8
               </div>
               <h3
                 className="font-serif text-3xl md:text-4xl font-bold leading-tight mb-3"
                 data-testid="text-welcome-william-zhu-name"
               >
-                Welcome,{" "}
+                Meet{" "}
                 <span className="italic font-light text-primary">William Zhu</span>
               </h3>
               <p className="text-[11px] font-bold uppercase tracking-wide text-foreground/60 mb-4">
                 Board Director, Applied AI & Community Strategy
               </p>
               <p className="text-base text-muted-foreground leading-relaxed font-serif mb-6 max-w-2xl">
-                We're delighted to welcome William Zhu to the Humanity + AI, Inc.
+                William Zhu serves on the Humanity + AI, Inc.
                 Board of Directors. An applied AI builder, data scientist, and
                 community organizer, William is a Senior Data Scientist & Applied
                 AI Engineer at Choice Hotels International and the founding
@@ -833,7 +829,7 @@ export default function Home() {
               </div>
               <div>
                 <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary mb-2">
-                  Seat 6
+                  Seat 5
                 </div>
                 <h4 className="font-serif text-xl font-bold leading-tight mb-1">
                   David Wood
@@ -877,7 +873,7 @@ export default function Home() {
               </div>
               <div>
                 <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary mb-2">
-                  Seat 7
+                  Seat 6
                 </div>
                 <h4 className="font-serif text-xl font-bold leading-tight mb-1">
                   Vasu Raj Jain
@@ -970,7 +966,7 @@ export default function Home() {
               </div>
               <div>
                 <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary mb-2">
-                  Seat 8
+                  Seat 7
                 </div>
                 <h4 className="font-serif text-xl font-bold leading-tight mb-1">
                   Vina Torossian
