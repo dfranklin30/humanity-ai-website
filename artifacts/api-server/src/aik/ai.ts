@@ -404,7 +404,7 @@ async function generateVideoJobApi(prompt: string, options: VideoOptions): Promi
         size,
       }),
     },
-    60_000,
+    120_000,
     "video",
   );
   if (!start.ok) throw new Error(`Video submit ${start.status}: ${(await start.text().catch(() => "")).slice(0, 300)}`);
@@ -425,7 +425,15 @@ async function generateVideoJobApi(prompt: string, options: VideoOptions): Promi
     }
     attempts++;
     await new Promise((r) => setTimeout(r, 4000));
-    const poll = await fetchWithTimeout(withApiVersion(`${videoBaseUrl}/videos/${jobId}`), { headers }, 30_000);
+    // A slow poll is not a failed job: give it a minute, and tolerate a transient error.
+    let poll: Response;
+    try {
+      poll = await fetchWithTimeout(withApiVersion(`${videoBaseUrl}/videos/${jobId}`), { headers }, 60_000);
+    } catch (err) {
+      logger.warn({ jobId, err: String((err as Error)?.message ?? err).slice(0, 120) }, "[aik] video poll hiccup");
+      continue;
+    }
+    if (poll.status === 429 || poll.status >= 500) continue;
     if (!poll.ok) throw new Error(`Video poll ${poll.status}`);
     const cur: any = await poll.json();
     status = String(cur?.status ?? status);
@@ -433,7 +441,7 @@ async function generateVideoJobApi(prompt: string, options: VideoOptions): Promi
   }
   if (status !== "completed" && status !== "succeeded") throw new Error(`Video job did not finish (last status: ${status})`);
 
-  const file = await fetchWithTimeout(withApiVersion(`${videoBaseUrl}/videos/${jobId}/content`), { headers }, 120_000);
+  const file = await fetchMediaWithRetry(withApiVersion(`${videoBaseUrl}/videos/${jobId}/content`), { headers }, 180_000, "video-download");
   if (!file.ok) throw new Error(`Video download ${file.status}`);
   return {
     base64: Buffer.from(await file.arrayBuffer()).toString("base64"),

@@ -1302,6 +1302,22 @@ export function registerAikRoutes(app: Express): void {
       if (!m) return void res.status(404).json({ error: "Not found." });
       res.setHeader("Cache-Control", "private, max-age=3600");
       res.setHeader("Content-Type", m.mime);
+      res.setHeader("Accept-Ranges", "bytes");
+      // Browsers scrub through a movie with Range requests; honour a single range.
+      const range = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range ?? ""));
+      if (range && (range[1] || range[2])) {
+        const total = m.bytes.length;
+        let start = range[1] ? Number(range[1]) : Math.max(0, total - Number(range[2]));
+        let end = range[1] && range[2] ? Math.min(Number(range[2]), total - 1) : total - 1;
+        if (!Number.isFinite(start) || !Number.isFinite(end) || start > end || start >= total) {
+          res.setHeader("Content-Range", `bytes */${total}`);
+          return void res.status(416).end();
+        }
+        res.status(206);
+        res.setHeader("Content-Range", `bytes ${start}-${end}/${total}`);
+        res.setHeader("Content-Length", String(end - start + 1));
+        return void res.end(m.bytes.subarray(start, end + 1));
+      }
       res.setHeader("Content-Length", String(m.bytes.length));
       res.end(m.bytes);
     }),

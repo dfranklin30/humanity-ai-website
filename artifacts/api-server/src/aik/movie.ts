@@ -85,14 +85,18 @@ export async function buildMovie(opts: {
     try {
       clips = await Promise.all(
         movie.shots.map(async (s) => {
-        try {
-          const m = await generateVideo(shotPrompt(movie.style, s), { seconds: s.seconds, size: aikConfig.videoSize });
-          return Buffer.from(m.base64, "base64");
-        } catch (err) {
-          if (err instanceof ContentFilteredError) throw err;
-          logger.warn({ requestId, shot: s.shot, err: String((err as Error)?.message ?? err).slice(0, 200) }, "[aik] shot failed");
-          return null;
+        // A shot that times out or hits a transient provider error gets one more take;
+        // a shot the provider refuses on content grounds does not.
+        for (let take = 1; take <= 2; take++) {
+          try {
+            const m = await generateVideo(shotPrompt(movie.style, s), { seconds: s.seconds, size: aikConfig.videoSize });
+            return Buffer.from(m.base64, "base64");
+          } catch (err) {
+            if (err instanceof ContentFilteredError) throw err;
+            logger.warn({ requestId, shot: s.shot, take, err: String((err as Error)?.message ?? err).slice(0, 200) }, "[aik] shot failed");
+          }
         }
+        return null;
       }),
       );
     } catch (err) {
