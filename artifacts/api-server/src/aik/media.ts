@@ -22,6 +22,19 @@ import { logger } from "../lib/logger";
 
 export type MediaRef = string; // "aik://r123/cover.png" or "data:image/png;base64,..."
 
+/**
+ * What the bytes actually are. Image models are casual about this: a FLUX
+ * call made with no format asked for answers JPEG, and a PDF that tries to
+ * embed those bytes as PNG silently drops the picture. Trust the magic
+ * numbers, not the label.
+ */
+export function sniffImageMime(bytes: Buffer, fallback = "image/png"): string {
+  if (bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
+  if (bytes.length > 7 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return "image/png";
+  if (bytes.length > 11 && bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WEBP") return "image/webp";
+  return fallback;
+}
+
 const PREFIX = "aik://";
 
 export function isStoredRef(ref: string): boolean {
@@ -68,6 +81,7 @@ async function getContainer(): Promise<Container> {
  * the artifact. Falls back to inline data when there is no store.
  */
 export async function putMedia(requestId: number, name: string, bytes: Buffer, mime: string): Promise<MediaRef> {
+  if (mime.startsWith("image/")) mime = sniffImageMime(bytes, mime);
   if (!isMediaStoreConfigured()) return `data:${mime};base64,${bytes.toString("base64")}`;
   const blobName = `r${requestId}/${name}`;
   const c = await getContainer();

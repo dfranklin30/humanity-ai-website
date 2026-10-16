@@ -167,7 +167,7 @@ export async function buildBook(opts: {
       steps.begin("cover", "Keeping the cover");
       steps.end("cover", "done", "unchanged");
       const m = await getMedia(previous.cover.image).catch(() => null);
-      coverPng = m?.mime === "image/png" ? m.bytes.toString("base64") : null;
+      coverPng = m?.mime.startsWith("image/") ? m.bytes.toString("base64") : null;
     } else {
       steps.begin("cover", "Drawing the cover");
       const made = await drawScreened(coverPrompt(draft), undefined, flags);

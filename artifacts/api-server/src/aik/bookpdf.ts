@@ -9,7 +9,7 @@
  * is always the approved version.
  */
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
-import { getMedia } from "./media";
+import { getMedia, sniffImageMime } from "./media";
 import type { Book } from "./book";
 
 const W = 792;
@@ -69,7 +69,8 @@ async function embed(doc: PDFDocument, ref: string) {
   const m = await getMedia(ref).catch(() => null);
   if (!m) return null;
   try {
-    const image = m.mime.includes("jpeg") || m.mime.includes("jpg") ? await doc.embedJpg(m.bytes) : await doc.embedPng(m.bytes);
+    const mime = sniffImageMime(m.bytes, m.mime);
+    const image = mime === "image/jpeg" ? await doc.embedJpg(m.bytes) : await doc.embedPng(m.bytes);
     return { image, width: image.width, height: image.height };
   } catch {
     return null;
