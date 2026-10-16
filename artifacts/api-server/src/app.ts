@@ -11,6 +11,7 @@ import { registerAiForKidsRoutes } from "./routes/aiforkids";
 import { registerAikRoutes } from "./aik/routes";
 import { WebhookHandlers } from "./webhookHandlers";
 import { handleStripeDonationEvent } from "./donationFulfillment";
+import { APP_ROLE, KIDS_ORIGIN, isKidsPath } from "./role";
 
 const app: Express = express();
 
@@ -42,8 +43,9 @@ app.use(cors({
 // Health check — mounted first so it is always reachable
 app.use("/api", healthRouter);
 
-// Stripe webhook — raw body, must come BEFORE express.json()
-app.post(
+// Stripe webhook — raw body, must come BEFORE express.json(). The kids
+// platform takes no money and never sees this route.
+if (APP_ROLE !== "kids") app.post(
   "/api/stripe/webhook",
   express.raw({ type: "application/json" }),
   async (req, res) => {
@@ -85,26 +87,44 @@ setupAuth(app);
 // catch-all in serveStatic so it is never shadowed.
 registerAiForKidsRoutes(app);
 
-// Kids AI Studio (/aiforkids/studio, /aiforkids/facilitator) API at /api/aik.
-// Mounted only when AIK_ENABLED=true; see src/aik/config.ts for all settings.
-registerAikRoutes(app);
+if (APP_ROLE === "site") {
+  // The Studio has moved: anyone arriving here for it is sent across, and the
+  // API answers with the new address rather than pretending not to exist.
+  app.use((req, res, next) => {
+    const pathname = req.path;
+    if (isKidsPath(pathname)) return void res.redirect(301, `${KIDS_ORIGIN}${req.originalUrl}`);
+    if (pathname.startsWith("/api/aik")) return void res.status(410).json({ error: "The Studio now lives at " + KIDS_ORIGIN, origin: KIDS_ORIGIN });
+    next();
+  });
+} else {
+  // Kids AI Studio (/aiforkids/studio, /aiforkids/facilitator) API at /api/aik.
+  // Mounted only when AIK_ENABLED=true; see src/aik/config.ts for all settings.
+  registerAikRoutes(app);
+}
 
 // Create http server and register all legacy routes
 export const httpServer: Server = createServer(app);
 
-// registerRoutes wires all app routes onto `app` and returns the server.
-// After the API routes are in place, serve the built website (SPA) from
-// dist/public with a catch-all fallback — this must register AFTER the API
-// routes so it never shadows /api/*.
-registerRoutes(httpServer, app)
-  .then(() => {
-    if (process.env.SERVE_STATIC !== "false") {
-      serveStatic(app);
-    }
-  })
-  .catch((err) => {
-    logger.error({ err }, "Failed to register routes");
-    process.exit(1);
-  });
+if (APP_ROLE === "kids") {
+  // No blog, events, donations or author tools here: the kids host serves the
+  // static bundle and the Studio API, and nothing else.
+  if (process.env.SERVE_STATIC !== "false") serveStatic(app);
+  logger.info("Running as the kids platform (APP_ROLE=kids)");
+} else {
+  // registerRoutes wires all app routes onto `app` and returns the server.
+  // After the API routes are in place, serve the built website (SPA) from
+  // dist/public with a catch-all fallback — this must register AFTER the API
+  // routes so it never shadows /api/*.
+  registerRoutes(httpServer, app)
+    .then(() => {
+      if (process.env.SERVE_STATIC !== "false") {
+        serveStatic(app);
+      }
+    })
+    .catch((err) => {
+      logger.error({ err }, "Failed to register routes");
+      process.exit(1);
+    });
+}
 
 export default app;

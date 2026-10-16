@@ -2,6 +2,7 @@ import { httpServer } from "./app";
 import { logger } from "./lib/logger";
 import { seedDatabase } from "./seed";
 import { startNewsletterScheduler } from "./newsletter";
+import { APP_ROLE } from "./role";
 
 const rawPort = process.env["PORT"];
 
@@ -49,7 +50,10 @@ async function initStripe() {
 
 // Bind port first so health checks pass, then run background work
 httpServer.listen(port, () => {
-  logger.info({ port }, "Server listening");
+  logger.info({ port, role: APP_ROLE }, "Server listening");
+
+  // The kids platform has no events to seed, no Stripe and no newsletter.
+  if (APP_ROLE === "kids") return;
 
   seedDatabase().catch((err) => {
     logger.error({ err }, "Seed error");

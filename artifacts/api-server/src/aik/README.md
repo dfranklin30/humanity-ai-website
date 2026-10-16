@@ -10,17 +10,18 @@ Design rationale: the *Kids AI Studio — Platform Design Brief* and
 
 | Studio | Interaction | Model tier | Output |
 |---|---|---|---|
-| 🎮 Game Maker | Director's Orders + helper chat | default (Claude) | single-file HTML game in a locked sandbox |
-| 📚 Story Maker | Orders + chat | default | six-panel comic script + cover idea |
+| 🎮 Game Maker | Director's Orders + helper chat | default (Claude) | single-file HTML game in a locked sandbox, run and repaired before delivery |
+| 📚 Story Maker | Orders + chat | default + image + TTS | a picture book: cover, six illustrated pages with the same hero, read-aloud narration, PDF (facilitator-approved) |
 | 🎨 Prompt Craft | Orders | fast | assembled prompt + image (facilitator-approved) |
 | 🧭 Quest Helper | Orders + chat | default | fact list / quiz / outline with "check me" flags |
-| 🎬 Video Maker | Orders | default + video model | 3-shot storyboard + ~5 s clip (facilitator-approved) |
+| 🎬 Video Maker | Orders | default + video model + TTS | three Sora shots cut into one movie with a title card and narration, every frame screened (facilitator-approved) |
 | 🤖 Robotics Lab | Orders + chat | default | parts, build steps, micro:bit MakeCode starter code, safety note |
 | 📝 Homework Help | chat only | fast | Socratic tutoring, step by step, never just the answer |
 
 Every studio runs through the same pipeline: structured input → PII catcher →
 blocklist → Azure AI Content Safety + Prompt Shields → model → output screening
-→ code scan (games/robots) → artifact. Media (images, video) is held for
+→ code scan (games/robots) → artifact. See `ARCHITECTURE.md` for the two-app
+layout, the media store and the finished-product pipelines. Media (images, video) is held for
 facilitator approval before a child sees it. Chats are turn-limited per session
 and every turn is screened both ways and shown on the facilitator dashboard.
 
@@ -62,6 +63,18 @@ key per provider; children never hold licenses.
 | Variable | Purpose |
 |---|---|
 | `AIK_ENABLED` | `true` to mount the API |
+| `APP_ROLE` | `kids` on the kids Container App, `site` on the website, unset = both in one process (see `../role.ts`) |
+| `KIDS_ORIGIN` | where the site redirects Studio pages (default `https://aiforkids.humanityplusai.org`) |
+| `AIK_TEXT_FALLBACK_PROVIDER` | second text provider on outage/429/timeout (default: whichever other provider is configured) |
+| `AIK_AZURE_USE_IDENTITY` | `true`: Azure OpenAI via the app's managed identity, no key |
+| **Media store** | |
+| `AIK_MEDIA_ACCOUNT`, `AIK_MEDIA_CONTAINER` | storage account + private container (default `aik-media`), written with the managed identity (Storage Blob Data Contributor) |
+| `AIK_MEDIA_CONNECTION_STRING` | alternative to the account + identity. Unset both: media stays inline (local only) |
+| **Finished products** | |
+| `AIK_BOOK_PAGES` | pages per picture book (default 6) |
+| `AIK_IMAGE_REFERENCE` | `true` (default): the cover is passed as a reference image so the hero stays consistent |
+| `AIK_VIDEO_SHOTS`, `AIK_VIDEO_SIZE`, `AIK_FFMPEG` | shots per movie (default 3 × 4 s), output size (default 1280x720), ffmpeg path |
+| `AIK_KIDS_VERIFY_GAMES` | `true` (default): children's games are run, checked and repaired before delivery |
 | `AIK_BOOTSTRAP_FACILITATOR` | `email:password` — creates the first (admin) facilitator if none exist. Remove after first sign-in and change the password from the dashboard. |
 | **Text (Claude)** | |
 | `AIK_TEXT_PROVIDER` | `anthropic` (default when the key is set) · `azure` · `oss` |
@@ -101,8 +114,12 @@ belongs at `/aiforkids/privacy`.
 - `ai.ts` — provider adapters: Anthropic, OpenAI-compatible (OSS), Azure OpenAI, fal.ai queue, ElevenLabs
 - `store.ts` — Postgres tables (`aik_*`, additive `CREATE TABLE IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS`)
 - `safety.ts` — PII catcher, blocklist, Content Safety + Prompt Shields, output screening, code scan, CSP hardening
-- `modes.ts` — the seven studios: fields, personas, system prompts, output parsing
+- `modes.ts` — the studios: fields, personas, system prompts, output parsing
 - `pipeline.ts` — request lifecycle (orders and chat turns), media approval gate, live-feed bus
+- `book.ts`, `bookpdf.ts` — Story Maker's picture book: writing, illustrating, narrating, PDF
+- `movie.ts`, `ffmpeg.ts` — Video Maker's movie: shots, frame screening, the cut
+- `forge.ts` — plan → build → run → repair (→ critique → polish) for games; critique-and-polish for JSON studios
+- `media.ts` — the blob store for generated media and the `aik://` reference scheme
 - `routes.ts` — HTTP API under `/api/aik`
 
 ## Local test

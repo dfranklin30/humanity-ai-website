@@ -16,6 +16,72 @@ earlier plan and are not used. Production runs on Azure as described here._
 Public URL: https://humanityplusai.org (custom domain on the Container App).
 Subscription: `Azure subscription 1` (`33680346-29fc-4366-845d-a04681b59a52`).
 
+## The kids platform (`aiforkids` Container App)
+
+The Kids AI Studio runs as its own Container App, **`aiforkids`**, from the same
+image with `APP_ROLE=kids`, on **aiforkids.humanityplusai.org**. The website
+(`humanity-ai`, `APP_ROLE=site`) redirects `/aiforkids/studio`, `/hub`,
+`/facilitator` and `/week/*` there and no longer mounts `/api/aik`. Rationale and
+layout: `artifacts/api-server/src/aik/ARCHITECTURE.md`.
+
+One-time creation (Cloud Shell). Secrets are Key Vault references; put the values
+in `kv-humanityplusai` first (`aik-anthropic-key`, `aik-aoai-key`,
+`aik-safety-key`, `elevenlabs-api-key`, `foundry-api-key`, `database-url`,
+`session-secret`). Never paste a secret value into a command that is logged.
+
+```bash
+RG=rg-humanityplusai; ENV=cae-humanityplusai; APP=aiforkids
+IMG=$(az containerapp show -g $RG -n humanity-ai --query "properties.template.containers[0].image" -o tsv)
+KV=https://kv-humanityplusai.vault.azure.net/secrets
+
+az containerapp create -g $RG -n $APP --environment $ENV --image "$IMG" \
+  --target-port 8080 --ingress external --min-replicas 1 --max-replicas 3 \
+  --cpu 1.0 --memory 2.0Gi --system-assigned \
+  --registry-server acrhumanityplusai.azurecr.io --registry-identity system
+
+# the app's identity reads Key Vault, pulls images, writes media, calls Azure OpenAI
+PRINCIPAL=$(az containerapp show -g $RG -n $APP --query identity.principalId -o tsv)
+az keyvault set-policy -n kv-humanityplusai --object-id $PRINCIPAL --secret-permissions get list
+az role assignment create --assignee $PRINCIPAL --role "Storage Blob Data Contributor" \
+  --scope $(az storage account show -g $RG -n sthumanityplusai --query id -o tsv)
+az role assignment create --assignee $PRINCIPAL --role "Cognitive Services OpenAI User" \
+  --scope $(az cognitiveservices account show -g $RG -n aoai-hpai-westus --query id -o tsv)
+
+az containerapp secret set -g $RG -n $APP --secrets \
+  database-url=keyvaultref:$KV/database-url,identityref:system \
+  session-secret=keyvaultref:$KV/session-secret,identityref:system \
+  aik-anthropic-key=keyvaultref:$KV/aik-anthropic-key,identityref:system \
+  aik-safety-key=keyvaultref:$KV/aik-safety-key,identityref:system \
+  elevenlabs-api-key=keyvaultref:$KV/elevenlabs-api-key,identityref:system \
+  foundry-api-key=keyvaultref:$KV/foundry-api-key,identityref:system
+
+az containerapp update -g $RG -n $APP --set-env-vars \
+  APP_ROLE=kids NODE_ENV=production APP_ENV=production PORT=8080 \
+  APP_URL=https://aiforkids.humanityplusai.org AIK_PUBLIC_URL=https://aiforkids.humanityplusai.org \
+  DATABASE_URL=secretref:database-url SESSION_SECRET=secretref:session-secret \
+  AIK_ENABLED=true AIK_REQUIRE_CONTENT_SAFETY=true \
+  AIK_TEXT_PROVIDER=anthropic AIK_ANTHROPIC_API_KEY=secretref:aik-anthropic-key \
+  AIK_ANTHROPIC_MODEL=claude-sonnet-4-5 AIK_ANTHROPIC_FAST_MODEL=claude-haiku-4-5 \
+  AIK_AZURE_OPENAI_ENDPOINT=https://aoai-hpai-westus.openai.azure.com/ AIK_AZURE_OPENAI_TEXT_DEPLOYMENT=gpt-4o AIK_AZURE_USE_IDENTITY=true \
+  AIK_CONTENT_SAFETY_ENDPOINT=https://danielle-4273-resource.cognitiveservices.azure.com/ AIK_CONTENT_SAFETY_KEY=secretref:aik-safety-key \
+  AIK_TTS_PROVIDER=azure AIK_AZURE_SPEECH_KEY=secretref:aik-safety-key AIK_AZURE_SPEECH_REGION=eastus2 \
+  AIK_IMAGE_PROVIDER=oss AIK_OSS_IMAGE_BASE_URL=https://danielle-4273-resource.openai.azure.com/openai/v1 AIK_OSS_IMAGE_MODEL=flux2-flex AIK_OSS_IMAGE_API_KEY=secretref:foundry-api-key \
+  AIK_VIDEO_PROVIDER=oss AIK_OSS_VIDEO_BASE_URL=https://danielle-4273-resource.openai.azure.com/openai/v1 AIK_OSS_VIDEO_MODEL=sora-2 AIK_OSS_VIDEO_API_KEY=secretref:foundry-api-key \
+  AIK_MUSIC_PROVIDER=elevenlabs AIK_ELEVENLABS_API_KEY=secretref:elevenlabs-api-key \
+  AIK_MEDIA_ACCOUNT=sthumanityplusai AIK_MEDIA_CONTAINER=aik-media \
+  AIK_CEILING_USER_DAILY=5 AIK_CEILING_ORG_MONTHLY=150
+
+# move the hostname from the website app to the kids app, then the website becomes site-only
+az containerapp hostname delete -g $RG -n humanity-ai --hostname aiforkids.humanityplusai.org --yes
+az containerapp hostname add  -g $RG -n $APP --hostname aiforkids.humanityplusai.org
+az containerapp hostname bind -g $RG -n $APP --hostname aiforkids.humanityplusai.org --environment $ENV --validation-method CNAME
+az containerapp update -g $RG -n humanity-ai --set-env-vars APP_ROLE=site KIDS_ORIGIN=https://aiforkids.humanityplusai.org
+```
+
+Check: `https://aiforkids.humanityplusai.org/api/aik/config` reports every capability
+`ready: true`, `book.illustrated`, `book.narrated` and `movie.ready`; and
+`https://humanityplusai.org/aiforkids/studio` answers 301.
+
 ## Deploys (automatic)
 
 Every push to `main` runs `.github/workflows/deploy-azure.yml`:

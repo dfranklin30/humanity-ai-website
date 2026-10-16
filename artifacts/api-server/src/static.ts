@@ -4,6 +4,7 @@ import fs from "fs";
 import path from "path";
 import { injectSeoMeta } from "./seo";
 import { storage } from "./storage";
+import { APP_ROLE, isChildFacingPath } from "./role";
 
 const KNOWN_ROUTES: RegExp[] = [
   /^\/aiforkids(?:\/.*)?$/,
@@ -56,10 +57,18 @@ export function serveStatic(app: Express) {
     try {
       const indexPath = path.resolve(distPath, "index.html");
       let html = await fs.promises.readFile(indexPath, "utf-8");
-      html = await injectSeoMeta(req.originalUrl, html, storage);
-      html = injectAnalytics(html, req.originalUrl);
+      const pathname = req.originalUrl.split("?")[0];
+      if (APP_ROLE !== "kids") html = await injectSeoMeta(req.originalUrl, html, storage);
+      // injectAnalytics already skips /aiforkids; on the kids host nothing is
+      // ever tagged, whatever the path.
+      if (APP_ROLE !== "kids") html = injectAnalytics(html, req.originalUrl);
       const status = isKnownRoute(req.originalUrl) ? 200 : 404;
-      res.status(status).set({ "Content-Type": "text/html" }).end(html);
+      const headers: Record<string, string> = { "Content-Type": "text/html" };
+      if (APP_ROLE === "kids" || isChildFacingPath(pathname)) {
+        headers["Referrer-Policy"] = "no-referrer";
+        headers["X-Robots-Tag"] = /\/(studio|hub|facilitator)(\/|$)/.test(pathname) ? "noindex" : "all";
+      }
+      res.status(status).set(headers).end(html);
     } catch {
       const status = isKnownRoute(req.originalUrl) ? 200 : 404;
       res.status(status).sendFile(path.resolve(distPath, "index.html"));

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "wouter";
 import { cx } from "../components/ui";
-import { getArtifact, type Artifact, type ArtifactMeta, type FieldDef, type ModeDef, type StudioRequest } from "./api";
+import { getArtifact, mediaSrc, downloadUrl, bookPdfUrl, type Artifact, type ArtifactMeta, type Book, type Movie, type FieldDef, type ModeDef, type StudioRequest } from "./api";
 
 /* ------------------------------------------------------------------ *
  * Primitives sized for small hands and projectors
@@ -114,15 +114,18 @@ export function ArtifactView({ artifact, compact }: { artifact: Artifact; compac
   if (artifact.kind === "game") return <GameFrame html={artifact.content} title={artifact.title} tall={!compact} />;
 
   if (artifact.kind === "story") {
-    let data: { title?: string; panels?: { narration: string; dialogue: string }[]; coverPrompt?: string } = {};
+    let data: any = {};
     try {
       data = JSON.parse(artifact.content);
     } catch {
       /* ignore */
     }
+    if (data?.format === "book") return <BookView artifactId={artifact.id} book={data as Book} compact={compact} />;
+    // Books from before the pictures: a six-panel comic script to draw yourself.
+    const panels: { narration: string; dialogue: string }[] = data.panels ?? [];
     return (
       <div className="grid gap-3 sm:grid-cols-2">
-        {(data.panels ?? []).map((p, i) => (
+        {panels.map((p, i) => (
           <div key={i} className="rounded-2xl bg-white p-4 ring-2 ring-slate-200">
             <p className="text-xs font-bold uppercase tracking-wide text-violet-600">Panel {i + 1}</p>
             <p className="mt-1 text-base text-slate-800">{p.narration}</p>
@@ -168,26 +171,44 @@ export function ArtifactView({ artifact, compact }: { artifact: Artifact; compac
   }
 
   if (artifact.kind === "video") {
-    let board: { title?: string; shots?: { shot: number; description: string; seconds: number }[]; videoPrompt?: string } = {};
+    let movie: Partial<Movie> = {};
     try {
-      board = JSON.parse(artifact.summary ?? "{}");
+      movie = JSON.parse(artifact.mime === "application/json" ? artifact.content : artifact.summary ?? "{}");
     } catch {
       /* ignore */
     }
+    const film = mediaSrc(artifact.id, movie.movie);
+    // Before the cutting room, a clip lived in content as base64.
+    const legacyClip = artifact.mime.startsWith("video/") ? mediaSrc(artifact.id, artifact.content, artifact.mime) : undefined;
+    const shots = movie.shots ?? [];
+    const anyClip = shots.some((sh) => sh.clip);
     return (
       <div className="space-y-3">
-        {artifact.content && artifact.mime.startsWith("video/") && (
-          <video controls playsInline className="mx-auto max-h-[420px] rounded-2xl ring-4 ring-violet-200" src={`data:${artifact.mime};base64,${artifact.content}`} />
-        )}
+        {film || legacyClip ? (
+          <video controls playsInline className="mx-auto w-full max-h-[480px] rounded-2xl bg-black ring-4 ring-violet-200" src={film ?? legacyClip} />
+        ) : anyClip ? (
+          <Notice tone="info">The shots are ready to watch one by one. Press play on each.</Notice>
+        ) : null}
         <div className="grid gap-2 sm:grid-cols-3">
-          {(board.shots ?? []).map((sh) => (
-            <div key={sh.shot} className="rounded-2xl bg-white p-3 ring-2 ring-slate-200">
-              <p className="text-xs font-bold uppercase tracking-wide text-violet-600">Shot {sh.shot} · {sh.seconds}s</p>
-              <p className="mt-1 text-sm text-slate-800">{sh.description}</p>
-            </div>
-          ))}
+          {shots.map((sh) => {
+            const clip = film ? undefined : mediaSrc(artifact.id, sh.clip);
+            return (
+              <div key={sh.shot} className="rounded-2xl bg-white p-3 ring-2 ring-slate-200">
+                {clip && <video controls playsInline preload="metadata" className="mb-2 w-full rounded-xl bg-black" src={clip} />}
+                <p className="text-xs font-bold uppercase tracking-wide text-violet-600">Shot {sh.shot} · {sh.seconds}s</p>
+                <p className="mt-1 text-sm text-slate-800">{sh.description}</p>
+              </div>
+            );
+          })}
         </div>
-        {board.videoPrompt && <p className="text-center text-xs text-slate-500">Clip prompt: {board.videoPrompt}</p>}
+        {(film || legacyClip || anyClip) && !compact && (
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <a href={downloadUrl(artifact.id)} className="rounded-2xl bg-white px-4 py-2 text-base font-bold text-violet-800 ring-2 ring-violet-200 hover:bg-violet-50">
+              ⬇️ Download the movie
+            </a>
+            {movie.style && <span className="text-xs text-slate-500">Look: {movie.style}</span>}
+          </div>
+        )}
       </div>
     );
   }
@@ -228,13 +249,20 @@ export function ArtifactView({ artifact, compact }: { artifact: Artifact; compac
     } catch {
       /* fall through to whatever we have */
     }
-    const hasAudio = Boolean(artifact.content) && artifact.mime.startsWith("audio/");
+    const audioSrc = artifact.mime.startsWith("audio/") ? mediaSrc(artifact.id, artifact.content, artifact.mime) : undefined;
     return (
       <div className="space-y-4">
-        {hasAudio ? (
-          <audio controls preload="none" className="w-full" src={`data:${artifact.mime};base64,${artifact.content}`}>
-            Your browser can't play this song.
-          </audio>
+        {audioSrc ? (
+          <div className="space-y-2">
+            <audio controls preload="none" className="w-full" src={audioSrc}>
+              Your browser can't play this song.
+            </audio>
+            {!compact && (
+              <a href={downloadUrl(artifact.id)} className="inline-block rounded-2xl bg-white px-4 py-2 text-base font-bold text-violet-800 ring-2 ring-violet-200 hover:bg-violet-50">
+                ⬇️ Download the song
+              </a>
+            )}
+          </div>
         ) : (
           // Why this says so little: the server already knows WHY there is no
           // audio -- no provider, or a generation that failed -- and says so in
@@ -267,10 +295,11 @@ export function ArtifactView({ artifact, compact }: { artifact: Artifact; compac
   }
 
   // image
-  if (artifact.mime.startsWith("image/") && artifact.content) {
+  const imageSrc = artifact.mime.startsWith("image/") ? mediaSrc(artifact.id, artifact.content, artifact.mime) : undefined;
+  if (imageSrc) {
     return (
       <div className="space-y-2">
-        <img src={`data:${artifact.mime};base64,${artifact.content}`} alt={artifact.title} className="mx-auto max-h-[480px] rounded-2xl ring-4 ring-violet-200" />
+        <img src={imageSrc} alt={artifact.title} className="mx-auto max-h-[480px] rounded-2xl ring-4 ring-violet-200" />
         {artifact.summary && <p className="text-center text-sm text-slate-600">Prompt: {artifact.summary}</p>}
       </div>
     );
@@ -280,6 +309,115 @@ export function ArtifactView({ artifact, compact }: { artifact: Artifact; compac
       <p className="text-xs font-bold uppercase tracking-wide text-violet-600">Your picture description</p>
       <p className="mt-2 text-xl font-semibold text-slate-900">{artifact.summary}</p>
       <p className="mt-3 text-sm text-slate-600">Pictures aren't switched on for this class yet, so your facilitator will draw this one on the big screen.</p>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * The flip-book
+ *
+ * A picture book is read one page at a time, so that is how it is shown:
+ * the cover, then each page with its picture and its words and a button
+ * that reads it aloud. Arrow keys turn pages for a child at a keyboard, big
+ * buttons for a child at a touchscreen, and the PDF link is for taking it
+ * home.
+ * ------------------------------------------------------------------ */
+
+export function BookView({ artifactId, book, compact }: { artifactId: number; book: Book; compact?: boolean }) {
+  const [index, setIndex] = useState(0); // 0 = cover, 1..n = pages, n+1 = the end
+  const [playing, setPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const last = book.pages.length + 1;
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight") setIndex((i) => Math.min(last, i + 1));
+      if (e.key === "ArrowLeft") setIndex((i) => Math.max(0, i - 1));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [last]);
+
+  // Turning the page stops the voice; a page read over the wrong picture is confusing.
+  useEffect(() => {
+    audioRef.current?.pause();
+    audioRef.current = null;
+    setPlaying(false);
+  }, [index]);
+
+  const page = index >= 1 && index <= book.pages.length ? book.pages[index - 1] : null;
+  const image = index === 0 ? mediaSrc(artifactId, book.cover.image) : page ? mediaSrc(artifactId, page.image) : undefined;
+  const audio = page ? mediaSrc(artifactId, page.audio) : undefined;
+
+  const readAloud = () => {
+    if (!audio) return;
+    if (playing) {
+      audioRef.current?.pause();
+      setPlaying(false);
+      return;
+    }
+    const a = new Audio(audio);
+    audioRef.current = a;
+    a.onended = () => setPlaying(false);
+    a.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+  };
+
+  const frame = cx("mx-auto w-full overflow-hidden rounded-2xl bg-white ring-4 ring-violet-200", compact ? "max-w-md" : "max-w-3xl");
+  return (
+    <div className="space-y-3">
+      <div className={frame}>
+        <div className={cx("grid", compact ? "" : "sm:grid-cols-2")}>
+          <div className="relative aspect-square bg-violet-50">
+            {image ? (
+              <img src={image} alt={index === 0 ? book.cover.scene : page?.scene ?? ""} className="h-full w-full object-cover" />
+            ) : (
+              <div className="flex h-full items-center justify-center p-6 text-center text-sm text-violet-700">
+                {index === 0 ? book.cover.scene : index > book.pages.length ? "✨" : page?.scene}
+              </div>
+            )}
+          </div>
+          <div className="flex flex-col justify-center gap-3 p-5 sm:p-7">
+            {index === 0 && (
+              <>
+                <p className="text-xs font-bold uppercase tracking-wide text-violet-600">A picture book</p>
+                <h3 className="text-2xl font-black text-slate-900 sm:text-3xl">{book.title}</h3>
+                <p className="text-sm text-slate-600">Starring {book.hero.name}. {book.pages.length} pages.</p>
+              </>
+            )}
+            {page && (
+              <>
+                <p className="text-xs font-bold uppercase tracking-wide text-violet-600">Page {page.n} of {book.pages.length}</p>
+                <p className="text-lg leading-relaxed text-slate-800 sm:text-xl">{page.text}</p>
+                {audio && (
+                  <button type="button" onClick={readAloud} className="mt-1 inline-flex w-fit items-center gap-2 rounded-2xl bg-violet-100 px-4 py-2 text-base font-bold text-violet-900 hover:bg-violet-200">
+                    {playing ? "⏸ Stop" : "🔊 Read it to me"}
+                  </button>
+                )}
+              </>
+            )}
+            {index > book.pages.length && (
+              <>
+                <h3 className="text-3xl font-black text-violet-800">{book.theEnd || "The End"}</h3>
+                <p className="text-sm text-slate-600">Written by the director{book.madeWith.pictures ? ", with pictures" : ""}{book.madeWith.narration ? " and a voice" : ""} from the Studio.</p>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        <button type="button" onClick={() => setIndex((i) => Math.max(0, i - 1))} disabled={index === 0} className="rounded-2xl bg-white px-4 py-2 text-base font-bold text-violet-800 ring-2 ring-violet-200 hover:bg-violet-50 disabled:opacity-40">
+          ← Back
+        </button>
+        <span className="text-sm font-semibold text-slate-600">{index === 0 ? "Cover" : index > book.pages.length ? "The End" : `Page ${index}`}</span>
+        <button type="button" onClick={() => setIndex((i) => Math.min(last, i + 1))} disabled={index === last} className="rounded-2xl bg-violet-600 px-4 py-2 text-base font-bold text-white shadow-md shadow-violet-200 hover:bg-violet-700 disabled:opacity-40">
+          Next →
+        </button>
+        {!compact && (
+          <a href={bookPdfUrl(artifactId)} target="_blank" rel="noreferrer" className="rounded-2xl bg-white px-4 py-2 text-base font-bold text-violet-800 ring-2 ring-violet-200 hover:bg-violet-50">
+            📖 Open as PDF
+          </a>
+        )}
+      </div>
     </div>
   );
 }

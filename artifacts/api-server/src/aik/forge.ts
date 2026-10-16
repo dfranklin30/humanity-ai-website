@@ -70,7 +70,7 @@ const MAX_REPAIRS = 3;
  * Step bookkeeping
  * ------------------------------------------------------------------ */
 
-class Steps {
+export class Steps {
   private steps: ForgeStep[] = [];
   private started = new Map<string, number>();
   constructor(private onProgress?: ForgeProgress) {}
@@ -228,9 +228,19 @@ export async function forgeGame(opts: {
   charBudget: number;
   maxTokens: number;
   onProgress?: ForgeProgress;
+  /**
+   * The child's build. Plan, build, run and repair — but no critique and no
+   * polish, and at most two repairs. A child with two tickets needs a game
+   * that works in a minute, not a better game in four.
+   */
+  light?: boolean;
+  /** Extra rules for the build prompt (the kid path keeps the smaller canvas and size). */
+  extraRules?: string;
 }): Promise<ForgeResult> {
   const steps = new Steps(opts.onProgress);
   const { brief, soundEnabled, charBudget, maxTokens } = opts;
+  const maxRepairs = opts.light ? 2 : MAX_REPAIRS;
+  const build = buildPrompt(soundEnabled, charBudget) + (opts.extraRules ? `\n${opts.extraRules}` : "");
 
   /* 1. Plan ------------------------------------------------------- */
   steps.begin("plan", "Designing the game");
@@ -249,7 +259,7 @@ export async function forgeGame(opts: {
     ? `Build exactly this design.\n\n${planForModel(plan)}\n\nThe child's original brief, for tone:\n${brief}`
     : `Build a game from this brief:\n${brief}`;
   let raw = await completeText({
-    system: buildPrompt(soundEnabled, charBudget),
+    system: build,
     user: buildUser,
     maxTokens,
     temperature: 0.55,
@@ -276,12 +286,12 @@ export async function forgeGame(opts: {
   );
   steps.end("verify", report.ok ? "done" : "failed", report.ok ? "runs clean" : `${report.issues.length} problem${report.issues.length === 1 ? "" : "s"} found`);
 
-  while (!report.ok && repairs < MAX_REPAIRS) {
+  while (!report.ok && repairs < maxRepairs) {
     repairs++;
     steps.begin(`repair${repairs}`, `Fixing what broke${repairs > 1 ? ` (attempt ${repairs})` : ""}`);
     try {
       const fixed = await completeText({
-        system: buildPrompt(soundEnabled, charBudget),
+        system: build,
         user: `This game was run automatically and these problems were found:\n\n${issuesForModel(report)}\n\nFix every one of them. Change nothing else. Reply with the complete corrected HTML document and nothing else.\n\nCURRENT GAME:\n${html}`,
         maxTokens,
         temperature: 0.3,
@@ -313,7 +323,7 @@ export async function forgeGame(opts: {
   }
 
   /* 5-6. Critique and polish -------------------------------------- */
-  if (report.ok) {
+  if (report.ok && !opts.light) {
     steps.begin("critique", "Looking for what's missing");
     let notes: string[] = [];
     try {
@@ -338,7 +348,7 @@ Do not suggest anything needing network, sound${soundEnabled ? " beyond AudioCon
       steps.begin("polish", "Polishing");
       try {
         const polished = await completeText({
-          system: buildPrompt(soundEnabled, charBudget),
+          system: build,
           user: `Apply these improvements to the game. Keep everything else working exactly as it does now. Reply with the complete HTML document and nothing else.\n\nIMPROVEMENTS:\n${notes.map((n, i) => `${i + 1}. ${n}`).join("\n")}\n\nCURRENT GAME:\n${html}`,
           maxTokens,
           temperature: 0.4,

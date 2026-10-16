@@ -12,8 +12,11 @@ import { aikConfig, isMusicConfigured } from "./config";
 import * as store from "./store";
 import type { RequestRow, ArtifactRow, ClassRow } from "./store";
 import { getMode, validateInput, systemPrompt, chatSystemPrompt, userPrompt, isRedirect, extractHtml, extractJson, gameSummary, gameTitle, type ModeDef } from "./modes";
-import { completeText, generateImage, generateVideo, generateMusic, ContentFilteredError, type ChatTurn } from "./ai";
-import { forgeGame, refineJson } from "./forge";
+import { completeText, generateImage, generateMusic, ContentFilteredError, type ChatTurn } from "./ai";
+import { forgeGame, refineJson, type ForgeStep } from "./forge";
+import { writeBookDraft, buildBook, bookTextOnly, type Book } from "./book";
+import { buildMovie, type Movie } from "./movie";
+import { putMedia, discardMedia } from "./media";
 import { verifyMicrobitCode } from "./verify";
 import { screenInput, screenOutputText, scanGameCode, hardenGameHtml, stripLinks, contentSafetyImage, KID_MESSAGES, type Flag } from "./safety";
 import { isContentSafetyConfigured, isImageConfigured, isVideoConfigured } from "./config";
@@ -177,6 +180,14 @@ export async function runRequest(requestId: number): Promise<void> {
       }
     }
 
+    /* ---- Story Maker: the picture-book path ----------------------------
+     * Writing, drawing, narrating and screening a book is its own pipeline
+     * (book.ts). Create and change both go there; chat went up above.    */
+    if (mode.id === "story") {
+      await runBook(req, mode, input, current, flags);
+      return;
+    }
+
     // 4. Model call (one retry with a tightened instruction on bad shape)
     const sys = systemPrompt(mode, { soundEnabled: klass.sound_enabled });
     const usr = userPrompt(mode, input, current ? projectStateForModel(current) : null);
@@ -184,7 +195,12 @@ export async function runRequest(requestId: number): Promise<void> {
     /* ---- Studio path: plan, build, run it, repair, critique, polish ----
      * Only for a "create" in the Hub. Children stay on the fast path, and a
      * change request stays fast so iteration remains quick for everyone.  */
-    if (req.quality === "studio" && mode.id === "game" && input.kind === "create") {
+    /* Children now get the half of that path that matters most: their game is
+     * run, checked and repaired before they see it. A game that throws on the
+     * first frame used to reach a child under a green tick; now it reaches a
+     * repair call instead. Critique and polish stay Hub-only for speed.     */
+    const studio = req.quality === "studio";
+    if ((studio || aikConfig.kidsVerifyGames) && mode.id === "game" && input.kind === "create") {
       // Progress writes are serialized: they fire faster than Postgres
       // round-trips, and unordered writes would leave the last-written row
       // showing an early step forever.
@@ -192,8 +208,10 @@ export async function runRequest(requestId: number): Promise<void> {
       const forged = await forgeGame({
         brief: input.text,
         soundEnabled: klass.sound_enabled,
-        charBudget: aikConfig.studioGameChars,
-        maxTokens: aikConfig.studioMaxTokens,
+        charBudget: studio ? aikConfig.studioGameChars : aikConfig.kidsGameChars,
+        maxTokens: studio ? aikConfig.studioMaxTokens : mode.maxTokens,
+        light: !studio,
+        extraRules: studio ? undefined : "- This game is for a child to read and change: a <canvas> no larger than 640x400, big shapes and emoji for characters are fine, and keep it simple enough to explain in one breath.",
         onProgress: (steps) => {
           writeChain = writeChain.then(() => store.setProgress(req.id, steps)).catch(() => {});
           publish(req.class_id, { type: "request", request: toPublicRequest({ ...req, status: "working", progress: steps }) });
@@ -202,7 +220,7 @@ export async function runRequest(requestId: number): Promise<void> {
       await writeChain.catch(() => {});
       // The authoritative final state, whatever the streaming writes did.
       await store.setProgress(req.id, forged.steps).catch(() => {});
-      const built = await buildArtifact(mode.id, forged.html, input, current, klass, flags);
+      const built = await buildArtifact(mode.id, forged.html, input, current, klass, flags, req.id);
       if (!built.ok) {
         await finish(req, { status: built.blocked ? "blocked" : "failed", message: built.message, flags: [...flags, ...built.flags] });
         return;
@@ -233,7 +251,7 @@ export async function runRequest(requestId: number): Promise<void> {
     }
 
     // 5. Turn the reply into an artifact, screening on the way
-    const built = await buildArtifact(mode.id, raw, input, current, klass, flags);
+    const built = await buildArtifact(mode.id, raw, input, current, klass, flags, req.id);
     if (!built.ok) {
       // one retry for shape problems only
       if (built.retryable) {
@@ -245,9 +263,9 @@ export async function runRequest(requestId: number): Promise<void> {
           tier: mode.tier,
           mockKind: mode.id,
         });
-        const built2 = await buildArtifact(mode.id, raw2, input, current, klass, flags);
+        const built2 = await buildArtifact(mode.id, raw2, input, current, klass, flags, req.id);
         if (built2.ok) {
-          await complete(req, built2.artifact, flags);
+          await finalize(req, mode, built2.artifact, flags);
           return;
         }
         await finish(req, { status: built2.blocked ? "blocked" : "failed", message: built2.message, flags: [...flags, ...built2.flags] });
@@ -285,7 +303,7 @@ export async function runRequest(requestId: number): Promise<void> {
         await store.setProgress(req.id, refined.steps).catch(() => {});
         if (refined.changed) {
           // Re-screen the revision: it is new model output like any other.
-          const rebuilt = await buildArtifact(mode.id, refined.json, input, current, klass, flags);
+          const rebuilt = await buildArtifact(mode.id, refined.json, input, current, klass, flags, req.id);
           if (rebuilt.ok) {
             await complete(req, rebuilt.artifact, flags);
             return;
@@ -295,7 +313,7 @@ export async function runRequest(requestId: number): Promise<void> {
       }
     }
 
-    await complete(req, built.artifact, flags);
+    await finalize(req, mode, built.artifact, flags);
   } catch (err) {
     logger.error({ err, requestId }, "[aik] pipeline error");
     await finish(req, { status: "failed", message: KID_MESSAGES.unavailable, flags: [...flags, { layer: "system", category: "error", detail: String((err as any)?.message ?? err).slice(0, 200) }] });
@@ -325,12 +343,126 @@ async function complete(req: RequestRow, artifactInput: NewArtifact, flags: Flag
   }
 }
 
+/**
+ * The last step for the studios whose artifact is a plan for a thing rather
+ * than the thing itself. Video Maker's storyboard becomes a movie here.
+ */
+async function finalize(req: RequestRow, mode: ModeDef, artifact: NewArtifact, flags: Flag[]): Promise<void> {
+  if (mode.id === "video" && isVideoConfigured()) {
+    await runMovie(req, artifact, flags);
+    return;
+  }
+  await complete(req, artifact, flags);
+}
+
+/** Progress reporting shared by the long builds: serialized writes plus a live-feed push. */
+function progressReporter(req: RequestRow) {
+  let writeChain: Promise<unknown> = Promise.resolve();
+  return {
+    report: (steps: ForgeStep[]) => {
+      writeChain = writeChain.then(() => store.setProgress(req.id, steps)).catch(() => {});
+      publish(req.class_id, { type: "request", request: toPublicRequest({ ...req, status: "working", progress: steps }) });
+    },
+    settle: async (steps: ForgeStep[]) => {
+      await writeChain.catch(() => {});
+      await store.setProgress(req.id, steps).catch(() => {});
+    },
+  };
+}
+
+function safeParseBook(content: string): Book | null {
+  try {
+    const b = JSON.parse(content);
+    return b && b.format === "book" && Array.isArray(b.pages) ? (b as Book) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function runBook(req: RequestRow, mode: ModeDef, input: ReturnType<typeof validateInput> & { ok: true }, current: ArtifactRow | null, flags: Flag[]): Promise<void> {
+  const fallbackTitle = input.kind === "create" ? input.values.hero || "My story" : current?.title || "My story";
+  const previous = current ? safeParseBook(current.content) : null;
+  const usr = userPrompt(mode, input, current ? bookTextOnly(current.content) : null);
+  const { report, settle } = progressReporter(req);
+
+  const writing: ForgeStep[] = [{ key: "write", label: "Writing the story", state: "running" }];
+  report(writing);
+  const started = Date.now();
+  const drafted = await writeBookDraft({ mode, user: usr, fallbackTitle });
+  if ("error" in drafted) {
+    writing[0] = { ...writing[0], state: "failed", ms: Date.now() - started };
+    await settle(writing);
+    if (drafted.error === "redirect") {
+      await finish(req, { status: "blocked", message: "That's a grown-up question. Let's ask your facilitator!", flags: [...flags, { layer: "output", category: "redirect" }] });
+    } else if (drafted.error === "filtered") {
+      await finish(req, { status: "blocked", message: KID_MESSAGES.unsafe, flags: [...flags, ...(drafted.flags ?? [{ layer: "content_safety", category: "provider_filter" }])] });
+    } else {
+      await finish(req, { status: "failed", message: KID_MESSAGES.failed, flags: [...flags, { layer: "system", category: "bad_json" }] });
+    }
+    return;
+  }
+  writing[0] = { ...writing[0], state: "done", detail: drafted.draft.title, ms: Date.now() - started };
+  report(writing);
+
+  const built = await buildBook({ requestId: req.id, draft: drafted.draft, previous, onProgress: (steps) => report([...writing, ...steps]) });
+  await settle([...writing, ...built.steps]);
+  if (!built.ok) {
+    await discardMedia(req.id);
+    await finish(req, { status: built.blocked ? "blocked" : "failed", message: built.message, flags: [...flags, ...built.flags] });
+    return;
+  }
+  const hasPictures = Boolean(built.book.cover.image || built.book.pages.some((p) => p.image));
+  await complete(
+    req,
+    {
+      kind: "story",
+      title: built.book.title,
+      content: JSON.stringify(built.book),
+      mime: "application/json",
+      summary: built.book.pages[0]?.text ?? null,
+      // Words alone need no gate; generated pictures always wait for a facilitator.
+      approved: !hasPictures,
+      kidNote: built.kidNote,
+    },
+    [...flags, ...built.flags],
+  );
+}
+
+async function runMovie(req: RequestRow, storyboard: NewArtifact, flags: Flag[]): Promise<void> {
+  let board: Movie;
+  try {
+    board = JSON.parse(storyboard.content);
+  } catch {
+    await complete(req, storyboard, flags);
+    return;
+  }
+  const { report, settle } = progressReporter(req);
+  const built = await buildMovie({
+    requestId: req.id,
+    title: board.title,
+    style: board.style,
+    shots: board.shots,
+    onProgress: report,
+  });
+  await settle(built.steps);
+  if (!built.ok) {
+    await discardMedia(req.id);
+    await finish(req, { status: built.blocked ? "blocked" : "failed", message: built.message, flags: [...flags, ...built.flags] });
+    return;
+  }
+  const hasClips = Boolean(built.movie.movie || built.movie.shots.some((s) => s.clip));
+  await complete(
+    req,
+    { ...storyboard, content: JSON.stringify(built.movie), mime: "application/json", summary: board.shots.map((s) => s.description).join(" "), approved: !hasClips, kidNote: built.kidNote },
+    [...flags, ...built.flags],
+  );
+}
+
 /** Studios whose JSON output gets the critique-and-polish pass. */
-const REFINABLE = new Set(["story", "quest", "robot", "music"]);
+const REFINABLE = new Set(["quest", "robot", "music"]);
 
 /** Enough of the shape for the model to return the same object, corrected. */
 const SCHEMA_HINTS: Record<string, string> = {
-  story: '{"title": string, "panels": [{"narration": string, "dialogue": string} x6], "coverPrompt": string}',
   quest: '{"title": string, "items": [{"text": string, "checkMe": boolean, "sourceHint": string}], "nextIdea": string}',
   robot: '{"name": string, "job": string, "parts": [string], "steps": [string], "code": string, "safetyNote": string}',
   music: '{"title": string, "lyrics": string, "musicPrompt": string, "tip": string}',
@@ -348,10 +480,6 @@ const SCHEMA_HINTS: Record<string, string> = {
  * vague ("a happy tune"), which is the one field a music model actually reads.
  */
 const CRITIQUE_FOCUS: Record<string, string> = {
-  story:
-    "Continuity. Every prop, place and character introduced in one panel must stay consistent in every later panel that refers to it. " +
-    "Anything a character uses must have been established earlier or be plausibly present in the setting. " +
-    "Flag contradictions in where something is, who has it, or what it can do. Flag objects that appear from nowhere.",
   music:
     "The musicPrompt field, which is what a music model performs. It must name a genre, a tempo in words or BPM, the instruments, " +
     "and how the feeling moves from the verse to the chorus. Reject anything vague like 'a happy song'. " +
@@ -373,13 +501,25 @@ function verifyRobotJson(json: string): string[] {
 function projectStateForModel(a: ArtifactRow): string {
   // Images: the model edits the prompt text stored in summary, not the pixels.
   if (a.kind === "image") return JSON.stringify({ prompt: a.summary ?? "" });
-  if (a.kind === "video") {
+  if (a.kind === "audio") {
     try {
       const j = JSON.parse(a.summary ?? "{}");
-      return JSON.stringify(j);
+      return JSON.stringify({ title: j.title, lyrics: j.lyrics, musicPrompt: j.musicPrompt });
     } catch {
-      return JSON.stringify({ videoPrompt: a.summary ?? "" });
+      return a.summary ?? "";
     }
+  }
+  if (a.kind === "video") {
+    // The storyboard without its clips: that is what the model edits.
+    try {
+      const j = JSON.parse(a.content || a.summary || "{}");
+      if (Array.isArray(j.shots)) {
+        return JSON.stringify({ title: j.title, style: j.style, shots: j.shots.map((s: any) => ({ shot: s.shot, description: s.description, seconds: s.seconds, videoPrompt: s.videoPrompt })) });
+      }
+    } catch {
+      /* legacy row */
+    }
+    return JSON.stringify({ title: a.title, style: "cartoon", shots: [], videoPrompt: a.summary ?? "" });
   }
   return a.content;
 }
@@ -499,6 +639,7 @@ async function buildArtifact(
   current: ArtifactRow | null,
   klass: ClassRow,
   flags: Flag[],
+  requestId: number,
 ): Promise<BuildResult> {
   const fallbackTitle = input.kind === "create" ? (input.values.title || input.values.hero || input.values.what || input.values.topic || "My project") : current?.title || "My project";
 
@@ -518,17 +659,6 @@ async function buildArtifact(
       ok: true,
       artifact: { kind: "game", title: gameTitle(html, fallbackTitle), content: hardenGameHtml(html), mime: "text/html", summary: gameSummary(html), approved: true },
     };
-  }
-
-  if (modeId === "story") {
-    const j = extractJson<{ title?: string; panels?: { narration?: string; dialogue?: string }[]; coverPrompt?: string }>(raw);
-    if (!j || !Array.isArray(j.panels) || j.panels.length < 4) return { ok: false, retryable: true, blocked: false, message: KID_MESSAGES.failed, flags: [{ layer: "system", category: "bad_json" }] };
-    const panels = j.panels.slice(0, 6).map((p) => ({ narration: stripLinks(String(p.narration ?? "").slice(0, 200)), dialogue: stripLinks(String(p.dialogue ?? "").slice(0, 120)) }));
-    const text = panels.map((p) => `${p.narration} ${p.dialogue}`).join("\n");
-    const out = await screenOutputText(text);
-    if (!out.ok) return { ok: false, retryable: false, blocked: true, message: out.kidMessage, flags: out.flags };
-    const content = JSON.stringify({ title: String(j.title ?? fallbackTitle).slice(0, 60), panels, coverPrompt: String(j.coverPrompt ?? "").slice(0, 300) });
-    return { ok: true, artifact: { kind: "story", title: String(j.title ?? fallbackTitle).slice(0, 60), content, mime: "application/json", summary: panels[0]?.narration ?? null, approved: true } };
   }
 
   if (modeId === "quest") {
@@ -591,10 +721,11 @@ async function buildArtifact(
       };
     }
     try {
-      const media = await generateMusic(musicPrompt, 45);
+      const media = await generateMusic(musicPrompt, 45, lyrics);
+      const ref = await putMedia(requestId, "song.mp3", Buffer.from(media.base64, "base64"), media.mime);
       return {
         ok: true,
-        artifact: { kind: "audio", title, content: media.base64, mime: media.mime, summary: sheet, approved: false,
+        artifact: { kind: "audio", title, content: ref, mime: media.mime, summary: sheet, approved: false,
           kidNote: tip || "Your song is ready. Your facilitator will listen, then play it for everyone." },
       };
     } catch (err) {
@@ -610,27 +741,26 @@ async function buildArtifact(
   }
 
   if (modeId === "video") {
-    const j = extractJson<{ title?: string; shots?: { shot?: number; description?: string; seconds?: number }[]; videoPrompt?: string }>(raw);
-    if (!j || !Array.isArray(j.shots) || !j.videoPrompt) return { ok: false, retryable: true, blocked: false, message: KID_MESSAGES.failed, flags: [{ layer: "system", category: "bad_json" }] };
-    const shots = j.shots.slice(0, 4).map((x, i) => ({ shot: i + 1, description: stripLinks(String(x.description ?? "").slice(0, 200)), seconds: Number(x.seconds) || 2 }));
-    const videoPrompt = stripLinks(String(j.videoPrompt).slice(0, 400));
-    const out = await screenOutputText([...shots.map((x) => x.description), videoPrompt].join("\n"));
+    const j = extractJson<{ title?: string; style?: string; shots?: { shot?: number; description?: string; seconds?: number; videoPrompt?: string }[]; videoPrompt?: string }>(raw);
+    if (!j || !Array.isArray(j.shots) || j.shots.length < 1) return { ok: false, retryable: true, blocked: false, message: KID_MESSAGES.failed, flags: [{ layer: "system", category: "bad_json" }] };
+    const shots = j.shots.slice(0, aikConfig.videoShots).map((x, i) => ({
+      shot: i + 1,
+      description: stripLinks(String(x.description ?? "").slice(0, 200)),
+      seconds: aikConfig.videoShotSeconds,
+      // Older replies carried one prompt for the whole film; use it for every shot.
+      videoPrompt: stripLinks(String(x.videoPrompt ?? j.videoPrompt ?? x.description ?? "").slice(0, 400)),
+    }));
+    const chosen = input.kind === "create" ? input.values.style : undefined;
+    const style = stripLinks(String(j.style ?? chosen ?? "cartoon").slice(0, 60));
+    const out = await screenOutputText([j.title, style, ...shots.flatMap((x) => [x.description, x.videoPrompt])].join("\n"));
     if (!out.ok) return { ok: false, retryable: false, blocked: true, message: out.kidMessage, flags: out.flags };
     const title = String(j.title ?? fallbackTitle).slice(0, 60);
-    const storyboard = JSON.stringify({ title, shots, videoPrompt });
-    if (!isVideoConfigured()) {
-      // No video provider yet: the storyboard itself is the artifact (still a great lesson).
-      return { ok: true, artifact: { kind: "video", title, content: "", mime: "text/plain", summary: storyboard, approved: true, kidNote: "Here's your storyboard! Video clips aren't switched on for this class yet." } };
-    }
-    try {
-      const media = await generateVideo(videoPrompt);
-      // Videos always wait for the facilitator.
-      return { ok: true, artifact: { kind: "video", title, content: media.base64, mime: media.mime, summary: storyboard, approved: false, kidNote: "Your storyboard is ready. The clip is waiting for your facilitator." } };
-    } catch (err) {
-      if (err instanceof ContentFilteredError) return { ok: false, retryable: false, blocked: true, message: KID_MESSAGES.unsafe, flags: [{ layer: "content_safety", category: "provider_filter" }] };
-      logger.error({ err }, "[aik] video generation failed");
-      return { ok: true, artifact: { kind: "video", title, content: "", mime: "text/plain", summary: storyboard, approved: true, kidNote: "Here's your storyboard! The clip didn't come out this time; try once more later." } };
-    }
+    const storyboard: Movie = { format: "movie", title, style, shots, madeWith: { shots: false, narration: false, cut: false } };
+    // The storyboard is the artifact; finalize() turns it into a movie when a video model is switched on.
+    return {
+      ok: true,
+      artifact: { kind: "video", title, content: JSON.stringify(storyboard), mime: "application/json", summary: shots.map((x) => x.description).join(" "), approved: true, kidNote: "Here's your storyboard! Video clips aren't switched on for this class yet." },
+    };
   }
 
   // prompt (image)
@@ -654,7 +784,8 @@ async function buildArtifact(
       return { ok: false, retryable: false, blocked: true, message: KID_MESSAGES.unavailable, flags: [{ layer: "system", category: "content_safety_not_configured" }] };
     }
     // Images always wait for the facilitator (approved: false).
-    return { ok: true, artifact: { kind: "image", title: fallbackTitle, content: media.base64, mime: media.mime, summary: promptText, approved: false, kidNote: tip } };
+    const ref = await putMedia(requestId, "picture.png", Buffer.from(media.base64, "base64"), media.mime);
+    return { ok: true, artifact: { kind: "image", title: fallbackTitle, content: ref, mime: media.mime, summary: promptText, approved: false, kidNote: tip } };
   } catch (err) {
     if (err instanceof ContentFilteredError) return { ok: false, retryable: false, blocked: true, message: KID_MESSAGES.unsafe, flags: [{ layer: "content_safety", category: "provider_filter" }] };
     // Log the provider's own words: an image failure is nearly always a wrong

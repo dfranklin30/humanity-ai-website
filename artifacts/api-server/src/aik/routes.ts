@@ -19,6 +19,9 @@ import { logger } from "../lib/logger";
 import { publicModes, getMode } from "./modes";
 import { runRequest, stashPhoto, subscribe, publish, toPublicRequest, toChildRequest, toPublicClass } from "./pipeline";
 import { KID_MESSAGES, contentSafetyImage } from "./safety";
+import { getMedia, referencedNames } from "./media";
+import { bookNarrationText, type Book } from "./book";
+import { renderBookPdf } from "./bookpdf";
 
 declare module "express-session" {
   interface SessionData {
@@ -992,7 +995,7 @@ export function registerAikRoutes(app: Express): void {
       let text = "";
       try {
         const j = JSON.parse(a.content);
-        if (a.kind === "story") text = [j.title, ...(j.panels ?? []).map((p: any) => `${p.narration} ${p.dialogue}`)].join(". ");
+        if (a.kind === "story") text = j.format === "book" ? bookNarrationText(j as Book) : [j.title, ...(j.panels ?? []).map((p: any) => `${p.narration} ${p.dialogue}`)].join(". ");
         else if (a.kind === "quest") text = [j.title, ...(j.items ?? []).map((i: any) => i.text)].join(". ");
         else if (a.kind === "robot") text = [j.name, j.job, ...(j.steps ?? [])].join(". ");
         else if (a.kind === "chat") text = (j.turns ?? []).slice(-1).map((t: any) => t.text).join(" ");
@@ -1251,25 +1254,115 @@ export function registerAikRoutes(app: Express): void {
 
   /* ---------------- Artifact content (child in class, or owning facilitator) ---------------- */
 
+  /**
+   * Who may see an artifact: its own child, any child in the class once it
+   * is approved and published, or the facilitator who runs the class. One
+   * answer for the JSON, the media files and the PDF, so the three can never
+   * disagree.
+   */
+  async function artifactAccess(req: Request, res: Response): Promise<store.ArtifactRow | null> {
+    const a = await store.getArtifact(Number(req.params.aid));
+    if (!a) {
+      res.status(404).json({ error: "Not found." });
+      return null;
+    }
+    let allowed = false;
+    const cs = req.session.aikChild;
+    if (cs && Date.now() - cs.at <= aikConfig.childSessionMinutes * 60_000 && cs.classId === a.class_id) {
+      allowed = a.child_id === cs.id || (a.published && a.approved);
+    }
+    const fs = req.session.aikFacilitator;
+    if (!allowed && fs) {
+      const f = await store.getFacilitator(fs.id);
+      const klass = await store.getClass(a.class_id);
+      allowed = Boolean(f && klass && (klass.facilitator_id === f.id || f.is_admin));
+    }
+    if (!allowed) {
+      res.status(404).json({ error: "Not found." });
+      return null;
+    }
+    if (!a.approved && !fs) {
+      res.status(423).json({ error: "Waiting for your facilitator." });
+      return null;
+    }
+    return a;
+  }
+
+  /* A picture, clip or recording that belongs to an artifact. Served only when
+   * the artifact itself references that exact file, so a guessed name finds
+   * nothing even inside the same class. */
+  app.get(
+    `${base}/artifacts/:aid/media/:dir/:file`,
+    wrap(async (req, res) => {
+      const a = await artifactAccess(req, res);
+      if (!a) return;
+      const name = `${req.params.dir}/${req.params.file}`;
+      if (!referencedNames(a.content, a.summary).has(name)) return void res.status(404).json({ error: "Not found." });
+      const m = await getMedia(`aik://${name}`);
+      if (!m) return void res.status(404).json({ error: "Not found." });
+      res.setHeader("Cache-Control", "private, max-age=3600");
+      res.setHeader("Content-Type", m.mime);
+      res.setHeader("Content-Length", String(m.bytes.length));
+      res.end(m.bytes);
+    }),
+  );
+
+  /* The finished thing as a file: a song, a movie or a picture to keep. */
+  app.get(
+    `${base}/artifacts/:aid/download`,
+    wrap(async (req, res) => {
+      const a = await artifactAccess(req, res);
+      if (!a) return;
+      let ref = a.content;
+      let ext = a.mime.includes("mpeg") ? "mp3" : a.mime.includes("mp4") ? "mp4" : a.mime.includes("png") ? "png" : "bin";
+      if (a.kind === "video" && a.mime === "application/json") {
+        try {
+          const j = JSON.parse(a.content);
+          ref = j.movie || j.shots?.find((s: any) => s.clip)?.clip || "";
+          ext = "mp4";
+        } catch {
+          ref = "";
+        }
+      }
+      if (!ref || (!ref.startsWith("aik://") && !ref.startsWith("data:"))) return void res.status(404).json({ error: "Nothing to download yet." });
+      const m = await getMedia(ref);
+      if (!m) return void res.status(404).json({ error: "Not found." });
+      const safeName = a.title.replace(/[^a-z0-9 _-]/gi, "").trim().slice(0, 60) || "my-project";
+      res.setHeader("Content-Type", m.mime);
+      res.setHeader("Content-Disposition", `attachment; filename="${safeName}.${ext}"`);
+      res.setHeader("Cache-Control", "private, no-store");
+      res.end(m.bytes);
+    }),
+  );
+
+  /* A storybook as a PDF, built from the approved pictures on request. */
+  app.get(
+    `${base}/artifacts/:aid/book.pdf`,
+    wrap(async (req, res) => {
+      const a = await artifactAccess(req, res);
+      if (!a) return;
+      let book: Book | null = null;
+      try {
+        const j = JSON.parse(a.content);
+        if (j?.format === "book") book = j;
+      } catch {
+        /* not a book */
+      }
+      if (!book) return void res.status(404).json({ error: "This isn't a picture book." });
+      const bytes = await renderBookPdf(book);
+      const safeName = book.title.replace(/[^a-z0-9 _-]/gi, "").trim().slice(0, 60) || "my-book";
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `inline; filename="${safeName}.pdf"`);
+      res.setHeader("Cache-Control", "private, no-store");
+      res.end(Buffer.from(bytes));
+    }),
+  );
+
   app.get(
     `${base}/artifacts/:aid`,
     wrap(async (req, res) => {
-      const a = await store.getArtifact(Number(req.params.aid));
-      if (!a) return void res.status(404).json({ error: "Not found." });
-
-      let allowed = false;
-      const cs = req.session.aikChild;
-      if (cs && Date.now() - cs.at <= aikConfig.childSessionMinutes * 60_000 && cs.classId === a.class_id) {
-        allowed = a.child_id === cs.id || (a.published && a.approved);
-      }
-      const fs = req.session.aikFacilitator;
-      if (!allowed && fs) {
-        const f = await store.getFacilitator(fs.id);
-        const klass = await store.getClass(a.class_id);
-        allowed = Boolean(f && klass && (klass.facilitator_id === f.id || f.is_admin));
-      }
-      if (!allowed) return void res.status(404).json({ error: "Not found." });
-      if (!a.approved && !fs) return void res.status(423).json({ error: "Waiting for your facilitator." });
+      const a = await artifactAccess(req, res);
+      if (!a) return;
 
       const { content, ...meta } = a;
       // Games are always delivered as text inside JSON for the sandboxed srcdoc iframe — never as a top-level page.

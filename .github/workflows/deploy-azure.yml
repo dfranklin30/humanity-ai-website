@@ -4,7 +4,9 @@
 # Trigger: every push to `main` (or run manually from the Actions tab).
 # Steps:  sync media/training-videos → Blob Storage
 #         → build the Docker image → push to Azure Container Registry
-#         → point the `humanity-ai` Container App at the new image.
+#         → point the `humanity-ai` Container App at the new image
+#         → point the `aiforkids` Container App (the kids platform, same
+#           image, APP_ROLE=kids) at it too, when that app exists.
 #
 # Auth: federated (OIDC) - no secret stored in GitHub.
 # One-time setup is documented in deploy/AZURE_RUNBOOK.md.
@@ -30,6 +32,7 @@ env:
   ACR_NAME: acrhumanityplusai
   IMAGE_NAME: humanity-ai
   CONTAINER_APP: humanity-ai
+  KIDS_CONTAINER_APP: aiforkids
   SUBSCRIPTION_ID: 33680346-29fc-4366-845d-a04681b59a52
   STORAGE_ACCOUNT: sthumanityplusai
   VIDEO_CONTAINER: training-videos
@@ -141,6 +144,28 @@ jobs:
           FQDN=$(az containerapp show -n "$CONTAINER_APP" -g "$AZURE_RESOURCE_GROUP" \
                   --query properties.configuration.ingress.fqdn -o tsv)
           echo "Deployed → https://$FQDN"
+
+      - name: Update the kids platform
+        # Same image, second app. Skipped cleanly until the app is created
+        # (see deploy/AZURE_RUNBOOK.md, "The kids platform").
+        run: |
+          if ! az containerapp show -n "$KIDS_CONTAINER_APP" -g "$AZURE_RESOURCE_GROUP" --output none 2>/dev/null; then
+            echo "No $KIDS_CONTAINER_APP app yet; skipping"; exit 0
+          fi
+          az containerapp update \
+            --name "$KIDS_CONTAINER_APP" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --image "${{ steps.meta.outputs.image }}" \
+            --revision-suffix "r${{ steps.meta.outputs.tag }}" \
+            --output none
+          FQDN=$(az containerapp show -n "$KIDS_CONTAINER_APP" -g "$AZURE_RESOURCE_GROUP" \
+                  --query properties.configuration.ingress.fqdn -o tsv)
+          for i in $(seq 1 12); do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://$FQDN/api/aik/config" || true)
+            if [ "$CODE" = "200" ]; then echo "OK: kids platform /api/aik/config returned 200"; exit 0; fi
+            echo "Attempt $i: got $CODE, waiting..."; sleep 10
+          done
+          echo "Kids platform did not return 200 after deploy"; exit 1
 
       - name: Smoke test
         run: |

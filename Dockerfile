@@ -31,6 +31,13 @@ FROM node:24-slim AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 
+# ffmpeg is the Kids AI Studio's cutting room: Video Maker's shots, title card
+# and narration become one movie here. Without it the Studio still runs and
+# delivers the shots one by one (see src/aik/ffmpeg.ts).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
 # Only the two packages the server bundle loads at runtime (native/dynamic deps)
 RUN npm install --omit=dev --no-audit --no-fund sharp@0.35.3 nodemailer@9.0.3
 

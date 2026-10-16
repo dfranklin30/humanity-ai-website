@@ -109,14 +109,14 @@ export const MODES: Record<ModeId, ModeDef> = {
     id: "story",
     name: "Story Maker",
     emoji: "📚",
-    tagline: "Your comic script, six panels, ready to draw.",
-    blurb: "Give a hero, a place and a problem. Get a six-panel comic script you draw yourself, plus a cover picture idea.",
+    tagline: "A real picture book: your story, drawn and read aloud.",
+    blurb: "Give a hero, a place and a problem. Get a six-page picture book with a cover, a picture on every page and a voice that reads it to you. Your facilitator looks at the pictures first.",
     artifactKind: "story",
     interaction: "both",
     chatGreeting: "I'm your story helper. Stuck on an ending? Want a funnier villain? Ask away!",
     chatPlaceholder: "How could my dragon solve the problem?",
     tier: "default",
-    needsApproval: false,
+    needsApproval: true,
     createFields: [
       { key: "hero", label: "Hero", hint: "a shy dragon, a pancake, a kid inventor", required: true },
       { key: "place", label: "Place", hint: "a treehouse, the moon, a noisy kitchen", required: true },
@@ -124,7 +124,7 @@ export const MODES: Record<ModeId, ModeDef> = {
       { key: "ending", label: "How it ends", hint: "happy, funny, surprising…", required: false },
       { key: "detail", label: "One surprising detail", hint: "the dragon is afraid of butterflies", required: false },
     ],
-    changeHint: "Rewrite one panel, change the ending, make it funnier, add a twist…",
+    changeHint: "Change the ending, make page 3 funnier, add a twist, give the hero a hat…",
     maxTokens: 4000,
     temperature: 0.8,
     starters: [
@@ -214,8 +214,8 @@ export const MODES: Record<ModeId, ModeDef> = {
     id: "video",
     name: "Video Maker",
     emoji: "🎬",
-    tagline: "Storyboard a tiny movie. Watch a clip come to life.",
-    blurb: "Plan three shots for a five-second movie. The helper writes the storyboard and makes a short clip your facilitator approves.",
+    tagline: "Plan three shots. Get a real movie with a title and a voice.",
+    blurb: "Plan three shots for a short movie. The helper writes the storyboard, films each shot, adds a title card and narration, and cuts it into one movie your facilitator approves.",
     artifactKind: "video",
     interaction: "form",
     createFields: [
@@ -230,8 +230,8 @@ export const MODES: Record<ModeId, ModeDef> = {
     maxTokens: 2500,
     temperature: 0.7,
     starters: [
-      { label: "Seed to flower", values: { shots: "three", subject: "a robot gardener", action: "plants a seed and it grows into a sunflower" } },
-      { label: "Paper boat", values: { shots: "three", subject: "a small paper boat", action: "sails down a rainy gutter and reaches a puddle sea" } },
+      { label: "Seed to flower", values: { title: "The Robot Gardener", what: "a round friendly robot with a watering can", action: "plants a seed and it grows into a giant sunflower", where: "a rooftop garden at sunrise", style: "claymation" } },
+      { label: "Paper boat", values: { title: "Paper Boat Voyage", what: "a small white paper boat", action: "sails down a rainy gutter and reaches a puddle sea", where: "a city street in the rain", style: "watercolor" } },
     ],
     needsApproval: true,
   },
@@ -347,11 +347,12 @@ export function validateInput(mode: ModeDef, kind: string, raw: any, opts?: { st
 export function systemPrompt(mode: ModeDef, opts: { soundEnabled: boolean }): string {
   switch (mode.id) {
     case "video":
-      return `You plan tiny animated movies for children who will then see a short generated clip.${COMMON_RULES}
+      return `You plan tiny animated movies for children. Each shot you plan is filmed separately by a text-to-video model, then the shots are cut together behind a title card with a narrator reading your descriptions.${COMMON_RULES}
 OUTPUT FORMAT: reply with ONLY a JSON object, no markdown fences:
-{"title": string, "shots": [{"shot": 1, "description": string, "seconds": number} x3], "videoPrompt": string}
-- Three shots, about 5 seconds total, each description one sentence a child can picture.
-- videoPrompt: ONE sentence (max 45 words) for a text-to-video model: subject, action, setting, art style, "bright colors, no text, no real people, kid-friendly". No camera jargon.`;
+{"title": string, "style": string, "shots": [{"shot": 1, "description": string, "seconds": 4, "videoPrompt": string} x3]}
+- style: the look the child chose, in a few words the video model understands (e.g. "soft claymation", "bright flat cartoon", "paper cut-out stop motion", "chunky pixel art", "loose watercolor animation").
+- Exactly three shots that tell a tiny story in order: setting, action, happy ending. Each description is ONE sentence a child can picture and a narrator can read aloud (max 20 words).
+- Each videoPrompt is ONE sentence (max 45 words) for the video model for THAT shot only: the same subject described the same way every time (colours, shape, one signature detail), what it does, where, the mood. Steady, simple motion. No camera jargon, no text on screen, no real people.`;
     case "robot":
       return `You are a friendly robotics mentor for children aged 8–11 using micro:bit-style kits, LEGO, cardboard and hobby servos.${COMMON_RULES}
 SAFETY: batteries only (never mains power), no soldering, no cutting tools without a grown-up, no drones/blades/projectiles, no chemicals. Say so in safetyNote.
@@ -431,11 +432,9 @@ OUTPUT FORMAT:
 - Make the game genuinely playable: things fall or move, the hero collects and dodges, difficulty rises gently.
 - Include the game title at the top of the page. Put a one-line HTML comment at the very top of the <body>: <!-- SUMMARY: one short sentence describing the game for a child -->`;
     case "story":
-      return `You are a comic-script helper for children who will draw the panels themselves.${COMMON_RULES}
-OUTPUT FORMAT: reply with ONLY a JSON object, no markdown fences:
-{"title": string, "panels": [{"narration": string, "dialogue": string} x6], "coverPrompt": string}
-- narration: one sentence (max 22 words). dialogue: one short line (max 12 words). Exactly six panels. The ending is hopeful or funny.
-- coverPrompt: one sentence describing a cover picture (who or what, where, mood, colors) with no people, no text, no real characters.`;
+      // Story Maker's prompt lives with the rest of the book pipeline in book.ts
+      // (bookSystemPrompt); the pipeline routes "story" there before reaching here.
+      return `You write short illustrated picture books for children.${COMMON_RULES}`;
     case "prompt":
       return `You teach children to write picture descriptions with specific details.${COMMON_RULES}
 The child gives: who or what, where, mood or colors, art style. Assemble ONE clear picture description of at most 45 words that an image model can draw. Always add "no text, no real people, kid-friendly" at the end. Do not add violent, scary, or romantic elements even if implied.
@@ -479,6 +478,7 @@ YOUR JOB: talk only about ${focus[mode.id] ?? "the child's creative project"}. K
 
 export function userPrompt(mode: ModeDef, input: ValidatedInput & { ok: true }, currentContent: string | null): string {
   if (input.kind === "create") {
+    if (mode.id === "story") return `The director's order for a new picture book:\n${input.text}\n\nWrite it now.`;
     return `The director's order for a new ${mode.name} project:\n${input.text}\n\nMake it now.`;
   }
   if (input.kind === "chat") return input.message;

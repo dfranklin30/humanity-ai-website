@@ -84,6 +84,39 @@ export type ArtifactMeta = {
 };
 export type Artifact = ArtifactMeta & { content: string };
 
+/**
+ * Media references inside an artifact come in three shapes: a stored file
+ * (`aik://r12/cover.png`, served through the API with the artifact's own
+ * access check), an inline data URI (no media store configured), or, from
+ * before the media store existed, bare base64 in `content`. This turns any of
+ * them into something an <img>, <audio> or <video> can load.
+ */
+export function mediaSrc(artifactId: number, ref: string | undefined | null, mime?: string): string | undefined {
+  if (!ref) return undefined;
+  if (ref.startsWith("aik://")) return `/api/aik/artifacts/${artifactId}/media/${ref.slice(6)}`;
+  if (ref.startsWith("data:")) return ref;
+  if (mime && /^[A-Za-z0-9+/=\s]+$/.test(ref.slice(0, 64))) return `data:${mime};base64,${ref}`;
+  return undefined;
+}
+export const downloadUrl = (artifactId: number) => `/api/aik/artifacts/${artifactId}/download`;
+export const bookPdfUrl = (artifactId: number) => `/api/aik/artifacts/${artifactId}/book.pdf`;
+
+/** A finished picture book, as Story Maker stores it. */
+export type BookPage = { n: number; text: string; scene: string; image?: string; audio?: string };
+export type Book = {
+  format: "book";
+  title: string;
+  hero: { name: string; look: string };
+  style: string;
+  cover: { scene: string; image?: string };
+  pages: BookPage[];
+  theEnd: string;
+  madeWith: { text: boolean; pictures: boolean; narration: boolean };
+};
+/** A finished movie, as Video Maker stores it. */
+export type MovieShot = { shot: number; description: string; seconds: number; videoPrompt: string; clip?: string };
+export type Movie = { format: "movie"; title: string; style: string; shots: MovieShot[]; movie?: string; narration?: string; madeWith: { shots: boolean; narration: boolean; cut: boolean } };
+
 export type PublicClass = {
   id: number;
   name: string;

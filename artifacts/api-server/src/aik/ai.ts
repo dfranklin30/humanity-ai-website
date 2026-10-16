@@ -13,7 +13,7 @@
  * facilitator approval before a child sees anything.
  */
 import { AzureOpenAI } from "openai";
-import { aikConfig, isImageConfigured, isMusicConfigured, isTextConfigured, isTtsConfigured, isVideoConfigured, textProviderConfigured, type TextProviderId } from "./config";
+import { aikConfig, isImageConfigured, isMusicConfigured, isTextConfigured, isTtsConfigured, isVideoConfigured, textProviderConfigured, textFallbackProvider, type TextProviderId } from "./config";
 import { logger } from "../lib/logger";
 
 export class ContentFilteredError extends Error {
@@ -56,22 +56,61 @@ function messagesOf(opts: TextCallOptions): ChatTurn[] {
   return [{ role: "user", content: opts.user ?? "" }];
 }
 
+/**
+ * One text call, with a second provider behind the first.
+ *
+ * A single model deployment is a single point of failure for every studio
+ * at once: a regional outage or a quota hit on it turns a classroom of
+ * children into a classroom of spinners. So when the primary provider fails
+ * for a reason that has nothing to do with the request — a 5xx, a 429, a
+ * timeout, a network error — the same prompt goes once to the fallback.
+ *
+ * A content refusal is not retried anywhere. That is a screening decision,
+ * and a second model's opinion of a blocked request is not wanted.
+ */
 export async function completeText(opts: TextCallOptions): Promise<string> {
   if (aikConfig.mockAI) return mockText(opts);
   const provider: TextProviderId = opts.tier === "oss" ? aikConfig.providers.ossText : aikConfig.providers.text;
   if (!textProviderConfigured(provider)) throw new Error(`Text provider "${provider}" not configured`);
+  try {
+    return await completeWith(provider, opts);
+  } catch (err) {
+    if (err instanceof ContentFilteredError) throw err;
+    const fallback = textFallbackProvider(provider);
+    if (!fallback) throw err;
+    logger.warn({ err: String((err as Error)?.message ?? err).slice(0, 200), provider, fallback }, "[aik] text provider failed; trying fallback");
+    return completeWith(fallback, opts);
+  }
+}
+
+async function completeWith(provider: TextProviderId, opts: TextCallOptions): Promise<string> {
   if (provider === "anthropic") return completeAnthropic(opts);
   if (provider === "oss") return completeOpenAICompatible(opts, aikConfig.oss.baseUrl, aikConfig.oss.apiKey, aikConfig.oss.model, "oss");
   return completeAzureOpenAI(opts);
 }
 
+/** Split a data URI into what the Anthropic and OpenAI image blocks need. */
+function parseDataUri(uri: string): { mime: string; data: string } | null {
+  const m = /^data:([^;,]+);base64,(.+)$/s.exec(uri);
+  return m ? { mime: m[1], data: m[2] } : null;
+}
+
 async function completeAnthropic(opts: TextCallOptions): Promise<string> {
   const started = Date.now();
   const model = opts.tier === "fast" ? aikConfig.anthropic.fastModel : aikConfig.anthropic.model;
+  const turns = messagesOf(opts);
+  // The photo rides on the newest user turn. Claude reads images as content
+  // blocks, so that one turn becomes [image, text] and the others stay plain.
+  const photo = opts.photoDataUri ? parseDataUri(opts.photoDataUri) : null;
+  const messages = turns.map((t, i) =>
+    photo && i === turns.length - 1 && t.role === "user"
+      ? { role: "user", content: [{ type: "image", source: { type: "base64", media_type: photo.mime, data: photo.data } }, { type: "text", text: t.content }] }
+      : t,
+  );
   const res = await fetchWithTimeout("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "content-type": "application/json", "x-api-key": aikConfig.anthropic.apiKey, "anthropic-version": aikConfig.anthropic.apiVersion },
-    body: JSON.stringify({ model, max_tokens: opts.maxTokens, temperature: opts.temperature, system: opts.system, messages: messagesOf(opts) }),
+    body: JSON.stringify({ model, max_tokens: opts.maxTokens, temperature: opts.temperature, system: opts.system, messages }),
   }, 90_000);
   if (!res.ok) throw new Error(`Anthropic ${res.status}: ${(await res.text().catch(() => "")).slice(0, 300)}`);
   const data: any = await res.json();
@@ -102,11 +141,26 @@ async function completeOpenAICompatible(opts: TextCallOptions, baseUrl: string, 
   return choice?.message?.content ?? "";
 }
 
-let azureClient: AzureOpenAI | null = null;
-function azure(): AzureOpenAI {
+let azureClient: Promise<AzureOpenAI> | null = null;
+/**
+ * Azure OpenAI client. With AIK_AZURE_USE_IDENTITY=true the Container App's
+ * managed identity signs every call (role: Cognitive Services OpenAI User)
+ * and there is no key to rotate, leak or paste into an env var.
+ */
+function azure(): Promise<AzureOpenAI> {
   if (!azureClient) {
-    const a = aikConfig.azureOpenAI;
-    azureClient = new AzureOpenAI({ endpoint: a.endpoint, apiKey: a.apiKey, apiVersion: a.apiVersion });
+    azureClient = (async () => {
+      const a = aikConfig.azureOpenAI;
+      if (a.useIdentity && !a.apiKey) {
+        const { DefaultAzureCredential, getBearerTokenProvider } = await import("@azure/identity");
+        const azureADTokenProvider = getBearerTokenProvider(new DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default");
+        return new AzureOpenAI({ endpoint: a.endpoint, azureADTokenProvider, apiVersion: a.apiVersion });
+      }
+      return new AzureOpenAI({ endpoint: a.endpoint, apiKey: a.apiKey, apiVersion: a.apiVersion });
+    })();
+    azureClient.catch(() => {
+      azureClient = null;
+    });
   }
   return azureClient;
 }
@@ -122,7 +176,7 @@ async function completeAzureOpenAI(opts: TextCallOptions): Promise<string> {
           : t,
       )
     : turns;
-  const res = await azure().chat.completions.create({
+  const res = await (await azure()).chat.completions.create({
     model: aikConfig.azureOpenAI.textDeployment,
     messages: [{ role: "system", content: opts.system }, ...withPhoto] as any,
     max_completion_tokens: opts.maxTokens,
@@ -140,17 +194,35 @@ async function completeAzureOpenAI(opts: TextCallOptions): Promise<string> {
 
 export type MediaResult = { base64: string; mime: string; provider: string; model: string };
 
-export async function generateImage(prompt: string): Promise<MediaResult> {
+export type ImageOptions = {
+  /**
+   * A PNG (base64) the new picture should stay faithful to: the same hero,
+   * the same palette, the same style. Used for every page of a storybook
+   * after the cover, so a child's dragon does not change colour on page 3.
+   * Providers that cannot take a reference fall back to the text prompt.
+   */
+  reference?: string;
+  size?: "1024x1024" | "1536x1024" | "1024x1536";
+};
+
+export async function generateImage(prompt: string, options: ImageOptions = {}): Promise<MediaResult> {
   if (aikConfig.mockAI) return { base64: MOCK_PNG, mime: "image/png", provider: "mock", model: "mock" };
   if (!isImageConfigured()) throw new Error("Image provider not configured");
+  if (options.reference && aikConfig.imageReference && aikConfig.providers.image === "oss") {
+    try {
+      return await editImageOpenAICompatible(prompt, options.reference, options.size ?? "1024x1024");
+    } catch (err) {
+      logger.warn({ err: String((err as Error)?.message ?? err).slice(0, 300) }, "[aik] reference image edit failed; generating from text");
+    }
+  }
   if (aikConfig.providers.image === "fal") {
     const data = await falRun(aikConfig.fal.imageModel, { prompt, image_size: "square_hd", num_images: 1, enable_safety_checker: true });
     const url = data?.images?.[0]?.url;
     if (!url) throw new Error("fal: no image returned");
     return { ...(await download(url)), provider: "fal", model: aikConfig.fal.imageModel };
   }
-  if (aikConfig.providers.image === "oss") return generateImageOpenAICompatible(prompt);
-  const res = await azure().images.generate({ model: aikConfig.azureOpenAI.imageDeployment, prompt, n: 1, size: "1024x1024" });
+  if (aikConfig.providers.image === "oss") return generateImageOpenAICompatible(prompt, options.size ?? "1024x1024");
+  const res = await (await azure()).images.generate({ model: aikConfig.azureOpenAI.imageDeployment, prompt, n: 1, size: options.size ?? "1024x1024" });
   const b64 = res.data?.[0]?.b64_json;
   if (!b64) throw new Error("Azure: no image returned");
   return { base64: b64, mime: "image/png", provider: "azure", model: aikConfig.azureOpenAI.imageDeployment };
@@ -161,7 +233,7 @@ export async function generateImage(prompt: string): Promise<MediaResult> {
  * Covers Azure AI Foundry (FLUX.1 and friends) and any self-hosted equivalent.
  * Accepts either a base64 payload or a URL in the response, since hosts differ.
  */
-async function generateImageOpenAICompatible(prompt: string): Promise<MediaResult> {
+async function generateImageOpenAICompatible(prompt: string, size: string): Promise<MediaResult> {
   const { imageBaseUrl, imageApiKey, imageModel } = aikConfig.oss;
   const res = await fetchWithTimeout(
     `${imageBaseUrl}/images/generations`,
@@ -172,23 +244,51 @@ async function generateImageOpenAICompatible(prompt: string): Promise<MediaResul
         authorization: `Bearer ${imageApiKey}`,
         "api-key": imageApiKey,
       },
-      body: JSON.stringify({ model: imageModel, prompt, n: 1, size: "1024x1024" }),
+      body: JSON.stringify({ model: imageModel, prompt, n: 1, size }),
     },
     aikConfig.mediaTimeoutMs,
   );
   if (!res.ok) throw new Error(`OSS image ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
-  const data: any = await res.json();
+  return imageFromResponse(await res.json(), imageModel);
+}
+
+/**
+ * Image-to-image through the OpenAI-compatible edits endpoint (FLUX.2 on
+ * Azure AI Foundry takes reference images this way). The reference is the
+ * book's cover; the prompt describes the new page. The model keeps the
+ * character and the look and changes the scene.
+ */
+async function editImageOpenAICompatible(prompt: string, referencePngBase64: string, size: string): Promise<MediaResult> {
+  const { imageBaseUrl, imageApiKey, imageModel } = aikConfig.oss;
+  const form = new FormData();
+  form.append("model", imageModel);
+  form.append("prompt", prompt);
+  form.append("n", "1");
+  form.append("size", size);
+  form.append("image", new Blob([Buffer.from(referencePngBase64, "base64")], { type: "image/png" }), "reference.png");
+  const res = await fetchWithTimeout(
+    `${imageBaseUrl}/images/edits`,
+    { method: "POST", headers: { authorization: `Bearer ${imageApiKey}`, "api-key": imageApiKey }, body: form },
+    aikConfig.mediaTimeoutMs,
+  );
+  if (!res.ok) throw new Error(`OSS image edit ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
+  return imageFromResponse(await res.json(), imageModel);
+}
+
+async function imageFromResponse(data: any, model: string): Promise<MediaResult> {
   const item = data?.data?.[0];
   const b64 = item?.b64_json;
-  if (b64) return { base64: b64, mime: "image/png", provider: "oss", model: imageModel };
-  if (item?.url) return { ...(await download(item.url)), provider: "oss", model: imageModel };
+  if (b64) return { base64: b64, mime: "image/png", provider: "oss", model };
+  if (item?.url) return { ...(await download(item.url)), provider: "oss", model };
   throw new Error("OSS image: no image returned");
 }
 
-export async function generateVideo(prompt: string): Promise<MediaResult> {
+export type VideoOptions = { seconds?: number; size?: string };
+
+export async function generateVideo(prompt: string, options: VideoOptions = {}): Promise<MediaResult> {
   if (aikConfig.mockAI) return { base64: MOCK_MP4, mime: "video/mp4", provider: "mock", model: "mock" };
   if (!isVideoConfigured()) throw new Error("Video provider not configured");
-  if (aikConfig.providers.video === "oss") return generateVideoJobApi(prompt);
+  if (aikConfig.providers.video === "oss") return generateVideoJobApi(prompt, options);
   const data = await falRun(aikConfig.fal.videoModel, { prompt, negative_prompt: "scary, violent, blood, weapons, text, watermark, realistic people", aspect_ratio: "16:9" });
   const url = data?.video?.url ?? data?.videos?.[0]?.url;
   if (!url) throw new Error("fal: no video returned");
@@ -207,8 +307,12 @@ export async function generateVideo(prompt: string): Promise<MediaResult> {
  * finishes must become an honest "it didn't come out this time" rather than a
  * request that hangs until the container is reclaimed.
  */
-async function generateVideoJobApi(prompt: string): Promise<MediaResult> {
+async function generateVideoJobApi(prompt: string, options: VideoOptions): Promise<MediaResult> {
   const { videoBaseUrl, videoApiKey, videoModel } = aikConfig.oss;
+  // Sora accepts a fixed set of lengths; snap to the nearest one it offers.
+  const wanted = options.seconds ?? aikConfig.videoShotSeconds;
+  const seconds = String([4, 8, 12].reduce((best, n) => (Math.abs(n - wanted) < Math.abs(best - wanted) ? n : best), 4));
+  const size = options.size ?? aikConfig.videoSize;
   const headers = {
     "content-type": "application/json",
     authorization: `Bearer ${videoApiKey}`,
@@ -223,8 +327,8 @@ async function generateVideoJobApi(prompt: string): Promise<MediaResult> {
       body: JSON.stringify({
         model: videoModel,
         prompt,
-        seconds: "4",
-        size: "720x1280",
+        seconds,
+        size,
       }),
     },
     60_000,
@@ -265,11 +369,19 @@ async function generateVideoJobApi(prompt: string): Promise<MediaResult> {
   };
 }
 
-export async function generateMusic(prompt: string, seconds = 30): Promise<MediaResult> {
+/**
+ * @param lyrics The child's own words. When given, the song must SING them:
+ * the whole point of Music Maker is that the words are theirs, and a track
+ * that hums a vague tune over "a song about pizza" has not kept that promise.
+ */
+export async function generateMusic(prompt: string, seconds = 30, lyrics?: string): Promise<MediaResult> {
   if (aikConfig.mockAI) return { base64: MOCK_MP3, mime: "audio/mpeg", provider: "mock", model: "mock" };
   if (!isMusicConfigured()) throw new Error("Music provider not configured");
+  const fullPrompt = lyrics
+    ? `${prompt}\n\nSing these exact lyrics, every line, in this order, with clear child-friendly vocals and nothing added:\n${lyrics}`
+    : prompt;
   if (aikConfig.providers.music === "fal") {
-    const data = await falRun(aikConfig.fal.musicModel, { prompt, seconds_total: seconds });
+    const data = await falRun(aikConfig.fal.musicModel, { prompt: fullPrompt, seconds_total: seconds });
     const url = data?.audio_file?.url ?? data?.audio?.url;
     if (!url) throw new Error("fal: no audio returned");
     return { ...(await download(url)), provider: "fal", model: aikConfig.fal.musicModel };
@@ -277,7 +389,7 @@ export async function generateMusic(prompt: string, seconds = 30): Promise<Media
   const res = await fetchWithTimeout("https://api.elevenlabs.io/v1/music", {
     method: "POST",
     headers: { "content-type": "application/json", "xi-api-key": aikConfig.elevenlabs.apiKey },
-    body: JSON.stringify({ prompt, music_length_ms: seconds * 1000 }),
+    body: JSON.stringify({ prompt: fullPrompt, music_length_ms: seconds * 1000, force_instrumental: false }),
   }, aikConfig.mediaTimeoutMs);
   if (!res.ok) throw new Error(`ElevenLabs music ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
   return { base64: Buffer.from(await res.arrayBuffer()).toString("base64"), mime: res.headers.get("content-type") || "audio/mpeg", provider: "elevenlabs", model: "eleven-music" };
@@ -456,6 +568,22 @@ function mockText(opts: TextCallOptions): string {
       });
     case "critique":
       return JSON.stringify(["Add a brief invulnerability flash after a hit so a single cloud cannot cost two lives."]);
+    case "book":
+      return JSON.stringify({
+        title: "The Very Brave Pancake",
+        hero: { name: "Flip", look: "a round golden pancake with a wobbly smile, two blueberry eyes, a small pat of butter on top like a hat, stubby syrup-drop feet, and a single curl of steam that follows wherever Flip goes" },
+        style: "bright watercolor",
+        coverScene: "Flip the pancake rolling through a sunny garden of giant sunflowers",
+        pages: [
+          { text: "Flip the pancake lived in a cozy kitchen. Every morning the kitchen smelled of butter. Today, Flip wanted to see what was outside.", scene: "Flip on a warm plate by an open kitchen door, sunshine spilling in" },
+          { text: "Flip rolled out the door and into a garden. The sunflowers were taller than houses. Flip felt very small and very brave.", scene: "Flip rolling along a garden path under towering sunflowers" },
+          { text: "A tiny snail was stuck upside down on a leaf. \"Help, please!\" said the snail in a tiny voice.", scene: "a small snail upside down on a big green leaf, Flip looking up at it" },
+          { text: "Flip tried to climb the leaf, but pancakes are not good at climbing. Flip slid down with a splat.", scene: "Flip sliding down a leaf with a surprised face" },
+          { text: "Then Flip had an idea. Flipping was Flip's superpower! With one great flip, the snail landed right side up.", scene: "Flip doing a big joyful flip in the air, the snail landing safely" },
+          { text: "The snail showed Flip a puddle that sparkled like syrup. They watched the clouds together. Flip rolled home a little muddier and a lot braver.", scene: "Flip and the snail side by side at a sparkling puddle at sunset" },
+        ],
+        theEnd: "The End, with extra syrup.",
+      });
     case "story":
       return JSON.stringify({
         title: "The Very Brave Pancake",
@@ -482,12 +610,12 @@ function mockText(opts: TextCallOptions): string {
     case "video":
       return JSON.stringify({
         title: "Robot Gardener on the Moon",
+        style: "soft claymation",
         shots: [
-          { shot: 1, description: "Wide shot: a round friendly robot waters glowing moon-flowers under a starry sky.", seconds: 2 },
-          { shot: 2, description: "Close-up: a flower opens and sparkles float up.", seconds: 2 },
-          { shot: 3, description: "The robot does a happy wiggle as Earth rises behind it.", seconds: 1 },
+          { shot: 1, description: "A round friendly robot waters glowing moon-flowers under a starry sky.", seconds: 4, videoPrompt: "A round silver robot with a blue light for a face waters a row of glowing blue flowers on the grey moon, starry sky, gentle steady motion" },
+          { shot: 2, description: "One flower opens and sparkles float up into the dark.", seconds: 4, videoPrompt: "Close on one glowing blue moon-flower opening slowly, sparkles drifting upward, the round silver robot with a blue light face watching" },
+          { shot: 3, description: "The robot does a happy wiggle as Earth rises behind it.", seconds: 4, videoPrompt: "The round silver robot with a blue light face wiggles happily on the moon as a big blue Earth rises behind it, stars twinkling" },
         ],
-        videoPrompt: "A friendly round robot waters glowing flowers on the moon, starry sky, Earth rising, cartoon style, bright colors, no text",
       });
     case "chat":
       return "Great question! Let's figure it out together. What do you already know about it? Tell me one thing, and we'll build from there.";

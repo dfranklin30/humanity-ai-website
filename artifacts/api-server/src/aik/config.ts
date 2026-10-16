@@ -53,6 +53,29 @@
  * ── Azure AI Content Safety (screening; fail closed in production) ──────
  *   AIK_CONTENT_SAFETY_ENDPOINT, AIK_CONTENT_SAFETY_KEY
  *   AIK_REQUIRE_CONTENT_SAFETY        default "true" in production
+ *
+ * ── Fallback and identity ───────────────────────────────────────────────
+ *   AIK_TEXT_FALLBACK_PROVIDER        a second text provider tried when the first one
+ *                                     is down or rate-limited (never on a content refusal)
+ *   AIK_AZURE_USE_IDENTITY            "true": call Azure OpenAI with the Container App's
+ *                                     managed identity instead of AIK_AZURE_OPENAI_API_KEY
+ *
+ * ── Media store (generated pictures, songs and movies) ──────────────────
+ *   AIK_MEDIA_ACCOUNT                 storage account name; blobs are written with the
+ *                                     managed identity (Storage Blob Data Contributor)
+ *   AIK_MEDIA_CONNECTION_STRING       alternative to the account + identity
+ *   AIK_MEDIA_CONTAINER               default "aik-media" (private; served through the API)
+ *   Unset: media stays inline in Postgres as before (fine for local work, slow at scale).
+ *
+ * ── Finished products ───────────────────────────────────────────────────
+ *   AIK_BOOK_PAGES                    illustrated pages per storybook (default 6)
+ *   AIK_IMAGE_REFERENCE               "true" (default): reuse the cover as a reference
+ *                                     image so the hero looks the same on every page
+ *   AIK_VIDEO_SHOTS                   Sora shots per movie (default 3, 4 s each)
+ *   AIK_VIDEO_SIZE                    default 1280x720
+ *   AIK_FFMPEG                        path to ffmpeg (default "ffmpeg" on PATH)
+ *   AIK_KIDS_VERIFY_GAMES             "true" (default): children's games are run, checked
+ *                                     and repaired before they are handed over
  */
 
 const env = process.env;
@@ -66,8 +89,10 @@ export type TtsProviderId = "azure" | "elevenlabs" | "none";
 
 const anthropicKey = env.AIK_ANTHROPIC_API_KEY || "";
 const ossConfigured = Boolean(env.AIK_OSS_BASE_URL && env.AIK_OSS_API_KEY && env.AIK_OSS_MODEL);
-const azureTextConfigured = Boolean(env.AIK_AZURE_OPENAI_ENDPOINT && env.AIK_AZURE_OPENAI_API_KEY && env.AIK_AZURE_OPENAI_TEXT_DEPLOYMENT);
-const azureImageConfigured = Boolean(env.AIK_AZURE_OPENAI_ENDPOINT && env.AIK_AZURE_OPENAI_API_KEY && env.AIK_AZURE_OPENAI_IMAGE_DEPLOYMENT);
+const azureUseIdentity = env.AIK_AZURE_USE_IDENTITY === "true";
+const azureAuthConfigured = Boolean(env.AIK_AZURE_OPENAI_API_KEY) || azureUseIdentity;
+const azureTextConfigured = Boolean(env.AIK_AZURE_OPENAI_ENDPOINT && azureAuthConfigured && env.AIK_AZURE_OPENAI_TEXT_DEPLOYMENT);
+const azureImageConfigured = Boolean(env.AIK_AZURE_OPENAI_ENDPOINT && azureAuthConfigured && env.AIK_AZURE_OPENAI_IMAGE_DEPLOYMENT);
 const ossImageConfigured = Boolean((env.AIK_OSS_IMAGE_BASE_URL || env.AIK_OSS_BASE_URL) && (env.AIK_OSS_IMAGE_API_KEY || env.AIK_OSS_API_KEY) && env.AIK_OSS_IMAGE_MODEL);
 const falConfigured = Boolean(env.AIK_FAL_KEY);
 const azureSpeechConfigured = Boolean(env.AIK_AZURE_SPEECH_KEY && env.AIK_AZURE_SPEECH_REGION);
@@ -91,6 +116,14 @@ export const aikConfig = {
     video: pick<VideoProviderId>(env.AIK_VIDEO_PROVIDER, ["oss", "fal", "none"], ossVideoConfigured ? "oss" : falConfigured ? "fal" : "none"),
     music: pick<MusicProviderId>(env.AIK_MUSIC_PROVIDER, ["elevenlabs", "fal", "none"], elevenConfigured ? "elevenlabs" : falConfigured ? "fal" : "none"),
     tts: pick<TtsProviderId>(env.AIK_TTS_PROVIDER, ["azure", "elevenlabs", "none"], azureSpeechConfigured ? "azure" : elevenConfigured ? "elevenlabs" : "none"),
+    /**
+     * Second text provider, used only when the first one fails for reasons
+     * that are not about content: an outage, a 429, a timeout. A refusal is
+     * a screening result and is never retried elsewhere. Defaults to whichever
+     * other provider is configured, so Claude falls back to Azure and Azure
+     * falls back to Claude without anyone having to set it.
+     */
+    textFallback: pick<TextProviderId | "none">(env.AIK_TEXT_FALLBACK_PROVIDER, ["anthropic", "azure", "oss", "none"], "none"),
   },
 
   anthropic: {
@@ -123,6 +156,7 @@ export const aikConfig = {
   azureOpenAI: {
     endpoint: env.AIK_AZURE_OPENAI_ENDPOINT || "",
     apiKey: env.AIK_AZURE_OPENAI_API_KEY || "",
+    useIdentity: azureUseIdentity,
     apiVersion: env.AIK_AZURE_OPENAI_API_VERSION || "2024-10-21",
     textDeployment: env.AIK_AZURE_OPENAI_TEXT_DEPLOYMENT || "",
     imageDeployment: env.AIK_AZURE_OPENAI_IMAGE_DEPLOYMENT || "",
@@ -189,6 +223,8 @@ export const aikConfig = {
    * An adult building a demo needs room, so the studio path gets its own
    * budget, still well inside maxGameChars.                            */
   studioGameChars: 28_000,
+  /** A child's game, with room for the repair pass to add a guard or two. */
+  kidsGameChars: 12_000,
   studioMaxTokens: 16_000,
   /** Requests per minute per child session. */
   childRequestsPerMinute: 8,
@@ -196,6 +232,28 @@ export const aikConfig = {
   loginAttemptsPerMinute: 20,
   /** Media generation timeout (video can take a couple of minutes). */
   mediaTimeoutMs: 240_000,
+
+  /* --- Media store ------------------------------------------------- */
+  media: {
+    account: env.AIK_MEDIA_ACCOUNT || "",
+    connectionString: env.AIK_MEDIA_CONNECTION_STRING || "",
+    container: env.AIK_MEDIA_CONTAINER || "aik-media",
+  },
+
+  /* --- Finished products ------------------------------------------- *
+   * A storybook is a cover plus this many illustrated, narrated pages; a
+   * movie is this many Sora shots cut together behind a title card. Both
+   * are bounded here, not by the model, because each page and each shot is
+   * a paid generation and a child is waiting.                           */
+  bookPages: Math.min(Math.max(Number(env.AIK_BOOK_PAGES) || 6, 3), 8),
+  imageReference: env.AIK_IMAGE_REFERENCE !== "false",
+  videoShots: Math.min(Math.max(Number(env.AIK_VIDEO_SHOTS) || 3, 1), 4),
+  videoShotSeconds: 4,
+  videoSize: env.AIK_VIDEO_SIZE || "1280x720",
+  ffmpeg: env.AIK_FFMPEG || "ffmpeg",
+  kidsVerifyGames: env.AIK_KIDS_VERIFY_GAMES !== "false",
+  /** Characters per narrated page; keeps a six-page book readable aloud in about two minutes. */
+  bookPageChars: 420,
 } as const;
 
 /* ------------------------------------------------------------------ *
@@ -251,6 +309,20 @@ export function isContentSafetyConfigured(): boolean {
   return Boolean(c.endpoint && c.key);
 }
 
+/** Which provider stands behind the primary one, if any is configured. */
+export function textFallbackProvider(primary: TextProviderId): TextProviderId | null {
+  const wanted = aikConfig.providers.textFallback;
+  if (wanted !== "none") return wanted !== primary && textProviderConfigured(wanted) ? wanted : null;
+  for (const p of ["anthropic", "azure", "oss"] as TextProviderId[]) {
+    if (p !== primary && textProviderConfigured(p)) return p;
+  }
+  return null;
+}
+
+export function isMediaStoreConfigured(): boolean {
+  return Boolean(aikConfig.media.connectionString || aikConfig.media.account);
+}
+
 /** Summary for /api/aik/config and the startup log. */
 export function capabilitySummary() {
   return {
@@ -261,6 +333,10 @@ export function capabilitySummary() {
     music: { provider: aikConfig.providers.music, ready: isMusicConfigured() },
     tts: { provider: aikConfig.providers.tts, ready: isTtsConfigured() },
     screening: { configured: isContentSafetyConfigured(), required: aikConfig.contentSafety.required },
+    textFallback: { provider: textFallbackProvider(aikConfig.providers.text) ?? "none", ready: Boolean(textFallbackProvider(aikConfig.providers.text)) },
+    mediaStore: { provider: isMediaStoreConfigured() ? "azure-blob" : "inline", ready: true },
+    book: { pages: aikConfig.bookPages, illustrated: isImageConfigured(), narrated: isTtsConfigured() },
+    movie: { shots: aikConfig.videoShots, ready: isVideoConfigured() },
     google: { configured: isGoogleConfigured(), ready: isGoogleConfigured() },
     mock: aikConfig.mockAI,
   };
