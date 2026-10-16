@@ -365,7 +365,7 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
       </div>
 
       {me.class.paused && <Notice>⏸️ Your facilitator paused the Studio. Look up front!</Notice>}
-      {me.class.locked && <Notice tone="info">🔒 Portfolios are locked for the Expo. You can still play everything!</Notice>}
+      {me.class.locked && <Notice tone="info">🔒 Your portfolio is locked for the Expo: no new orders or chats today, but everything you made is ready to show in My stuff and the Arcade!</Notice>}
       {me.child.muted && <Notice>Your facilitator paused your orders for now.</Notice>}
       {error && <Notice>{error}</Notice>}
 
