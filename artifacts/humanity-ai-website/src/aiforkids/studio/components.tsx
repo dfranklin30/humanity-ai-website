@@ -506,6 +506,8 @@ export function ChatPanel({
   /** When present, a camera button appears and photos can be asked about. */
   onSendPhoto?: (text: string, dataUri: string) => void;
   avatar?: string;
+  /** Overrides the mode's placeholder (the Study Desk changes it per tool). */
+  placeholder?: string;
 }) {
   const [text, setText] = useState("");
   const [photo, setPhoto] = useState<{ dataUri: string; name: string } | null>(null);
@@ -608,7 +610,7 @@ export function ChatPanel({
           value={text}
           maxLength={maxChars}
           onChange={(e) => setText(e.target.value)}
-          placeholder={turnsLeft > 0 ? mode.chatPlaceholder ?? "Ask a question…" : "No chats left today"}
+          placeholder={turnsLeft > 0 ? placeholder ?? mode.chatPlaceholder ?? "Ask a question…" : "No chats left today"}
           disabled={busy || turnsLeft <= 0}
           autoComplete="off"
           className="flex-1 rounded-2xl border-2 border-violet-200 bg-white px-4 py-3 text-lg text-slate-900 placeholder:text-slate-400 focus:border-violet-500 focus:outline-none disabled:opacity-60"

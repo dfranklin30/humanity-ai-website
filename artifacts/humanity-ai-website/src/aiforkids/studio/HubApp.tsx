@@ -60,13 +60,14 @@ import {
   type StudioRequest,
 } from "./api";
 import { ArtifactView, BigButton, Card, ChangeBox, ForgeSteps, ModeForm, Notice, RequestStatus, Spinner, kindEmoji } from "./components";
+import { fLounge, fLoungeAdd, fLoungeRemove, type LoungeItem } from "./api";
 import { BASE } from "../content/program";
 import { WEEK_MODULES, SESSION_RHYTHM, type WeekModule } from "../content/weeks";
 
 const STAFF_FIELD_CHARS = 1200;
 const STAFF_CHAT_CHARS = 4000;
 
-type Tab = "tools" | "projects" | "program" | "classes" | "review" | "people";
+type Tab = "tools" | "projects" | "program" | "classes" | "review" | "lounge" | "people";
 
 export default function HubApp() {
   const [location] = useLocation();
@@ -382,6 +383,7 @@ function HubShell() {
             ["program", "🗓️ 8-week program"],
             ["classes", `👋 Classes · ${state.classes.length}`],
             ["review", "🛡️ Review"],
+            ["lounge", "📺 Lounge"],
             ...(state.facilitator.isAdmin ? ([["people", "🔑 People"]] as [Tab, string][]) : []),
           ] as [Tab, string][]
         ).map(([id, label]) => (
@@ -405,6 +407,7 @@ function HubShell() {
       {tab === "classes" && <ClassesTab state={state} />}
       {tab === "review" && <ReviewTab />}
       {tab === "people" && <PeopleTab me={state.facilitator} />}
+      {tab === "lounge" && <LoungeTab classes={state.classes} />}
     </div>
   );
 }
@@ -1744,6 +1747,112 @@ function ClassesTab({ state }: { state: HubState }) {
             <p className="mt-2 font-mono text-sm text-slate-700">/aiforkids/hub</p>
           </div>
         </div>
+      </Card>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Screen Time Lounge: the facilitator's picks
+ * ------------------------------------------------------------------ */
+
+function LoungeTab({ classes }: { classes: { id: number; name: string }[] }) {
+  const [data, setData] = useState<{ items: LoungeItem[]; starters: LoungeItem[] } | null>(null);
+  const [form, setForm] = useState({ title: "", url: "", source: "", note: "", classId: "" });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const load = useCallback(() => fLounge().then(setData).catch(() => setData({ items: [], starters: [] })), []);
+  useEffect(() => {
+    void load();
+  }, [load]);
+  if (!data) return <Spinner label="Loading the Lounge…" />;
+  return (
+    <div className="space-y-5">
+      <Card>
+        <h2 className="text-xl font-extrabold">📺 Screen Time Lounge</h2>
+        <p className="mt-1 text-sm text-slate-600">
+          What children can watch when they finish early. Add a YouTube link (it plays inside the Studio with related videos off) or a page from PBS KIDS, Storyline Online, National Geographic Kids, NASA,
+          Smithsonian, TED-Ed or Khan Academy (opens in a new tab). Watch it yourself first: the Studio never screens outside video.
+        </p>
+        <form
+          className="mt-4 grid gap-3 sm:grid-cols-2"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setBusy(true);
+            setError(null);
+            try {
+              await fLoungeAdd({ title: form.title, url: form.url, source: form.source, note: form.note, classId: form.classId ? Number(form.classId) : null });
+              setForm({ title: "", url: "", source: "", note: "", classId: "" });
+              await load();
+            } catch (err) {
+              setError((err as Error).message || "That didn't save.");
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          <input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Title children will see" className="rounded-xl border-2 border-slate-200 px-3 py-2" />
+          <input required value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} placeholder="https://www.youtube.com/watch?v=…" className="rounded-xl border-2 border-slate-200 px-3 py-2" />
+          <input value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} placeholder="Source (e.g. SciShow Kids)" className="rounded-xl border-2 border-slate-200 px-3 py-2" />
+          <input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="One line about it" className="rounded-xl border-2 border-slate-200 px-3 py-2" />
+          <select value={form.classId} onChange={(e) => setForm({ ...form, classId: e.target.value })} className="rounded-xl border-2 border-slate-200 px-3 py-2">
+            <option value="">All my classes</option>
+            {classes.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name} only
+              </option>
+            ))}
+          </select>
+          <BigButton type="submit" disabled={busy}>
+            {busy ? "Saving…" : "Add to the Lounge"}
+          </BigButton>
+        </form>
+        {error && <Notice>{error}</Notice>}
+      </Card>
+
+      <Card>
+        <h3 className="text-lg font-extrabold">Your picks · {data.items.length}</h3>
+        {data.items.length === 0 ? (
+          <p className="mt-1 text-sm text-slate-600">Nothing yet. Children see the starter shelf below until you add your own.</p>
+        ) : (
+          <ul className="mt-3 divide-y divide-slate-100">
+            {data.items.map((v) => (
+              <li key={v.id} className="flex items-center gap-3 py-2">
+                {v.youtubeId ? <img src={`https://i.ytimg.com/vi/${v.youtubeId}/default.jpg`} alt="" className="h-12 w-16 rounded-lg object-cover" referrerPolicy="no-referrer" /> : <span className="flex h-12 w-16 items-center justify-center rounded-lg bg-teal-50 text-xl">📺</span>}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-bold">{v.title}</p>
+                  <p className="truncate text-xs text-slate-500">
+                    {v.source} · {v.class_id ? classes.find((c) => c.id === v.class_id)?.name ?? "one class" : "all classes"} · <a href={v.url} target="_blank" rel="noopener noreferrer" className="underline">open</a>
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await fLoungeRemove(v.id).catch(() => {});
+                    await load();
+                  }}
+                  className="text-sm font-semibold text-rose-700 underline"
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      <Card tone="tint">
+        <h3 className="text-lg font-extrabold">Starter shelf (always shown)</h3>
+        <ul className="mt-2 grid gap-1 text-sm text-slate-700 sm:grid-cols-2">
+          {data.starters.map((s) => (
+            <li key={s.title}>
+              <a href={s.url} target="_blank" rel="noopener noreferrer" className="font-semibold underline">
+                {s.title}
+              </a>{" "}
+              · {s.source}
+            </li>
+          ))}
+        </ul>
       </Card>
     </div>
   );

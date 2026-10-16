@@ -314,6 +314,19 @@ export function ensureTables(): Promise<void> {
         CREATE INDEX IF NOT EXISTS aik_artifacts_project_idx ON aik_artifacts (project_id, created_at)`);
       await db.execute(sql`
         CREATE INDEX IF NOT EXISTS aik_projects_facilitator_idx ON aik_projects (facilitator_id, archived)`);
+      /* The Screen Time Lounge: videos a facilitator picked for a class.
+       * A null class_id is a video for every class of that facilitator. */
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS aik_lounge (
+          id serial PRIMARY KEY,
+          facilitator_id integer NOT NULL REFERENCES aik_facilitators(id) ON DELETE CASCADE,
+          class_id integer REFERENCES aik_classes(id) ON DELETE CASCADE,
+          title text NOT NULL,
+          url text NOT NULL,
+          source text NOT NULL DEFAULT '',
+          note text NOT NULL DEFAULT '',
+          created_at timestamptz NOT NULL DEFAULT now()
+        )`);
     })().catch((err) => {
       ready = null;
       throw err;
@@ -1020,4 +1033,40 @@ export async function listAudit(facilitatorId: number, limit = 200): Promise<Aud
        ORDER BY t.id DESC
        LIMIT ${limit}`),
   );
+}
+
+/* ------------------------------------------------------------------ *
+ * Screen Time Lounge
+ * ------------------------------------------------------------------ */
+
+export type LoungeRow = { id: number; facilitator_id: number; class_id: number | null; title: string; url: string; source: string; note: string; created_at: string };
+
+export async function listLounge(classId: number, facilitatorId: number): Promise<LoungeRow[]> {
+  await ensureTables();
+  return rows(
+    await db.execute(sql`
+      SELECT * FROM aik_lounge
+       WHERE facilitator_id = ${facilitatorId} AND (class_id IS NULL OR class_id = ${classId})
+       ORDER BY created_at DESC`),
+  );
+}
+
+export async function listLoungeForFacilitator(facilitatorId: number): Promise<LoungeRow[]> {
+  await ensureTables();
+  return rows(await db.execute(sql`SELECT * FROM aik_lounge WHERE facilitator_id = ${facilitatorId} ORDER BY created_at DESC`));
+}
+
+export async function addLounge(v: { facilitatorId: number; classId: number | null; title: string; url: string; source: string; note: string }): Promise<LoungeRow> {
+  await ensureTables();
+  return one<LoungeRow>(
+    await db.execute(sql`
+      INSERT INTO aik_lounge (facilitator_id, class_id, title, url, source, note)
+      VALUES (${v.facilitatorId}, ${v.classId}, ${v.title}, ${v.url}, ${v.source}, ${v.note}) RETURNING *`),
+  )!;
+}
+
+export async function removeLounge(id: number, facilitatorId: number): Promise<boolean> {
+  await ensureTables();
+  const r = rows(await db.execute(sql`DELETE FROM aik_lounge WHERE id = ${id} AND facilitator_id = ${facilitatorId} RETURNING id`));
+  return r.length > 0;
 }

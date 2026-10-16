@@ -264,15 +264,15 @@ export const MODES: Record<ModeId, ModeDef> = {
   },
   homework: {
     id: "homework",
-    name: "Homework Help",
+    name: "Study Desk",
     emoji: "📝",
-    tagline: "A patient helper that shows you how, not just the answer.",
-    blurb: "Stuck on homework? Tell the helper what you tried. It explains step by step and asks good questions until you get it.",
+    tagline: "Hints, lessons, practice and research for every subject.",
+    blurb: "Stuck on homework? Get a hint, learn the idea behind it, practise with new problems, read a passage, or gather research notes. The helper never does your assignment for you, but it will teach you how.",
     artifactKind: "chat",
     interaction: "chat",
     createFields: [],
     changeHint: "",
-    chatGreeting: "Hi! I'm your homework helper. Tell me the problem and what you've tried so far, and we'll work it out together, one step at a time.",
+    chatGreeting: "Hi! I'm your Study Desk helper. Pick a subject and a tool up top, then tell me what you're working on. I won't do it for you, but I'll show you how.",
     chatPlaceholder: "I'm stuck on 3/4 + 1/8…",
     tier: "default",
     maxTokens: 2500,
@@ -281,6 +281,9 @@ export const MODES: Record<ModeId, ModeDef> = {
       { label: "I'm stuck on fractions", message: "I'm stuck on 2/3 + 1/6. I tried adding the tops and the bottoms but it looked wrong." },
       { label: "I don't get the question", message: "My worksheet says \"estimate the product\" and I don't know what estimate means here." },
       { label: "Help me plan my writing", message: "I have to write about why recycling matters and I don't know how to start." },
+      { label: "Teach me long division", message: "Can you teach me how long division works?" },
+      { label: "Practice: multiplication", message: "Give me practice on multiplying two-digit numbers." },
+      { label: "Research: the water cycle", message: "I need background notes for a report on the water cycle." },
     ],
     needsApproval: false,
   },
@@ -298,13 +301,86 @@ export function publicModes() {
 }
 
 /* ------------------------------------------------------------------ *
+ * The Study Desk: Homework Help's tools.
+ *
+ * "Hint" is the Socratic helper and never gives the child's answer. The
+ * other tools teach AROUND the child's work: a lesson explains the idea with
+ * a worked example on DIFFERENT numbers, practice makes new problems the
+ * helper may check, reading brings a passage, research brings background
+ * notes to verify. The rule is the same in every tool: the helper may solve
+ * its own examples, never the child's assignment.
+ * ------------------------------------------------------------------ */
+
+export const DESK_TOOLS = ["hint", "lesson", "practice", "check", "read", "research"] as const;
+export type DeskTool = (typeof DESK_TOOLS)[number];
+export const DESK_SUBJECTS = ["math", "reading", "writing", "science", "social"] as const;
+export type DeskSubject = (typeof DESK_SUBJECTS)[number];
+
+const SUBJECT_NAMES: Record<DeskSubject, string> = {
+  math: "math",
+  reading: "reading",
+  writing: "writing and spelling",
+  science: "science",
+  social: "social studies (history, geography, communities)",
+};
+
+function deskToolPrompt(tool: DeskTool, subject?: DeskSubject): string {
+  const subj = subject ? `The subject is ${SUBJECT_NAMES[subject]}; keep everything at a grade 3-5 level for it.` : "Work out the subject from what the child says; grade 3-5 level.";
+  switch (tool) {
+    case "hint":
+      return "";
+    case "lesson":
+      return `
+STUDY DESK TOOL: TEACH ME THE IDEA. ${subj}
+The child wants to understand the idea behind their work, not the answer to it.
+- Explain the one idea they ask about in plain words a 9-year-old gets, with a picture in words or a real-life example (pizza slices, a number line, a timeline, a sentence they'd actually say).
+- Then show ONE fully worked example that you make up with DIFFERENT numbers, words or facts from anything the child has typed. You may solve YOUR example completely, step by step, saying why each step happens.
+- Then stop and ask them to try the first step on their own problem. Do NOT solve their problem, even partly.
+- Under 170 words. Plain text; numbered steps are fine (up to 5).`;
+    case "practice":
+      return `
+STUDY DESK TOOL: GIVE ME PRACTICE. ${subj}
+Make a short practice set on the skill the child names (or the skill of the problem they're stuck on), using NEW problems you invent -- never the child's own homework items.
+- Exactly 4 problems, numbered 1-4, easiest first, each on its own line. For reading/writing: short tasks (fix the sentence, pick the word, write one sentence using...). For social studies/science: short questions with one clear answer at this grade level.
+- After the set write exactly: "Send me your answers and I'll check them!" Do NOT include the answers.
+- Under 120 words. Plain text.`;
+    case "check":
+      return `
+STUDY DESK TOOL: CHECK MY ANSWER. ${subj}
+The child is sending answers (to the practice set, or to a problem they already tried). Your job is to say which are right, and for a wrong one say WHERE it went off the rails without giving the correct answer.
+- Practice problems that YOU made up earlier in this chat: you may confirm right/wrong for each, and for a wrong one give a hint and ask them to try that one again.
+- The child's OWN homework problem: never state the correct answer. Say whether their answer is right ("Yes! How did you get there?") or, if not, point at the step to look at again and ask one question.
+- Warm, specific, under 110 words. Plain text.`;
+    case "read":
+      return `
+STUDY DESK TOOL: READ WITH ME. ${subj}
+Write a short, original reading passage for a grade 3-5 child on the topic they ask for (or a fun one if they don't say), then questions.
+- Passage: 90-140 words, a clear title line first, simple sentences, one or two vocabulary words a child might not know.
+- Then "Words to know:" with those 1-2 words and a kid-friendly meaning each.
+- Then exactly 3 questions: one "find it in the text", one "why do you think", one "what does the word mean".
+- Do NOT give the answers. End with: "Tell me your answers and we'll talk about them!"
+- Plain text. No real people, no brands, nothing scary.`;
+    case "research":
+      return `
+STUDY DESK TOOL: RESEARCH NOTES. ${subj}
+The child is starting a report or project and needs background. Give them a FIRST-DRAFT set of notes they must check, in their own words later.
+- Start with one sentence: what the topic is, in kid words.
+- Then 5 short facts, numbered, each max 18 words, grade 3-5 level. Prefer facts that are well known and stable (how, why, where, when; not exact statistics).
+- After each fact add "(check: ...)" naming a kid-safe place to confirm it: a library book about..., Britannica Kids, National Geographic Kids, a science museum site. Never a URL.
+- Then "Big question to think about:" and one question that would make a good opening for their report.
+- Remind them in one line that these are notes to check, not sentences to copy.
+- Under 170 words. Plain text. Health, medicine, weapons, personal problems: reply ONLY with REDIRECT.`;
+  }
+}
+
+/* ------------------------------------------------------------------ *
  * Input validation. Returns the cleaned input or a kid-facing error.
  * ------------------------------------------------------------------ */
 
 export type ValidatedInput =
   | { ok: true; kind: "create"; values: Record<string, string>; text: string }
   | { ok: true; kind: "change"; change: string; text: string }
-  | { ok: true; kind: "chat"; message: string; text: string }
+  | { ok: true; kind: "chat"; message: string; text: string; tool?: DeskTool; subject?: DeskSubject }
   | { ok: false; error: string };
 
 function clean(s: unknown, max: number): string {
@@ -321,7 +397,9 @@ export function validateInput(mode: ModeDef, kind: string, raw: any, opts?: { st
     if (mode.interaction === "form") return { ok: false, error: "This module doesn't have a chat helper." };
     const message = clean(raw?.message, opts?.staff ? aikConfig.staffChatChars : aikConfig.maxChatChars);
     if (message.length < 2) return { ok: false, error: "Type a question or an idea for the helper." };
-    return { ok: true, kind: "chat", message, text: message };
+    const tool = DESK_TOOLS.includes(raw?.tool) ? (raw.tool as DeskTool) : undefined;
+    const subject = DESK_SUBJECTS.includes(raw?.subject) ? (raw.subject as DeskSubject) : undefined;
+    return { ok: true, kind: "chat", message, text: message, tool, subject };
   }
   if (mode.interaction === "chat") return { ok: false, error: "This module is chat only." };
   if (kind === "change") {
@@ -465,8 +543,17 @@ OUTPUT FORMAT: reply with ONLY a JSON object, no markdown fences:
 }
 
 /** Persona for the "Ask the helper" chat inside form modules. */
-export function chatSystemPrompt(mode: ModeDef): string {
-  if (mode.id === "homework") return systemPrompt(mode, { soundEnabled: false });
+export function chatSystemPrompt(mode: ModeDef, desk?: { tool?: DeskTool; subject?: DeskSubject }): string {
+  if (mode.id === "homework") {
+    const base = systemPrompt(mode, { soundEnabled: false });
+    const tool = desk?.tool ?? "hint";
+    if (tool === "hint") return base + (desk?.subject ? `\n\nThe child picked the subject: ${SUBJECT_NAMES[desk.subject]}.` : "");
+    return (
+      base +
+      `\n\nTHE CHILD HAS OPENED A STUDY DESK TOOL. The rule above still protects the child's OWN assignment, but this tool asks you to teach around it, and you MAY fully work examples that you invent yourself. Follow the tool instructions exactly:` +
+      deskToolPrompt(tool, desk?.subject)
+    );
+  }
   const focus: Record<string, string> = {
     game: "how simple browser games work (score, lives, movement, collisions, power-ups), and how to describe a change clearly so the game helper makes exactly that change",
     story: "story ideas: characters, settings, problems, funny or surprising endings, and how to describe a picture with three details",

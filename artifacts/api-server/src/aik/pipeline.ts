@@ -11,7 +11,7 @@ import { logger } from "../lib/logger";
 import { aikConfig, isMusicConfigured } from "./config";
 import * as store from "./store";
 import type { RequestRow, ArtifactRow, ClassRow } from "./store";
-import { getMode, validateInput, systemPrompt, chatSystemPrompt, userPrompt, isRedirect, extractHtml, extractJson, gameSummary, gameTitle, type ModeDef } from "./modes";
+import { getMode, validateInput, systemPrompt, chatSystemPrompt, userPrompt, isRedirect, extractHtml, extractJson, gameSummary, gameTitle, type ModeDef, type DeskTool, type DeskSubject } from "./modes";
 import { completeText, generateImage, generateMusic, ContentFilteredError, type ChatTurn } from "./ai";
 import { sendCareAlert } from "./mail";
 import { forgeGame, refineJson, type ForgeStep } from "./forge";
@@ -172,7 +172,7 @@ export async function runRequest(requestId: number): Promise<void> {
 
     // Guided chat turns have their own, shorter path.
     if (input.kind === "chat") {
-      await runChatTurn(req, mode, input.message, flags, takePhoto(req.id));
+      await runChatTurn(req, mode, input.message, flags, takePhoto(req.id), { tool: input.tool, subject: input.subject });
       return;
     }
 
@@ -657,7 +657,7 @@ function takePhoto(requestId: number): string | undefined {
  * worksheet on a kitchen table is a photo of a child's home, and it has no
  * business persisting in a database.
  */
-async function runChatTurn(req: RequestRow, mode: ModeDef, message: string, flags: Flag[], photoDataUri?: string): Promise<void> {
+async function runChatTurn(req: RequestRow, mode: ModeDef, message: string, flags: Flag[], photoDataUri?: string, desk?: { tool?: DeskTool; subject?: DeskSubject }): Promise<void> {
   // Find or create the transcript artifact.
   let convo: ArtifactRow | null = req.project_artifact_id ? await store.getArtifact(req.project_artifact_id) : null;
   if (convo && (convo.kind !== "chat" || convo.class_id !== req.class_id || (req.child_id !== null && convo.child_id !== req.child_id))) convo = null;
@@ -678,12 +678,17 @@ async function runChatTurn(req: RequestRow, mode: ModeDef, message: string, flag
 
   let reply: string;
   try {
-    reply = await completeText({ system: chatSystemPrompt(mode), turns, photoDataUri, maxTokens: mode.id === "homework" ? mode.maxTokens : 350, temperature: 0.5, tier: mode.tier === "oss" ? "oss" : "fast", mockKind: "chat" });
-    if (mode.id === "homework" && leaksAnswer(reply)) {
+    const system = chatSystemPrompt(mode, desk);
+    reply = await completeText({ system, turns, photoDataUri, maxTokens: mode.id === "homework" ? mode.maxTokens : 350, temperature: 0.5, tier: mode.tier === "oss" ? "oss" : "fast", mockKind: "chat" });
+    // The leak guard protects the child's own problem: it runs for the hint
+    // and check tools, where the model is talking about THEIR work. A lesson's
+    // worked example or a practice set is supposed to contain answers.
+    const guardAnswers = mode.id === "homework" && (!desk?.tool || desk.tool === "hint" || desk.tool === "check");
+    if (guardAnswers && leaksAnswer(reply)) {
       // One more try with the rule in the model's face; then a safe scripted hint.
       logger.info({ requestId: req.id }, "[aik] homework reply leaked the answer; rewriting");
       const retry = await completeText({
-        system: chatSystemPrompt(mode) + "\n\nYOUR PREVIOUS DRAFT GAVE AWAY THE ANSWER. Rewrite it: no final number, no solved equation, no bold result. One warm line, then ONE question that moves the child a single step. Under 50 words.",
+        system: system + "\n\nYOUR PREVIOUS DRAFT GAVE AWAY THE ANSWER. Rewrite it: no final number, no solved equation, no bold result. One warm line, then ONE question that moves the child a single step. Under 50 words.",
         turns,
         photoDataUri,
         maxTokens: mode.maxTokens,

@@ -30,6 +30,9 @@ import {
   type StudioRequest,
 } from "./api";
 import { ArtifactLoader, BigButton, Card, ChangeBox, ChatPanel, ModeForm, Notice, RequestStatus, Spinner, kindEmoji, type ChatMsg } from "./components";
+import { RoomIcon, ROOM_THEME, roomIdFor } from "./icons";
+import { Lounge } from "./Lounge";
+import { childLounge, DESK_TOOLS, DESK_SUBJECTS, type DeskTool, type DeskSubject, type LoungeItem } from "./api";
 
 type Stage = { step: "code" } | { step: "pick"; code: string; className: string; children: { id: number; nickname: string; avatar: string }[] } | { step: "pin"; code: string; child: { id: number; nickname: string; avatar: string } } | { step: "in" };
 
@@ -57,13 +60,14 @@ export default function StudioApp() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-violet-100 via-sky-50 to-white text-slate-900">
+    <div className="studio min-h-screen bg-gradient-to-b from-violet-100 via-sky-50 to-white text-slate-900" style={{ fontFamily: "'Nunito', 'Public Sans', system-ui, sans-serif" }}>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" />
       <header className="mx-auto flex max-w-5xl items-center justify-between px-5 py-4">
         <div className="flex items-center gap-3">
-          <span className="text-3xl">🎬</span>
+          <RoomIcon id="video" size={28} />
           <div>
-            <p className="text-xl font-extrabold tracking-tight text-violet-800">Kids AI Studio</p>
-            <p className="text-xs font-semibold text-slate-500">Humanity + AI · You are the director</p>
+            <p className="text-xl font-black tracking-tight text-violet-800">Kids AI Studio</p>
+            <p className="text-xs font-bold text-slate-500">Humanity + AI · You are the director</p>
           </div>
         </div>
         {stage.step === "in" && (
@@ -219,7 +223,7 @@ function SignIn({ config, stage, setStage }: { config: StudioConfig; stage: Stag
  * Workspace
  * ------------------------------------------------------------------ */
 
-type Tab = "make" | "portfolio" | "arcade";
+type Tab = "make" | "portfolio" | "arcade" | "lounge";
 
 function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut: () => void }) {
   const [me, setMe] = useState<ChildMe | null>(null);
@@ -305,11 +309,15 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
     }
   }
 
+  const [deskTool, setDeskTool] = useState<DeskTool>("hint");
+  const [deskSubject, setDeskSubject] = useState<DeskSubject | null>(null);
+
   async function sendChat(text: string) {
     if (!mode) return;
+    const desk = mode.id === "homework" ? { tool: deskTool, ...(deskSubject ? { subject: deskSubject } : {}) } : {};
     setChat((c) => ({ ...c, messages: [...c.messages, { role: "user", text }], busy: true }));
     try {
-      const { request } = await childSubmit({ mode: mode.id, kind: "chat", projectArtifactId: chat.convoId ?? undefined, input: { message: text } });
+      const { request } = await childSubmit({ mode: mode.id, kind: "chat", projectArtifactId: chat.convoId ?? undefined, input: { message: text, ...desk } });
       const settled = await waitForRequest(request.id, childRequest, undefined, 120_000);
       const reply = settled.status === "done" ? settled.message ?? "…" : settled.message ?? "Let's try that a different way.";
       setChat((c) => ({ convoId: settled.resultArtifactId ?? c.convoId, messages: [...c.messages, { role: settled.status === "done" ? "assistant" : "system", text: reply }], busy: false }));
@@ -338,16 +346,21 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
             💬 {chatsLeft} chats
           </span>
         </div>
-        <nav className="flex gap-2">
-          {(["make", "portfolio", "arcade"] as Tab[]).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={cx("rounded-full px-4 py-2 text-base font-bold transition", tab === t ? "bg-violet-600 text-white" : "bg-violet-50 text-violet-800 hover:bg-violet-100")}
-            >
-              {t === "make" ? "🏛️ Studios" : t === "portfolio" ? "📁 My stuff" : "🕹️ Arcade"}
-            </button>
-          ))}
+        <nav className="flex flex-wrap gap-2">
+          {(["make", "portfolio", "arcade", "lounge"] as Tab[]).map((t) => {
+            const room = t === "make" ? "video" : t === "portfolio" ? "portfolio" : t === "arcade" ? "arcade" : "lounge";
+            const label = t === "make" ? "Rooms" : t === "portfolio" ? "My stuff" : t === "arcade" ? "Arcade" : "Lounge";
+            return (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={cx("flex items-center gap-2 rounded-full py-1.5 pl-1.5 pr-4 text-base font-extrabold transition", tab === t ? "bg-slate-900 text-white" : "bg-white/80 text-slate-800 ring-1 ring-slate-200 hover:bg-white")}
+              >
+                <RoomIcon id={room} size={18} tile={tab !== t} />
+                {label}
+              </button>
+            );
+          })}
         </nav>
       </div>
 
@@ -375,10 +388,24 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
 
           {mode.interaction === "chat" ? (
             <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
-              <ChatPanel mode={mode} messages={chat.messages} onSend={sendChat} busy={chat.busy} turnsLeft={chatsLeft} maxChars={config.maxChatChars} avatar={me.child.avatar} />
+              <div className="space-y-3">
+                {mode.id === "homework" && (
+                  <StudyDeskBar tool={deskTool} subject={deskSubject} onTool={setDeskTool} onSubject={setDeskSubject} />
+                )}
+                <ChatPanel
+                  mode={mode}
+                  messages={chat.messages}
+                  onSend={sendChat}
+                  busy={chat.busy}
+                  turnsLeft={chatsLeft}
+                  maxChars={config.maxChatChars}
+                  avatar={me.child.avatar}
+                  placeholder={mode.id === "homework" ? DESK_TOOLS.find((t) => t.id === deskTool)?.placeholder : undefined}
+                />
+              </div>
               <div className="space-y-3">
                 <Card tone="tint">
-                  <p className="text-sm font-bold uppercase tracking-wide text-violet-600">{mode.emoji} {mode.name}</p>
+                  <p className="flex items-center gap-2 text-sm font-black uppercase tracking-wide" style={{ color: ROOM_THEME[roomIdFor(mode.id)].accent }}><RoomIcon id={roomIdFor(mode.id)} size={20} tile={false} /> {mode.name}</p>
                   <h2 className="text-2xl font-extrabold">{mode.tagline}</h2>
                   <p className="mt-2 text-slate-700">{mode.blurb}</p>
                 </Card>
@@ -397,7 +424,7 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
             <div className="grid gap-5 lg:grid-cols-[1fr_1.4fr]">
               <div className="space-y-4">
                 <Card>
-                  <p className="text-sm font-bold uppercase tracking-wide text-violet-600">{mode.emoji} {mode.name}</p>
+                  <p className="flex items-center gap-2 text-sm font-black uppercase tracking-wide" style={{ color: ROOM_THEME[roomIdFor(mode.id)].accent }}><RoomIcon id={roomIdFor(mode.id)} size={20} tile={false} /> {mode.name}</p>
                   <h2 className="text-2xl font-extrabold">{project ? `Working on: ${project.title}` : mode.tagline}</h2>
                   <div className="mt-4">
                     {project ? (
@@ -471,7 +498,7 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
                 ) : (
                   !active && (
                     <Card tone="tint" className="flex h-full min-h-[300px] flex-col items-center justify-center text-center">
-                      <p className="text-6xl">{mode.emoji}</p>
+                      <RoomIcon id={roomIdFor(mode.id)} size={72} />
                       <p className="mt-2 text-xl font-extrabold text-violet-800">Your creation shows up here</p>
                       <p className="text-slate-600">Fill in the form and hit Make it!</p>
                     </Card>
@@ -498,31 +525,75 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
       )}
 
       {tab === "arcade" && <Arcade />}
+      {tab === "lounge" && <Lounge />}
+    </div>
+  );
+}
+
+/** The Study Desk's drawers: a subject and a tool. The tool changes what the helper is allowed to do. */
+function StudyDeskBar({ tool, subject, onTool, onSubject }: { tool: DeskTool; subject: DeskSubject | null; onTool: (t: DeskTool) => void; onSubject: (s: DeskSubject | null) => void }) {
+  const current = DESK_TOOLS.find((t) => t.id === tool)!;
+  return (
+    <div className="rounded-3xl bg-white p-4 ring-2 ring-blue-100">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-black uppercase tracking-wide text-blue-700">Subject</span>
+        {DESK_SUBJECTS.map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            onClick={() => onSubject(subject === s.id ? null : s.id)}
+            className={cx("rounded-full px-3 py-1.5 text-sm font-extrabold transition", subject === s.id ? "bg-blue-600 text-white" : "bg-blue-50 text-blue-900 hover:bg-blue-100")}
+          >
+            {s.emoji} {s.label}
+          </button>
+        ))}
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span className="text-xs font-black uppercase tracking-wide text-blue-700">Tool</span>
+        {DESK_TOOLS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => onTool(t.id)}
+            className={cx("rounded-full px-3 py-1.5 text-sm font-extrabold transition", tool === t.id ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-800 hover:bg-slate-200")}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <p className="mt-2 text-sm font-semibold text-slate-600">{current.blurb}</p>
     </div>
   );
 }
 
 function StudioHall({ modes, onOpen }: { modes: ModeDef[]; onOpen: (id: ModeId) => void }) {
-  if (!modes.length) return <Card tone="tint">No studios are unlocked yet. Your facilitator will open one soon!</Card>;
+  if (!modes.length) return <Card tone="tint">No rooms are unlocked yet. Your facilitator will open one soon!</Card>;
   return (
     <div>
-      <h2 className="mb-3 text-2xl font-extrabold text-violet-900">Pick a studio</h2>
+      <h2 className="mb-1 text-3xl font-black text-slate-900">Pick a room</h2>
+      <p className="mb-4 text-base font-semibold text-slate-600">Every room makes something real: a game, a book, a movie, a song. Which one today?</p>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {modes.map((m) => (
-          <button
-            key={m.id}
-            onClick={() => onOpen(m.id)}
-            className="flex flex-col items-start rounded-3xl bg-white p-5 text-left ring-2 ring-violet-100 transition hover:-translate-y-1 hover:ring-violet-400 focus:outline-none focus-visible:ring-4 focus-visible:ring-amber-300"
-          >
-            <span className="text-5xl">{m.emoji}</span>
-            <span className="mt-2 text-xl font-extrabold text-slate-900">{m.name}</span>
-            <span className="text-sm font-semibold text-violet-700">{m.tagline}</span>
-            <span className="mt-2 text-sm text-slate-600">{m.blurb}</span>
-            <span className="mt-3 rounded-full bg-violet-50 px-3 py-1 text-xs font-bold text-violet-800">
-              {m.interaction === "chat" ? "💬 Chat helper" : m.interaction === "both" ? "🎬 Orders + 💬 chat" : "🎬 Director's Orders"}
-            </span>
-          </button>
-        ))}
+        {modes.map((m) => {
+          const room = roomIdFor(m.id);
+          const theme = ROOM_THEME[room];
+          return (
+            <button
+              key={m.id}
+              onClick={() => onOpen(m.id)}
+              className={cx("group flex flex-col items-start rounded-[28px] bg-white p-5 text-left shadow-[0_8px_30px_-12px_rgba(76,29,149,.25)] ring-2 transition hover:-translate-y-1 hover:shadow-[0_18px_40px_-14px_rgba(76,29,149,.35)] focus:outline-none focus-visible:ring-4 focus-visible:ring-amber-300", theme.ring)}
+            >
+              <RoomIcon id={room} size={56} />
+              <span className="mt-4 text-2xl font-black leading-tight text-slate-900">{m.name}</span>
+              <span className="mt-1 text-sm font-bold" style={{ color: theme.accent }}>
+                {m.tagline}
+              </span>
+              <span className="mt-2 text-sm font-semibold leading-snug text-slate-600">{m.blurb}</span>
+              <span className="mt-4 inline-flex items-center gap-1 rounded-full px-4 py-2 text-sm font-black text-white transition group-hover:gap-2" style={{ background: theme.accent }}>
+                Go in <span aria-hidden="true">→</span>
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

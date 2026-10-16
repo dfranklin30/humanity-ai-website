@@ -207,6 +207,30 @@ export const childSubmit = (body: { mode: ModeId; kind: "create" | "change" | "c
 export const childSpeak = (artifactId: number) => call<{ audio: string; mime: string }>("POST", `/child/artifacts/${artifactId}/speak`);
 export const childRequest = (id: number) => call<{ request: StudioRequest }>("GET", `/child/requests/${id}`);
 export const childArcade = () => call<{ items: ArtifactMeta[] }>("GET", "/child/arcade");
+
+export type LoungeItem = { id: number | string; title: string; url: string; source: string; note: string; youtubeId?: string; starter?: boolean; class_id?: number | null };
+export const fLounge = () => call<{ items: LoungeItem[]; starters: LoungeItem[] }>("GET", "/facilitator/lounge");
+export const fLoungeAdd = (body: { title: string; url: string; source?: string; note?: string; classId?: number | null }) => call<{ item: LoungeItem }>("POST", "/facilitator/lounge", body);
+export const fLoungeRemove = (id: number | string) => call<{ ok: true }>("DELETE", `/facilitator/lounge/${id}`);
+export const childLounge = () => call<{ picked: LoungeItem[]; made: ArtifactMeta[] }>("GET", "/child/lounge");
+
+export const DESK_TOOLS = [
+  { id: "hint", label: "Hint me", blurb: "Stuck? Get one question that moves you forward.", placeholder: "I'm stuck on 3/4 + 1/8…" },
+  { id: "lesson", label: "Teach me the idea", blurb: "Learn how it works, with a worked example.", placeholder: "How does long division work?" },
+  { id: "practice", label: "Give me practice", blurb: "Four new problems to try, then get them checked.", placeholder: "Practice on multiplying fractions" },
+  { id: "check", label: "Check my answers", blurb: "Send your answers; find out which to look at again.", placeholder: "1) 12  2) 3/4  3) 56  4) 9" },
+  { id: "read", label: "Read with me", blurb: "A short passage and three questions.", placeholder: "A passage about volcanoes" },
+  { id: "research", label: "Research notes", blurb: "Background facts to check for a report.", placeholder: "Notes for a report on the water cycle" },
+] as const;
+export type DeskTool = (typeof DESK_TOOLS)[number]["id"];
+export const DESK_SUBJECTS = [
+  { id: "math", label: "Math", emoji: "➗" },
+  { id: "reading", label: "Reading", emoji: "📖" },
+  { id: "writing", label: "Writing", emoji: "✏️" },
+  { id: "science", label: "Science", emoji: "🔬" },
+  { id: "social", label: "Social Studies", emoji: "🌍" },
+] as const;
+export type DeskSubject = (typeof DESK_SUBJECTS)[number]["id"];
 export const childPublish = (id: number, publish: boolean) => call<{ ok: true }>("POST", `/child/artifacts/${id}/publish`, { publish });
 
 /* Shared */

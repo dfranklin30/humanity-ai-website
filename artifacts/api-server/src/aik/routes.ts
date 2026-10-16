@@ -21,6 +21,7 @@ import { runRequest, stashPhoto, subscribe, publish, toPublicRequest, toChildReq
 import { KID_MESSAGES, contentSafetyImage } from "./safety";
 import { getMedia, referencedNames } from "./media";
 import { bookNarrationText, type Book } from "./book";
+import { LOUNGE_STARTERS, youtubeIdOf, validateLoungeUrl } from "./lounge";
 import { renderBookPdf } from "./bookpdf";
 
 declare module "express-session" {
@@ -954,6 +955,58 @@ export function registerAikRoutes(app: Express): void {
       const r = await store.getRequest(Number(req.params.rid));
       if (!r || r.child_id !== child.id) return void res.status(404).json({ error: "Not found." });
       res.json({ request: toChildRequest(r) });
+    }),
+  );
+
+  /* ---------------- Screen Time Lounge ---------------- */
+
+  app.get(
+    `${base}/child/lounge`,
+    requireChild,
+    wrap(async (req, res) => {
+      const { klass } = req as CReq;
+      const picked = (await store.listLounge(klass.id, klass.facilitator_id)).map((v) => ({ id: v.id, title: v.title, url: v.url, source: v.source, note: v.note, youtubeId: youtubeIdOf(v.url) }));
+      const starters = LOUNGE_STARTERS.map((s, i) => ({ ...s, id: `starter-${i}` }));
+      const made = (await store.listArcade(klass.id)).filter((a) => a.kind === "video" || a.kind === "audio" || a.kind === "story");
+      res.json({ picked: [...picked, ...starters], made });
+    }),
+  );
+
+  app.get(
+    `${base}/facilitator/lounge`,
+    requireRunClasses,
+    wrap(async (req, res) => {
+      const items = await store.listLoungeForFacilitator((req as FReq).facilitator.id);
+      res.json({ items: items.map((v) => ({ ...v, youtubeId: youtubeIdOf(v.url) })), starters: LOUNGE_STARTERS });
+    }),
+  );
+
+  app.post(
+    `${base}/facilitator/lounge`,
+    requireRunClasses,
+    wrap(async (req, res) => {
+      const body = z.object({ title: z.string().min(2).max(90), url: z.string().min(4).max(500), source: z.string().max(60).optional(), note: z.string().max(200).optional(), classId: z.number().int().nullable().optional() }).safeParse(req.body);
+      if (!body.success) return void res.status(400).json({ error: "Give the video a title and a link." });
+      const v = validateLoungeUrl(body.data.url);
+      if (!v.ok) return void res.status(400).json({ error: v.error });
+      const fac = (req as FReq).facilitator;
+      if (body.data.classId) {
+        const klass = await store.getClass(body.data.classId);
+        if (!klass || klass.facilitator_id !== fac.id) return void res.status(404).json({ error: "Class not found." });
+      }
+      const row = await store.addLounge({ facilitatorId: fac.id, classId: body.data.classId ?? null, title: body.data.title.trim(), url: v.url, source: (body.data.source ?? "").trim(), note: (body.data.note ?? "").trim() });
+      await store.audit(body.data.classId ?? null, "facilitator", fac.id, "lounge_added", { id: row.id, url: row.url });
+      res.json({ item: { ...row, youtubeId: v.youtubeId } });
+    }),
+  );
+
+  app.delete(
+    `${base}/facilitator/lounge/:lid`,
+    requireRunClasses,
+    wrap(async (req, res) => {
+      const ok = await store.removeLounge(Number(req.params.lid), (req as FReq).facilitator.id);
+      if (!ok) return void res.status(404).json({ error: "Not found." });
+      res.json({ ok: true });
     }),
   );
 
