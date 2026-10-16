@@ -6,7 +6,7 @@
  * Director's Order form (never a chat box), the result in a locked sandbox,
  * the child's portfolio, and the class Arcade.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cx } from "../components/ui";
 import {
   ApiError,
@@ -309,6 +309,13 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
     }
   }
 
+  /* An order error used to land at the top of the page while the child was
+     looking at the form further down. Bring it into view. */
+  const errorRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (error) errorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [error]);
+
   const [deskTool, setDeskTool] = useState<DeskTool>("hint");
   const [deskSubject, setDeskSubject] = useState<DeskSubject | null>(null);
 
@@ -367,7 +374,11 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
       {me.class.paused && <Notice>⏸️ Your facilitator paused the Studio. Look up front!</Notice>}
       {me.class.locked && <Notice tone="info">🔒 Your portfolio is locked for the Expo: no new orders or chats today, but everything you made is ready to show in My stuff and the Arcade!</Notice>}
       {me.child.muted && <Notice>Your facilitator paused your orders for now.</Notice>}
-      {error && <Notice>{error}</Notice>}
+      {error && (
+        <div ref={errorRef}>
+          <Notice>{error}</Notice>
+        </div>
+      )}
 
       {tab === "make" && !mode && (
         <StudioHall modes={modes} onOpen={openModule} />
