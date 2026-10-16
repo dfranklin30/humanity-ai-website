@@ -38,8 +38,9 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-# Only the two packages the server bundle loads at runtime (native/dynamic deps)
-RUN npm install --omit=dev --no-audit --no-fund sharp@0.35.3 nodemailer@9.0.3
+# Packages the server bundle loads at runtime instead of bundling (native or
+# dynamic deps, and the Azure SDKs, which build.mjs keeps external).
+RUN npm install --omit=dev --no-audit --no-fund sharp@0.35.3 nodemailer@9.0.3 "@azure/storage-blob@^12.27.0" "@azure/identity@^4.10.0"
 
 COPY --from=build /app/artifacts/api-server/dist ./dist
 

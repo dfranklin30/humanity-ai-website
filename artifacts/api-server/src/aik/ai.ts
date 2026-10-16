@@ -233,10 +233,41 @@ export async function generateImage(prompt: string, options: ImageOptions = {}):
  * Covers Azure AI Foundry (FLUX.1 and friends) and any self-hosted equivalent.
  * Accepts either a base64 payload or a URL in the response, since hosts differ.
  */
+/**
+ * Azure AI Foundry serves the OpenAI-compatible v1 routes for FLUX and Sora
+ * only with `?api-version=preview`; without it the route is a plain 404,
+ * which is what every picture request got until now. Other hosts (Groq,
+ * fal, vLLM…) take the path as-is.
+ */
+export function withApiVersion(url: string): string {
+  if (!/\.openai\.azure\.com|\.services\.ai\.azure\.com|\.cognitiveservices\.azure\.com/i.test(url)) return url;
+  if (/[?&]api-version=/.test(url)) return url;
+  return `${url}${url.includes("?") ? "&" : "?"}api-version=${aikConfig.oss.apiVersion}`;
+}
+
+/**
+ * A paid media model behind a small deployment answers "429 RateLimitReached"
+ * when a book asks for two pictures at once. That is not a failure, it is a
+ * queue: wait for the Retry-After (or a few seconds) and ask again, a few
+ * times, before giving the page up.
+ */
+async function fetchMediaWithRetry(url: string, init: RequestInit, timeoutMs: number, label: string): Promise<Response> {
+  let res = await fetchWithTimeout(url, init, timeoutMs);
+  for (let attempt = 1; attempt <= 4 && (res.status === 429 || res.status === 503); attempt++) {
+    const hinted = Number(res.headers.get("retry-after"));
+    const waitMs = Math.min(60_000, (Number.isFinite(hinted) && hinted > 0 ? hinted * 1000 : 4000 * attempt) + Math.random() * 1000);
+    logger.info({ label, status: res.status, attempt, waitMs: Math.round(waitMs) }, "[aik] media rate-limited; waiting");
+    await res.text().catch(() => "");
+    await new Promise((r) => setTimeout(r, waitMs));
+    res = await fetchWithTimeout(url, init, timeoutMs);
+  }
+  return res;
+}
+
 async function generateImageOpenAICompatible(prompt: string, size: string): Promise<MediaResult> {
   const { imageBaseUrl, imageApiKey, imageModel } = aikConfig.oss;
-  const res = await fetchWithTimeout(
-    `${imageBaseUrl}/images/generations`,
+  const res = await fetchMediaWithRetry(
+    withApiVersion(`${imageBaseUrl}/images/generations`),
     {
       method: "POST",
       headers: {
@@ -247,6 +278,7 @@ async function generateImageOpenAICompatible(prompt: string, size: string): Prom
       body: JSON.stringify({ model: imageModel, prompt, n: 1, size }),
     },
     aikConfig.mediaTimeoutMs,
+    "image",
   );
   if (!res.ok) throw new Error(`OSS image ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
   return imageFromResponse(await res.json(), imageModel);
@@ -266,10 +298,11 @@ async function editImageOpenAICompatible(prompt: string, referencePngBase64: str
   form.append("n", "1");
   form.append("size", size);
   form.append("image", new Blob([Buffer.from(referencePngBase64, "base64")], { type: "image/png" }), "reference.png");
-  const res = await fetchWithTimeout(
-    `${imageBaseUrl}/images/edits`,
+  const res = await fetchMediaWithRetry(
+    withApiVersion(`${imageBaseUrl}/images/edits`),
     { method: "POST", headers: { authorization: `Bearer ${imageApiKey}`, "api-key": imageApiKey }, body: form },
     aikConfig.mediaTimeoutMs,
+    "image-edit",
   );
   if (!res.ok) throw new Error(`OSS image edit ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
   return imageFromResponse(await res.json(), imageModel);
@@ -319,8 +352,8 @@ async function generateVideoJobApi(prompt: string, options: VideoOptions): Promi
     "api-key": videoApiKey,
   };
 
-  const start = await fetchWithTimeout(
-    `${videoBaseUrl}/videos`,
+  const start = await fetchMediaWithRetry(
+    withApiVersion(`${videoBaseUrl}/videos`),
     {
       method: "POST",
       headers,
@@ -332,6 +365,7 @@ async function generateVideoJobApi(prompt: string, options: VideoOptions): Promi
       }),
     },
     60_000,
+    "video",
   );
   if (!start.ok) throw new Error(`Video submit ${start.status}: ${(await start.text().catch(() => "")).slice(0, 300)}`);
   const job: any = await start.json();
@@ -351,7 +385,7 @@ async function generateVideoJobApi(prompt: string, options: VideoOptions): Promi
     }
     attempts++;
     await new Promise((r) => setTimeout(r, 4000));
-    const poll = await fetchWithTimeout(`${videoBaseUrl}/videos/${jobId}`, { headers }, 30_000);
+    const poll = await fetchWithTimeout(withApiVersion(`${videoBaseUrl}/videos/${jobId}`), { headers }, 30_000);
     if (!poll.ok) throw new Error(`Video poll ${poll.status}`);
     const cur: any = await poll.json();
     status = String(cur?.status ?? status);
@@ -359,7 +393,7 @@ async function generateVideoJobApi(prompt: string, options: VideoOptions): Promi
   }
   if (status !== "completed" && status !== "succeeded") throw new Error(`Video job did not finish (last status: ${status})`);
 
-  const file = await fetchWithTimeout(`${videoBaseUrl}/videos/${jobId}/content`, { headers }, 120_000);
+  const file = await fetchWithTimeout(withApiVersion(`${videoBaseUrl}/videos/${jobId}/content`), { headers }, 120_000);
   if (!file.ok) throw new Error(`Video download ${file.status}`);
   return {
     base64: Buffer.from(await file.arrayBuffer()).toString("base64"),

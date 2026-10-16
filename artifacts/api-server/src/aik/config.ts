@@ -134,6 +134,8 @@ export const aikConfig = {
   },
 
   oss: {
+    /** Query string Azure AI Foundry needs on its v1 media routes (FLUX, Sora). */
+    apiVersion: env.AIK_OSS_API_VERSION || "preview",
     videoBaseUrl: env.AIK_OSS_VIDEO_BASE_URL || "",
     videoApiKey: env.AIK_OSS_VIDEO_API_KEY || "",
     videoModel: env.AIK_OSS_VIDEO_MODEL || "",
