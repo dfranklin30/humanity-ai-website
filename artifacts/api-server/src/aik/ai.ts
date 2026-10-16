@@ -208,6 +208,7 @@ export type ImageOptions = {
 export async function generateImage(prompt: string, options: ImageOptions = {}): Promise<MediaResult> {
   if (aikConfig.mockAI) return { base64: MOCK_PNG, mime: "image/png", provider: "mock", model: "mock" };
   if (!isImageConfigured()) throw new Error("Image provider not configured");
+  if (aikConfig.providers.image === "bfl") return generateImageBfl(prompt, options);
   if (options.reference && aikConfig.imageReference && aikConfig.providers.image === "oss") {
     try {
       return await editImageOpenAICompatible(prompt, options.reference, options.size ?? "1024x1024");
@@ -226,6 +227,45 @@ export async function generateImage(prompt: string, options: ImageOptions = {}):
   const b64 = res.data?.[0]?.b64_json;
   if (!b64) throw new Error("Azure: no image returned");
   return { base64: b64, mime: "image/png", provider: "azure", model: aikConfig.azureOpenAI.imageDeployment };
+}
+
+/**
+ * FLUX.2 through Azure AI Foundry's Black Forest Labs route. One endpoint
+ * does both jobs: a plain prompt draws a new picture, and the same prompt
+ * with `input_image` draws a picture that keeps the character and style of
+ * the one supplied — which is how every page of a storybook gets the same
+ * hero as its cover. When the reference call is refused, the page is drawn
+ * from the words alone rather than lost.
+ */
+async function generateImageBfl(prompt: string, options: ImageOptions): Promise<MediaResult> {
+  const { url, apiKey, model } = aikConfig.bfl;
+  const [w, h] = (options.size ?? "1024x1024").split("x").map(Number);
+  const call = async (reference?: string) => {
+    const body: Record<string, unknown> = { prompt, model, width: w, height: h, n: 1 };
+    if (reference) body.input_image = reference;
+    const res = await fetchMediaWithRetry(
+      url,
+      { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}`, "api-key": apiKey }, body: JSON.stringify(body) },
+      aikConfig.mediaTimeoutMs,
+      reference ? "flux-reference" : "flux",
+    );
+    if (!res.ok) {
+      const text = (await res.text().catch(() => "")).slice(0, 300);
+      if (/content|policy|safety|moderat/i.test(text)) throw new ContentFilteredError("FLUX");
+      throw new Error(`FLUX ${res.status}: ${text}`);
+    }
+    const r = await imageFromResponse(await res.json(), model);
+    return { ...r, provider: "bfl" };
+  };
+  if (options.reference && aikConfig.imageReference) {
+    try {
+      return await call(options.reference);
+    } catch (err) {
+      if (err instanceof ContentFilteredError) throw err;
+      logger.warn({ err: String((err as Error)?.message ?? err).slice(0, 200) }, "[aik] FLUX reference call failed; drawing from the words");
+    }
+  }
+  return call();
 }
 
 /**

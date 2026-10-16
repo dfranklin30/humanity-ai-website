@@ -15,7 +15,8 @@
  *   AIK_TEXT_PROVIDER                 anthropic | azure | oss   (default anthropic if key set)
  *   AIK_OSS_TEXT_PROVIDER             which provider backs modules that ask for an open-source
  *                                     model: oss | anthropic (default oss if configured)
- *   AIK_IMAGE_PROVIDER                azure | fal               (default: whichever is configured)
+ *   AIK_IMAGE_PROVIDER                bfl | azure | oss | fal   (default: whichever is configured)
+ *   AIK_BFL_IMAGE_URL, AIK_BFL_API_KEY, AIK_BFL_MODEL   FLUX.2 on Foundry (provider route, see `bfl` below)
  *   AIK_VIDEO_PROVIDER                fal | none
  *   AIK_VIDEO_PROVIDER                oss | fal | none
  *   AIK_OSS_VIDEO_BASE_URL            e.g. https://<res>.openai.azure.com/openai/v1
@@ -82,7 +83,7 @@ const env = process.env;
 const isProduction = env.NODE_ENV === "production";
 
 export type TextProviderId = "anthropic" | "azure" | "oss";
-export type ImageProviderId = "azure" | "oss" | "fal" | "none";
+export type ImageProviderId = "azure" | "oss" | "bfl" | "fal" | "none";
 export type VideoProviderId = "oss" | "fal" | "none";
 export type MusicProviderId = "elevenlabs" | "fal" | "none";
 export type TtsProviderId = "azure" | "elevenlabs" | "none";
@@ -95,6 +96,8 @@ const azureTextConfigured = Boolean(env.AIK_AZURE_OPENAI_ENDPOINT && azureAuthCo
 const azureImageConfigured = Boolean(env.AIK_AZURE_OPENAI_ENDPOINT && azureAuthConfigured && env.AIK_AZURE_OPENAI_IMAGE_DEPLOYMENT);
 const ossImageConfigured = Boolean((env.AIK_OSS_IMAGE_BASE_URL || env.AIK_OSS_BASE_URL) && (env.AIK_OSS_IMAGE_API_KEY || env.AIK_OSS_API_KEY) && env.AIK_OSS_IMAGE_MODEL);
 const falConfigured = Boolean(env.AIK_FAL_KEY);
+// FLUX.2 on Azure AI Foundry: the Black Forest Labs provider route, not the OpenAI images API.
+const bflConfigured = Boolean(env.AIK_BFL_IMAGE_URL && (env.AIK_BFL_API_KEY || env.AIK_OSS_IMAGE_API_KEY || env.AIK_OSS_API_KEY));
 const azureSpeechConfigured = Boolean(env.AIK_AZURE_SPEECH_KEY && env.AIK_AZURE_SPEECH_REGION);
 const elevenConfigured = Boolean(env.AIK_ELEVENLABS_API_KEY);
 const ossVideoConfigured = Boolean(env.AIK_OSS_VIDEO_BASE_URL && env.AIK_OSS_VIDEO_API_KEY && env.AIK_OSS_VIDEO_MODEL);
@@ -112,7 +115,7 @@ export const aikConfig = {
   providers: {
     text: pick<TextProviderId>(env.AIK_TEXT_PROVIDER, ["anthropic", "azure", "oss"], anthropicKey ? "anthropic" : azureTextConfigured ? "azure" : "oss"),
     ossText: pick<TextProviderId>(env.AIK_OSS_TEXT_PROVIDER, ["oss", "anthropic", "azure"], ossConfigured ? "oss" : anthropicKey ? "anthropic" : "azure"),
-    image: pick<ImageProviderId>(env.AIK_IMAGE_PROVIDER, ["azure", "oss", "fal", "none"], azureImageConfigured ? "azure" : ossImageConfigured ? "oss" : falConfigured ? "fal" : "none"),
+    image: pick<ImageProviderId>(env.AIK_IMAGE_PROVIDER, ["azure", "oss", "bfl", "fal", "none"], bflConfigured ? "bfl" : azureImageConfigured ? "azure" : ossImageConfigured ? "oss" : falConfigured ? "fal" : "none"),
     video: pick<VideoProviderId>(env.AIK_VIDEO_PROVIDER, ["oss", "fal", "none"], ossVideoConfigured ? "oss" : falConfigured ? "fal" : "none"),
     music: pick<MusicProviderId>(env.AIK_MUSIC_PROVIDER, ["elevenlabs", "fal", "none"], elevenConfigured ? "elevenlabs" : falConfigured ? "fal" : "none"),
     tts: pick<TtsProviderId>(env.AIK_TTS_PROVIDER, ["azure", "elevenlabs", "none"], azureSpeechConfigured ? "azure" : elevenConfigured ? "elevenlabs" : "none"),
@@ -146,6 +149,20 @@ export const aikConfig = {
     imageBaseUrl: (env.AIK_OSS_IMAGE_BASE_URL || env.AIK_OSS_BASE_URL || "").replace(/\/$/, ""),
     imageApiKey: env.AIK_OSS_IMAGE_API_KEY || env.AIK_OSS_API_KEY || "",
     imageModel: env.AIK_OSS_IMAGE_MODEL || "",
+  },
+
+  /**
+   * FLUX.2 on Azure AI Foundry. The deployment is reached through the Black
+   * Forest Labs provider route, e.g.
+   *   https://<resource>.services.ai.azure.com/providers/blackforestlabs/v1/flux-2-flex?api-version=preview
+   * with a JSON body of prompt, model, width, height, n and, for a picture that
+   * must match an earlier one, input_image (base64). The reply is OpenAI-shaped
+   * (data[0].b64_json). The Foundry portal's "View code" shows the exact URL.
+   */
+  bfl: {
+    url: env.AIK_BFL_IMAGE_URL || "",
+    apiKey: env.AIK_BFL_API_KEY || env.AIK_OSS_IMAGE_API_KEY || env.AIK_OSS_API_KEY || "",
+    model: env.AIK_BFL_MODEL || "flux2-flex",
   },
 
   /** Azure AI Speech — available on the same multi-service AIServices resource as Content Safety. */
@@ -278,7 +295,7 @@ export function isOssTextConfigured(): boolean {
 export function isImageConfigured(): boolean {
   if (aikConfig.mockAI) return true;
   const p = aikConfig.providers.image;
-  return (p === "azure" && azureImageConfigured) || (p === "oss" && ossImageConfigured) || (p === "fal" && falConfigured);
+  return (p === "azure" && azureImageConfigured) || (p === "oss" && ossImageConfigured) || (p === "bfl" && bflConfigured) || (p === "fal" && falConfigured);
 }
 export function isVideoConfigured(): boolean {
   return (
