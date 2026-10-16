@@ -111,7 +111,17 @@ export function GameFrame({ html, title, tall }: { html: string; title: string; 
  * ------------------------------------------------------------------ */
 
 export function ArtifactView({ artifact, compact }: { artifact: Artifact; compact?: boolean }) {
-  if (artifact.kind === "game") return <GameFrame html={artifact.content} title={artifact.title} tall={!compact} />;
+  if (artifact.kind === "game")
+    return (
+      <div className="space-y-3">
+        <GameFrame html={artifact.content} title={artifact.title} tall={!compact} />
+        {!compact && (
+          <a href={downloadUrl(artifact.id)} className="inline-block rounded-2xl bg-white px-4 py-2 text-base font-bold text-violet-800 ring-2 ring-violet-200 hover:bg-violet-50">
+            ⬇️ Download the game (plays in any browser)
+          </a>
+        )}
+      </div>
+    );
 
   if (artifact.kind === "story") {
     let data: any = {};
@@ -143,31 +153,13 @@ export function ArtifactView({ artifact, compact }: { artifact: Artifact; compac
   }
 
   if (artifact.kind === "quest") {
-    let data: { title?: string; items?: { text: string; sourceHint: string }[]; nextIdea?: string } = {};
+    let data: { title?: string; items?: { text: string; sourceHint: string; answer?: string }[]; nextIdea?: string } = {};
     try {
       data = JSON.parse(artifact.content);
     } catch {
       /* ignore */
     }
-    return (
-      <div className="space-y-3">
-        <Notice tone="info">These are first-draft ideas from the AI. Your job: check each one in a book or a kid-safe site, then mark it ✅ on paper.</Notice>
-        <ol className="space-y-2">
-          {(data.items ?? []).map((it, i) => (
-            <li key={i} className="rounded-2xl bg-white p-4 ring-2 ring-slate-200">
-              <p className="text-base font-semibold text-slate-900">
-                <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-violet-100 text-sm font-bold text-violet-800">{i + 1}</span>
-                {it.text}
-              </p>
-              <p className="mt-1 text-sm text-slate-600">
-                <span className="font-bold text-amber-700">Check me:</span> {it.sourceHint}
-              </p>
-            </li>
-          ))}
-        </ol>
-        {data.nextIdea && <p className="text-base font-semibold text-violet-800">Next idea: {data.nextIdea}</p>}
-      </div>
-    );
+    return <QuestView data={data} title={artifact.title} compact={compact} />;
   }
 
   if (artifact.kind === "video") {
@@ -733,11 +725,80 @@ function Field({ def, value, maxChars, onChange }: { def: FieldDef; value: strin
   );
 }
 
-export function ChangeBox({ hint, maxChars, onSubmit, busy }: { hint: string; maxChars: number; onSubmit: (change: string) => void; busy?: boolean }) {
+/**
+ * A quest is a list to check, and a quiz is a list with the answers kept
+ * separate: hidden for a student sheet, shown for the answer key. Both views
+ * print cleanly (the print button opens a plain page with just the list).
+ */
+function QuestView({ data, title, compact }: { data: { title?: string; items?: { text: string; sourceHint: string; answer?: string }[]; nextIdea?: string }; title: string; compact?: boolean }) {
+  const items = data.items ?? [];
+  const isQuiz = items.some((it) => it.answer);
+  const [showAnswers, setShowAnswers] = useState(false);
+  const [revealed, setRevealed] = useState<Record<number, boolean>>({});
+  function printSheet(withAnswers: boolean) {
+    const esc = (t: string) => String(t ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c] as string);
+    const rows = items
+      .map((it, i) => `<li><p class="q">${esc(it.text)}</p>${withAnswers ? `<p class="a">Answer: ${esc(it.answer ?? "")}</p>` : isQuiz ? `<p class="line">&nbsp;</p>` : ""}<p class="s">Check me: ${esc(it.sourceHint)}</p></li>`)
+      .join("");
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(data.title ?? title)}</title><style>body{font-family:system-ui,sans-serif;max-width:720px;margin:32px auto;padding:0 20px;color:#111}h1{font-size:22px}ol{padding-left:24px}li{margin:14px 0}.q{font-size:16px;font-weight:600;margin:0}.a{margin:4px 0 0;color:#166534;font-weight:600}.s{margin:4px 0 0;font-size:12px;color:#92400e}.line{border-bottom:1px solid #999;height:22px;margin:6px 0 0}.name{font-size:14px;margin-bottom:20px}</style></head><body><h1>${esc(data.title ?? title)}${withAnswers ? " (answer key)" : ""}</h1>${withAnswers ? "" : '<p class="name">Name: ____________________________</p>'}<ol>${rows}</ol></body></html>`;
+    const w = window.open("", "_blank");
+    if (!w) return;
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    w.print();
+  }
+  return (
+    <div className="space-y-3">
+      <Notice tone="info">These are first-draft ideas from the AI. Your job: check each one in a book or a kid-safe site, then mark it ✅ on paper.</Notice>
+      {isQuiz && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => setShowAnswers((v) => !v)} className="rounded-full bg-violet-100 px-3 py-1.5 text-sm font-bold text-violet-800 ring-1 ring-violet-200 hover:bg-violet-200">
+            {showAnswers ? "🙈 Hide the answers" : "👀 Show the answers"}
+          </button>
+          {!compact && (
+            <>
+              <button type="button" onClick={() => printSheet(false)} className="rounded-full bg-white px-3 py-1.5 text-sm font-bold text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50">
+                🖨️ Print student sheet
+              </button>
+              <button type="button" onClick={() => printSheet(true)} className="rounded-full bg-white px-3 py-1.5 text-sm font-bold text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50">
+                🖨️ Print answer key
+              </button>
+            </>
+          )}
+        </div>
+      )}
+      <ol className="space-y-2">
+        {items.map((it, i) => (
+          <li key={i} className="rounded-2xl bg-white p-4 ring-2 ring-slate-200">
+            <p className="text-base font-semibold text-slate-900">
+              <span className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-violet-100 text-sm font-bold text-violet-800">{i + 1}</span>
+              {it.text}
+            </p>
+            {it.answer &&
+              (showAnswers || revealed[i] ? (
+                <p className="mt-1 text-sm font-semibold text-green-800">Answer: {it.answer}</p>
+              ) : (
+                <button type="button" onClick={() => setRevealed((r) => ({ ...r, [i]: true }))} className="mt-1 text-sm font-bold text-violet-700 underline decoration-dotted">
+                  Reveal the answer
+                </button>
+              ))}
+            <p className="mt-1 text-sm text-slate-600">
+              <span className="font-bold text-amber-700">Check me:</span> {it.sourceHint}
+            </p>
+          </li>
+        ))}
+      </ol>
+      {data.nextIdea && <p className="text-base font-semibold text-violet-800">Next idea: {data.nextIdea}</p>}
+    </div>
+  );
+}
+
+export function ChangeBox({ hint, maxChars, onSubmit, busy, quick }: { hint: string; maxChars: number; onSubmit: (change: string) => void; busy?: boolean; quick?: { label: string; change: string }[] }) {
   const [change, setChange] = useState("");
   return (
     <form
-      className="flex flex-col gap-3 sm:flex-row sm:items-end"
+      className="flex flex-col gap-3 sm:flex-row sm:items-end sm:flex-wrap"
       onSubmit={(e) => {
         e.preventDefault();
         if (change.trim().length < 3 || busy) return;
@@ -745,6 +806,21 @@ export function ChangeBox({ hint, maxChars, onSubmit, busy }: { hint: string; ma
         setChange("");
       }}
     >
+      {quick && quick.length > 0 && (
+        <div className="flex w-full flex-wrap gap-2">
+          {quick.map((q) => (
+            <button
+              key={q.label}
+              type="button"
+              disabled={busy}
+              onClick={() => onSubmit(q.change)}
+              className="rounded-full bg-violet-100 px-3 py-1.5 text-sm font-bold text-violet-800 ring-1 ring-violet-200 hover:bg-violet-200 disabled:opacity-50"
+            >
+              {q.label}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="flex-1">
         <label htmlFor="change" className="block text-base font-bold text-slate-800">
           Director's Order: make one change

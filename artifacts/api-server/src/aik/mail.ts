@@ -97,3 +97,19 @@ export async function sendReset(to: string, displayName: string, token: string):
     url,
   );
 }
+
+/**
+ * A child said something worrying in a chat. The facilitator is the person
+ * who can actually help, so they hear about it at once. No links, no child
+ * names (the Studio never has them): the class, the module and the words.
+ */
+export async function sendCareAlert(to: string, info: { className: string; childId: number | null; mode: string; message: string }): Promise<{ sent: boolean }> {
+  const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] as string);
+  const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;margin:0 auto;color:#111827;">
+    <h2 style="color:#b91c1c;">A child in ${esc(info.className)} may need you</h2>
+    <p style="font-size:15px;line-height:1.6;">In the <b>${esc(info.mode)}</b> helper, a child (studio id ${info.childId ?? "unknown"}) wrote:</p>
+    <blockquote style="border-left:4px solid #b91c1c;margin:16px 0;padding:8px 16px;background:#fef2f2;font-size:15px;">${esc(info.message)}</blockquote>
+    <p style="font-size:15px;line-height:1.6;">The helper replied with a kind, scripted message and asked them to talk to you or another trusted adult. Please check in with them now. The class feed shows which request this was.</p>
+  </div>`;
+  return send(to, `${BRAND}: a child in ${info.className} may need you`, html, "care-alert");
+}

@@ -13,12 +13,14 @@ import * as store from "./store";
 import type { RequestRow, ArtifactRow, ClassRow } from "./store";
 import { getMode, validateInput, systemPrompt, chatSystemPrompt, userPrompt, isRedirect, extractHtml, extractJson, gameSummary, gameTitle, type ModeDef } from "./modes";
 import { completeText, generateImage, generateMusic, ContentFilteredError, type ChatTurn } from "./ai";
+import { sendCareAlert } from "./mail";
 import { forgeGame, refineJson, type ForgeStep } from "./forge";
+import { stripArt, carryArt } from "./gameart";
 import { writeBookDraft, buildBook, bookTextOnly, type Book } from "./book";
 import { buildMovie, type Movie } from "./movie";
 import { putMedia, discardMedia } from "./media";
 import { verifyMicrobitCode } from "./verify";
-import { screenInput, screenOutputText, scanGameCode, hardenGameHtml, stripLinks, contentSafetyImage, KID_MESSAGES, type Flag } from "./safety";
+import { screenCare, CARE_REPLY, screenInput, screenOutputText, scanGameCode, hardenGameHtml, stripLinks, contentSafetyImage, KID_MESSAGES, type Flag } from "./safety";
 import { isContentSafetyConfigured, isImageConfigured, isVideoConfigured } from "./config";
 
 /* ------------------------------------------------------------------ *
@@ -151,6 +153,14 @@ export async function runRequest(requestId: number): Promise<void> {
       return;
     }
 
+    // 2a. A child who is hurting gets care, not a block. Checked before any
+    // screening so the words "hurt myself" never produce a scolding message.
+    if (input.kind === "chat" && screenCare(input.message)) {
+      await careAlert(req, mode, input.message);
+      await finish(req, { status: "done", message: CARE_REPLY, flags: [...flags, { layer: "output", category: "care_alert" }] });
+      return;
+    }
+
     // 2. Screen the child's words
     const screen = await screenInput(input.text);
     flags.push(...screen.flags);
@@ -211,7 +221,8 @@ export async function runRequest(requestId: number): Promise<void> {
         charBudget: studio ? aikConfig.studioGameChars : aikConfig.kidsGameChars,
         maxTokens: studio ? aikConfig.studioMaxTokens : mode.maxTokens,
         light: !studio,
-        extraRules: studio ? undefined : "- This game is for a child to read and change: a <canvas> no larger than 640x400, big shapes and emoji for characters are fine, and keep it simple enough to explain in one breath.",
+        paintArt: isImageConfigured(),
+        extraRules: studio ? undefined : "- This game is for a child to read and change: a <canvas> no larger than 640x400, and keep it simple enough to explain in one breath.",
         onProgress: (steps) => {
           writeChain = writeChain.then(() => store.setProgress(req.id, steps)).catch(() => {});
           publish(req.class_id, { type: "request", request: toPublicRequest({ ...req, status: "working", progress: steps }) });
@@ -274,6 +285,33 @@ export async function runRequest(requestId: number): Promise<void> {
       await finish(req, { status: built.blocked ? "blocked" : "failed", message: built.message, flags: [...flags, ...built.flags] });
       return;
     }
+    /* ---- Robotics, for everyone: a plan a child will flash onto hardware
+     * is checked (does the code parse? does it invent parts the micro:bit
+     * already has?) and repaired once before it is shown. The studio path
+     * below then adds its critique on top for facilitators.               */
+    if (mode.id === "robot" && input.kind === "create") {
+      const issues = verifyRobotJson(built.artifact.content);
+      if (issues.length) {
+        logger.info({ requestId: req.id, issues: issues.length }, "[aik] robot plan needs repair");
+        try {
+          const fixedRaw = await completeText({
+            system: sys,
+            user: `${usr}\n\nYour previous plan had these problems:\n- ${issues.join("\n- ")}\n\nReply with the complete corrected JSON and nothing else.\n\nPREVIOUS PLAN:\n${built.artifact.content}`,
+            maxTokens: mode.maxTokens,
+            temperature: 0.3,
+            tier: mode.tier,
+            mockKind: mode.id,
+          });
+          const fixed = await buildArtifact(mode.id, fixedRaw, input, current, klass, flags, req.id);
+          if (fixed.ok && verifyRobotJson(fixed.artifact.content).length < issues.length) {
+            built.artifact = fixed.artifact;
+          }
+        } catch (err) {
+          logger.warn({ err, requestId: req.id }, "[aik] robot repair failed; shipping the first draft");
+        }
+      }
+    }
+
     /* ---- Studio path for the writing studios --------------------------
      * Story, Quest and Robotics produce JSON, not a program, so there is
      * nothing to execute. They get the half of the pipeline that applies: a
@@ -492,7 +530,25 @@ function verifyRobotJson(json: string): string[] {
   try {
     const parsed = JSON.parse(json);
     const report = verifyMicrobitCode(String(parsed?.code ?? ""));
-    return report.ok ? [] : report.issues.map((i) => i.detail);
+    const issues = report.ok ? [] : report.issues.map((i) => i.detail);
+    // Built-in sensors are not parts. A plan that reads input.lightLevel() and
+    // then tells the child to buy and wire a light sensor is wrong twice over.
+    const code = String(parsed?.code ?? "");
+    const text = [...(parsed?.parts ?? []), ...(parsed?.steps ?? [])].join(" \n ").toLowerCase();
+    const builtIn: [RegExp, RegExp, string][] = [
+      [/input\.lightLevel\s*\(/, /\blight\s*sensor|\bldr\b|photo\s*resistor/, "light sensor (input.lightLevel() uses the micro:bit's own LED screen)"],
+      [/input\.temperature\s*\(/, /temperature\s*sensor|thermistor/, "temperature sensor (input.temperature() is built in)"],
+      [/input\.(acceleration|onGesture|rotation)\s*\(/, /accelerometer|tilt\s*sensor|motion\s*sensor/, "accelerometer (built into the micro:bit)"],
+      [/input\.compassHeading\s*\(/, /compass\s*(module|sensor)/, "compass (built into the micro:bit)"],
+      [/input\.soundLevel\s*\(/, /sound\s*sensor|microphone\s*module/, "microphone (built into micro:bit V2)"],
+    ];
+    for (const [codeRe, partRe, what] of builtIn) {
+      if (codeRe.test(code) && partRe.test(text)) {
+        issues.push(`The code uses the micro:bit's built-in ${what}, but the parts or steps tell the child to add and wire an external one. Remove that part and those wiring steps; the only parts needed for it are the micro:bit and a battery pack.`);
+      }
+    }
+    if (/light-sensor|add\s+"light/i.test(code)) issues.push("There is no 'light-sensor' extension: input.lightLevel() is built in. Remove that comment.");
+    return issues;
   } catch {
     return ["The robot plan is not valid JSON."];
   }
@@ -501,6 +557,8 @@ function verifyRobotJson(json: string): string[] {
 function projectStateForModel(a: ArtifactRow): string {
   // Images: the model edits the prompt text stored in summary, not the pixels.
   if (a.kind === "image") return JSON.stringify({ prompt: a.summary ?? "" });
+  // Games: the painted art is hundreds of kilobytes of base64 the model must never see.
+  if (a.kind === "game") return stripArt(a.content);
   if (a.kind === "audio") {
     try {
       const j = JSON.parse(a.summary ?? "{}");
@@ -530,6 +588,38 @@ function projectStateForModel(a: ArtifactRow): string {
  * ------------------------------------------------------------------ */
 
 type Transcript = { mode: string; turns: { role: "user" | "assistant"; text: string; at: string }[] };
+
+/**
+ * Tell the facilitator a child said something worrying. The words are kept
+ * in the audit log (the facilitator needs them) and e-mailed when mail is
+ * configured; the request itself shows the care flag in the class feed.
+ */
+async function careAlert(req: RequestRow, mode: ModeDef, message: string): Promise<void> {
+  await store.audit(req.class_id, "system", null, "care_alert", { requestId: req.id, childId: req.child_id, mode: mode.id, message: message.slice(0, 500) }).catch(() => {});
+  try {
+    const klass = await store.getClass(req.class_id);
+    const fac = klass ? await store.getFacilitator(klass.facilitator_id) : null;
+    if (fac?.email) {
+      await sendCareAlert(fac.email, { className: klass!.name, childId: req.child_id, mode: mode.name, message: message.slice(0, 500) });
+    }
+  } catch (err) {
+    logger.error({ err, requestId: req.id }, "[aik] care alert e-mail failed");
+  }
+}
+
+/* The homework rule, enforced in code as well as in the prompt. A reply that
+ * states a result ("the answer is 7/8", "**5/6**", "= 12.") has broken it,
+ * whatever the model was told. */
+const ANSWER_LEAK = [
+  /\b(the\s+)?(final\s+)?(answer|result|solution|total)\s+(is|=|would\s+be|comes\s+to)\b/i,
+  /\*\*\s*[-\d][\d\s.,\/]*\s*\*\*/, // a bolded number or fraction
+  /=\s*[-\d][\d.,\/]*\s*[.!]?\s*(\n|$)/m, // a line that ends on "= 7/8"
+  /\b(so|therefore|that\s+means)\s+[^.?!]{0,40}\b(is|equals)\s+[-\d][\d.,\/]*\b/i,
+];
+function leaksAnswer(reply: string): boolean {
+  return ANSWER_LEAK.some((re) => re.test(reply));
+}
+const HOMEWORK_FALLBACK = "I can't hand over the answer, but we can get there together. Which part is the tricky bit: the first step, or putting it all together?";
 
 /* ------------------------------------------------------------------ *
  * Transient photo stash
@@ -589,6 +679,21 @@ async function runChatTurn(req: RequestRow, mode: ModeDef, message: string, flag
   let reply: string;
   try {
     reply = await completeText({ system: chatSystemPrompt(mode), turns, photoDataUri, maxTokens: mode.id === "homework" ? mode.maxTokens : 350, temperature: 0.5, tier: mode.tier === "oss" ? "oss" : "fast", mockKind: "chat" });
+    if (mode.id === "homework" && leaksAnswer(reply)) {
+      // One more try with the rule in the model's face; then a safe scripted hint.
+      logger.info({ requestId: req.id }, "[aik] homework reply leaked the answer; rewriting");
+      const retry = await completeText({
+        system: chatSystemPrompt(mode) + "\n\nYOUR PREVIOUS DRAFT GAVE AWAY THE ANSWER. Rewrite it: no final number, no solved equation, no bold result. One warm line, then ONE question that moves the child a single step. Under 50 words.",
+        turns,
+        photoDataUri,
+        maxTokens: mode.maxTokens,
+        temperature: 0.3,
+        tier: mode.tier === "oss" ? "oss" : "fast",
+        mockKind: "chat",
+      }).catch(() => "");
+      reply = retry && !leaksAnswer(retry) ? retry : HOMEWORK_FALLBACK;
+      flags.push({ layer: "output", category: "answer_withheld" });
+    }
   } catch (err) {
     if (err instanceof ContentFilteredError) {
       await finish(req, { status: "blocked", message: KID_MESSAGES.unsafe, flags: [...flags, { layer: "content_safety", category: "provider_filter" }] });
@@ -644,8 +749,10 @@ async function buildArtifact(
   const fallbackTitle = input.kind === "create" ? (input.values.title || input.values.hero || input.values.what || input.values.topic || "My project") : current?.title || "My project";
 
   if (modeId === "game") {
-    const html = extractHtml(raw);
+    let html = extractHtml(raw);
     if (!html) return { ok: false, retryable: true, blocked: false, message: KID_MESSAGES.failed, flags: [{ layer: "system", category: "no_html" }] };
+    // An edit ("make the rocks purple") keeps the pictures the first version was painted with.
+    if (current?.kind === "game") html = carryArt(html, current.content);
     const codeFlags = scanGameCode(html, klass.sound_enabled);
     if (codeFlags.length) {
       // Sound and dialogs are shape problems the model can fix; network/escape attempts are not retried.
@@ -662,10 +769,18 @@ async function buildArtifact(
   }
 
   if (modeId === "quest") {
-    const j = extractJson<{ title?: string; items?: { text?: string; sourceHint?: string }[]; nextIdea?: string }>(raw);
+    const j = extractJson<{ title?: string; items?: { text?: string; sourceHint?: string; answer?: string }[]; nextIdea?: string }>(raw);
     if (!j || !Array.isArray(j.items) || j.items.length < 3) return { ok: false, retryable: true, blocked: false, message: KID_MESSAGES.failed, flags: [{ layer: "system", category: "bad_json" }] };
-    const items = j.items.slice(0, 8).map((i) => ({ text: stripLinks(String(i.text ?? "").slice(0, 240)), checkMe: true, checked: false, sourceHint: stripLinks(String(i.sourceHint ?? "").slice(0, 120)) }));
-    const out = await screenOutputText(items.map((i) => i.text).join("\n"));
+    // A quiz keeps its answers in a separate field so the studio can hide them
+    // (student sheet) or show them (answer key); the two used to be printed as one.
+    const items = j.items.slice(0, 8).map((i) => ({
+      text: stripLinks(String(i.text ?? "").slice(0, 240)),
+      checkMe: true,
+      checked: false,
+      sourceHint: stripLinks(String(i.sourceHint ?? "").slice(0, 120)),
+      ...(i.answer ? { answer: stripLinks(String(i.answer).slice(0, 160)) } : {}),
+    }));
+    const out = await screenOutputText(items.map((i) => [i.text, i.answer ?? ""].join(" ")).join("\n"));
     if (!out.ok) return { ok: false, retryable: false, blocked: true, message: out.kidMessage, flags: out.flags };
     const title = String(j.title ?? fallbackTitle).slice(0, 60);
     const content = JSON.stringify({ title, items, nextIdea: stripLinks(String(j.nextIdea ?? "").slice(0, 200)) });

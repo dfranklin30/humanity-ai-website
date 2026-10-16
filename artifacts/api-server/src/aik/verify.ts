@@ -181,6 +181,30 @@ function makeDom(state: { drawCalls: number; listeners: string[]; loopCalls: num
     Date,
     JSON,
     console: { log: () => {}, warn: () => {}, error: () => {}, info: () => {} },
+    // Pictures: the art script sets src on an Image and waits for onload. In
+    // the sandbox a picture "loads" on the next tick, so the game's onload
+    // paths run too.
+    Image: class {
+      width = 256;
+      height = 256;
+      complete = false;
+      naturalWidth = 256;
+      naturalHeight = 256;
+      onload: null | (() => void) = null;
+      onerror: null | (() => void) = null;
+      private _src = "";
+      addEventListener(t: string, fn: () => void) {
+        if (t === "load") this.onload = fn;
+      }
+      set src(v: string) {
+        this._src = v;
+        this.complete = true;
+        queueTick(() => this.onload?.());
+      }
+      get src() {
+        return this._src;
+      }
+    },
   };
   win.window = win;
   win.self = win;

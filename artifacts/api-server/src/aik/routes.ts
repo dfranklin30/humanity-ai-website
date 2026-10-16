@@ -1329,8 +1329,16 @@ export function registerAikRoutes(app: Express): void {
     wrap(async (req, res) => {
       const a = await artifactAccess(req, res);
       if (!a) return;
+      const safeName = a.title.replace(/[^a-z0-9 _-]/gi, "").trim().slice(0, 60) || "my-project";
+      // A game is its own file: one HTML document that runs anywhere.
+      if (a.kind === "game") {
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        res.setHeader("Content-Disposition", `attachment; filename="${safeName}.html"`);
+        res.setHeader("Cache-Control", "private, no-store");
+        return void res.end(a.content);
+      }
       let ref = a.content;
-      let ext = a.mime.includes("mpeg") ? "mp3" : a.mime.includes("mp4") ? "mp4" : a.mime.includes("png") ? "png" : "bin";
+      let ext = a.mime.includes("mpeg") ? "mp3" : a.mime.includes("mp4") ? "mp4" : a.mime.includes("png") || a.mime.includes("jpeg") ? (a.mime.includes("jpeg") ? "jpg" : "png") : "bin";
       if (a.kind === "video" && a.mime === "application/json") {
         try {
           const j = JSON.parse(a.content);
@@ -1343,7 +1351,6 @@ export function registerAikRoutes(app: Express): void {
       if (!ref || (!ref.startsWith("aik://") && !ref.startsWith("data:"))) return void res.status(404).json({ error: "Nothing to download yet." });
       const m = await getMedia(ref);
       if (!m) return void res.status(404).json({ error: "Not found." });
-      const safeName = a.title.replace(/[^a-z0-9 _-]/gi, "").trim().slice(0, 60) || "my-project";
       res.setHeader("Content-Type", m.mime);
       res.setHeader("Content-Disposition", `attachment; filename="${safeName}.${ext}"`);
       res.setHeader("Cache-Control", "private, no-store");

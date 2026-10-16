@@ -26,6 +26,7 @@ import { completeText } from "./ai";
 import { COMMON_RULES } from "./modes";
 import { issuesForModel, verifyGameHtml, type VerifyReport } from "./verify";
 import { logger } from "./../lib/logger";
+import { paintGameArt, artRules, injectArt, stripArt, type GameArt } from "./gameart";
 
 export type StepState = "running" | "done" | "skipped" | "failed";
 
@@ -236,11 +237,15 @@ export async function forgeGame(opts: {
   light?: boolean;
   /** Extra rules for the build prompt (the kid path keeps the smaller canvas and size). */
   extraRules?: string;
+  /** Paint sprites and a background with the image model and hand them to the game. */
+  paintArt?: boolean;
 }): Promise<ForgeResult> {
   const steps = new Steps(opts.onProgress);
   const { brief, soundEnabled, charBudget, maxTokens } = opts;
   const maxRepairs = opts.light ? 2 : MAX_REPAIRS;
-  const build = buildPrompt(soundEnabled, charBudget) + (opts.extraRules ? `\n${opts.extraRules}` : "");
+  let build = buildPrompt(soundEnabled, charBudget) + (opts.extraRules ? `\n${opts.extraRules}` : "");
+  let art: GameArt | null = null;
+  let artJob: Promise<GameArt> | null = null;
 
   /* 1. Plan ------------------------------------------------------- */
   steps.begin("plan", "Designing the game");
@@ -251,6 +256,24 @@ export async function forgeGame(opts: {
   } catch (err) {
     logger.warn({ err }, "[forge] plan failed");
     steps.end("plan", "skipped", "building straight from the brief");
+  }
+
+  /* 1b. Art, painted while the code is written ---------------------- */
+  if (opts.paintArt && plan) {
+    build += artRules(plan);
+    steps.begin("art", "Painting the characters");
+    artJob = paintGameArt(plan, (note) => steps.begin("art", note)).then(
+      (a) => {
+        const n = Object.keys(a.sprites).length;
+        steps.end("art", n || a.background ? "done" : "failed", `${n} sprite${n === 1 ? "" : "s"}${a.background ? " + background" : ""}${a.missing.length ? `, ${a.missing.length} missing` : ""}`);
+        return a;
+      },
+      (err) => {
+        logger.warn({ err }, "[forge] art failed");
+        steps.end("art", "failed", "no pictures this time");
+        return { style: "", sprites: {}, missing: [] } as GameArt;
+      },
+    );
   }
 
   /* 2. Build ------------------------------------------------------ */
@@ -272,6 +295,11 @@ export async function forgeGame(opts: {
     throw new Error("forge: model returned no HTML document");
   }
   steps.end("build", "done", `${html.length.toLocaleString()} characters`);
+  if (artJob) {
+    art = await artJob;
+    // The art goes in before verification so the test sees exactly what a child will.
+    html = injectArt(html, art);
+  }
 
   /* 3-4. Verify and repair ---------------------------------------- */
   let repairs = 0;
@@ -292,17 +320,18 @@ export async function forgeGame(opts: {
     try {
       const fixed = await completeText({
         system: build,
-        user: `This game was run automatically and these problems were found:\n\n${issuesForModel(report)}\n\nFix every one of them. Change nothing else. Reply with the complete corrected HTML document and nothing else.\n\nCURRENT GAME:\n${html}`,
+        user: `This game was run automatically and these problems were found:\n\n${issuesForModel(report)}\n\nFix every one of them. Change nothing else. Reply with the complete corrected HTML document and nothing else.\n\nCURRENT GAME:\n${stripArt(html)}`,
         maxTokens,
         temperature: 0.3,
         tier: "default",
         mockKind: "game",
       });
-      const next = extractDocument(fixed);
+      let next = extractDocument(fixed);
       if (!next) {
         steps.end(`repair${repairs}`, "failed", "no document came back");
         break;
       }
+      if (art && !/window\.AIK_ART\s*=/.test(next)) next = injectArt(next, art);
       const nextReport = verifyGameHtml(next);
       // Only accept a repair that genuinely improves matters.
       if (nextReport.issues.length <= report.issues.length) {
@@ -331,7 +360,7 @@ export async function forgeGame(opts: {
         system: `You review children's browser games against the design they were built from. You are specific and you do not flatter.${COMMON_RULES}
 Reply with ONLY a JSON array of at most 4 strings. Each string is one concrete, implementable improvement — name the thing and what to do to it. If the game already delivers the design, reply with [].
 Do not suggest anything needing network, sound${soundEnabled ? " beyond AudioContext" : " at all"}, external assets or libraries.`,
-        user: `THE DESIGN:\n${plan ? planForModel(plan) : brief}\n\nWHAT THE AUTOMATED TEST SAW: ${report.observed.drawCalls} draw calls, loop ${report.observed.hasLoop ? "running" : "absent"}, listeners: ${report.observed.listeners.join(", ") || "none"}.\n\nTHE GAME:\n${html}`,
+        user: `THE DESIGN:\n${plan ? planForModel(plan) : brief}\n\nWHAT THE AUTOMATED TEST SAW: ${report.observed.drawCalls} draw calls, loop ${report.observed.hasLoop ? "running" : "absent"}, listeners: ${report.observed.listeners.join(", ") || "none"}.\n\nTHE GAME:\n${stripArt(html)}`,
         maxTokens: 700,
         temperature: 0.5,
         tier: "default",
@@ -349,13 +378,14 @@ Do not suggest anything needing network, sound${soundEnabled ? " beyond AudioCon
       try {
         const polished = await completeText({
           system: build,
-          user: `Apply these improvements to the game. Keep everything else working exactly as it does now. Reply with the complete HTML document and nothing else.\n\nIMPROVEMENTS:\n${notes.map((n, i) => `${i + 1}. ${n}`).join("\n")}\n\nCURRENT GAME:\n${html}`,
+          user: `Apply these improvements to the game. Keep everything else working exactly as it does now. Reply with the complete HTML document and nothing else.\n\nIMPROVEMENTS:\n${notes.map((n, i) => `${i + 1}. ${n}`).join("\n")}\n\nCURRENT GAME:\n${stripArt(html)}`,
           maxTokens,
           temperature: 0.4,
           tier: "default",
           mockKind: "game",
         });
-        const next = extractDocument(polished);
+        let next = extractDocument(polished);
+        if (next && art && !/window\.AIK_ART\s*=/.test(next)) next = injectArt(next, art);
         const nextReport = next ? verifyGameHtml(next) : null;
         // Polish is optional: never ship a polished version that broke.
         if (next && nextReport?.ok) {

@@ -46,7 +46,11 @@ const PII_PATTERNS: { re: RegExp; category: string }[] = [
   { re: /\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b/, category: "phone" },
   { re: /\b[\w.+-]+@[\w-]+\.[\w.]+\b/i, category: "email" },
   { re: /\b\d{1,5}\s+\w+(\s+\w+)?\s+(street|st|avenue|ave|road|rd|lane|ln|drive|dr|boulevard|blvd|court|ct|way)\b/i, category: "address" },
-  { re: /\b(my|our)\s+(last\s+name|address|phone|school|teacher|birthday|password|home)\b/i, category: "self_disclosure" },
+  // A child DISCLOSING something: "my address is", "my school is called", "my
+  // teacher's name is". Merely mentioning a teacher, a mom or a school ("my
+  // teacher said it's ok") is ordinary homework talk and must pass.
+  { re: /\b(my|our)\s+(last\s+name|full\s+name|address|phone\s+number|phone|birthday|password|home\s+address)\s+(is|are|:|=)/i, category: "self_disclosure" },
+  { re: /\b(my|our)\s+(school|teacher|street)('s\s+name|\s+is\s+called|\s+is\s+named|\s+name\s+is)\b/i, category: "self_disclosure" },
   { re: /\b(elementary|middle)\s+school\b/i, category: "school" },
   { re: /\b(https?:\/\/|www\.)\S+/i, category: "url" },
   { re: /\b(snap(chat)?|insta(gram)?|tiktok|roblox\s+user|discord|gamertag|username)\b/i, category: "social_handle" },
@@ -112,7 +116,10 @@ const BLOCK_TERMS: { terms: string[]; soft?: string[]; category: string }[] = [
   },
   {
     category: "real_people",
-    terms: ["president", "trump", "biden", "obama", "elon musk", "celebrity", "famous person", "my teacher", "my mom", "my dad", "my brother", "my sister", "my friend"],
+    // People the child knows ("my teacher", "my mom") are not blocked: a
+    // picture of "my mom" is drawn as a generic grown-up by the image prompts,
+    // and homework chat mentions them constantly.
+    terms: ["president", "trump", "biden", "obama", "elon musk", "celebrity", "famous person"],
   },
 ];
 
@@ -215,6 +222,31 @@ export async function contentSafetyImage(base64: string): Promise<Flag[]> {
  * Combined input screening
  * ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ *
+ * Care: a child in distress is not a policy violation
+ *
+ * "I want to hurt myself" used to hit the scary-words blocklist and come back
+ * as "that's not for the Studio", which is the worst possible reply. These
+ * patterns are checked FIRST, and the caller answers with a kind, scripted
+ * message and tells the facilitator, instead of blocking.
+ * ------------------------------------------------------------------ */
+
+const CARE_PATTERNS: RegExp[] = [
+  /\b(hurt|harm|cut|kill)(ing)?\s+myself\b/i,
+  /\b(want|wanna|going|gonna)\s+to\s+(die|disappear|be\s+dead|not\s+be\s+here)\b/i,
+  /\bwish\s+i\s+(was|were)\s+(dead|never\s+born)\b/i,
+  /\b(suicide|suicidal|self[-\s]?harm)\b/i,
+  /\bnobody\s+(likes|wants|loves)\s+me\b.*\b(hurt|die|dead|hate\s+myself)\b/i,
+  /\b(someone|somebody|he|she|they|my\s+\w+)\s+(hits|hurts|touches)\s+me\b/i,
+];
+
+export function screenCare(text: string): boolean {
+  return CARE_PATTERNS.some((re) => re.test(text));
+}
+
+export const CARE_REPLY =
+  "Thank you for telling me. That sounds really hard, and you deserve help from a grown-up who cares about you. Please tell your facilitator or a trusted adult right now; I've let your facilitator know you might want to talk. If you ever feel unsafe, tell a grown-up straight away. You matter.";
+
 export async function screenInput(text: string): Promise<ScreenResult> {
   const flags: Flag[] = [];
 
@@ -299,11 +331,14 @@ const FORBIDDEN_CODE: { re: RegExp; category: string }[] = [
 
 export function scanGameCode(html: string, allowSound: boolean): Flag[] {
   const flags: Flag[] = [];
+  // The painted art (data: URLs of sprites and a background) is ours, not the
+  // model's; it is measured and scanned separately from the game code.
+  const code = html.replace(/<script>window\.AIK_ART=[\s\S]*?<\/script>/, "");
   for (const { re, category } of FORBIDDEN_CODE) {
     if (category === "sound" && allowSound) continue;
-    if (re.test(html)) flags.push({ layer: "code_scan", category });
+    if (re.test(code)) flags.push({ layer: "code_scan", category });
   }
-  if (html.length > aikConfig.maxGameChars) flags.push({ layer: "code_scan", category: "too_large" });
+  if (code.length > aikConfig.maxGameChars) flags.push({ layer: "code_scan", category: "too_large" });
   return flags;
 }
 

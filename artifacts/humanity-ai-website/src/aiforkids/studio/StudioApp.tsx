@@ -33,6 +33,14 @@ import { ArtifactLoader, BigButton, Card, ChangeBox, ChatPanel, ModeForm, Notice
 
 type Stage = { step: "code" } | { step: "pick"; code: string; className: string; children: { id: number; nickname: string; avatar: string }[] } | { step: "pin"; code: string; child: { id: number; nickname: string; avatar: string } } | { step: "in" };
 
+/** One-tap remixes: the words stay exactly the same, only the sound changes. */
+const REMIXES = [
+  { label: "🎺 Marching band remix", change: "Remix: keep every word of the lyrics exactly the same, and make it a big marching band version with drums and brass." },
+  { label: "🎸 Rock remix", change: "Remix: keep every word of the lyrics exactly the same, and make it a loud, fun rock version with electric guitars." },
+  { label: "🌙 Lullaby remix", change: "Remix: keep every word of the lyrics exactly the same, and make it a soft, slow lullaby version with gentle piano." },
+  { label: "🤖 Robot dance remix", change: "Remix: keep every word of the lyrics exactly the same, and make it a bouncy electronic dance version with robot voice effects." },
+];
+
 export default function StudioApp() {
   const [config, setConfig] = useState<StudioConfig | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
@@ -394,7 +402,13 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
                   <div className="mt-4">
                     {project ? (
                       <div className="space-y-3">
-                        <ChangeBox hint={mode.changeHint} maxChars={config.maxFieldChars} busy={busy} onSubmit={(change) => submit("change", { change }, project.id)} />
+                        <ChangeBox
+                          hint={mode.changeHint}
+                          maxChars={config.maxFieldChars}
+                          busy={busy}
+                          quick={mode.id === "music" ? REMIXES : undefined}
+                          onSubmit={(change) => submit("change", { change }, project.id)}
+                        />
                         <BigButton
                           variant="ghost"
                           onClick={() => {
