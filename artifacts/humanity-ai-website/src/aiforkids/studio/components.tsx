@@ -496,6 +496,7 @@ export function ChatPanel({
   maxChars,
   onSendPhoto,
   avatar,
+  placeholder,
 }: {
   mode: ModeDef;
   messages: ChatMsg[];

@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 /**
  * Sticker icons for the Kids AI Studio.
  *
@@ -141,7 +142,7 @@ function Portfolio() {
   );
 }
 
-const DRAW: Record<RoomId, () => JSX.Element> = { game: Game, story: Story, prompt: Prompt, music: Music, quest: Quest, video: Video, robot: Robot, homework: Homework, lounge: Lounge, arcade: Arcade, portfolio: Portfolio };
+const DRAW: Record<RoomId, () => ReactElement> = { game: Game, story: Story, prompt: Prompt, music: Music, quest: Quest, video: Video, robot: Robot, homework: Homework, lounge: Lounge, arcade: Arcade, portfolio: Portfolio };
 
 /** A sticker: the icon on its pastel tile, in the room's colour. */
 export function RoomIcon({ id, size = 56, tile = true, className = "" }: { id: RoomId; size?: number; tile?: boolean; className?: string }) {
