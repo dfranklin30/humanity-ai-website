@@ -400,3 +400,10 @@ export const hubRemixIdeas = (artifactId: number) => call<{ source: { id: number
 export const hubSendProject = (projectId: number, body: { participantName?: string; participantEmail: string; note?: string; send?: boolean }) =>
   call<{ project: Project; sent: boolean; saved?: boolean; reason?: string | null; to?: string; cc?: string[]; attached?: number; pieces?: number }>("POST", `/hub/projects/${projectId}/send`, body);
 export const wordsUrl = (artifactId: number) => `/api/aik/artifacts/${artifactId}/words.txt`;
+
+/* ---- Hub extras: AI box on every menu, Lounge video finder ---------- */
+export const hubAssist = (menu: string, prompt: string) => call<{ reply: string; menu: string }>("POST", "/hub/assist", { menu, prompt });
+export type LoungeSuggestion = { title: string; url: string; source: string; note: string; youtubeId?: string; kind: "video" | "search"; verified: string };
+export const fLoungeTopics = () => call<{ topics: string[]; ages: string[]; channels: string[] }>("GET", "/facilitator/lounge/topics");
+export const fLoungeSuggest = (body: { topic: string; ages: string; prompt?: string }) =>
+  call<{ items: LoungeSuggestion[]; dropped: number }>("POST", "/facilitator/lounge/suggest", body);

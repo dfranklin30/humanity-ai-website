@@ -15,7 +15,7 @@ import { getMode, validateInput, systemPrompt, chatSystemPrompt, userPrompt, isR
 import { completeText, generateImage, generateMusic, ContentFilteredError, type ChatTurn } from "./ai";
 import { sendCareAlert } from "./mail";
 import { forgeGame, refineJson, type ForgeStep } from "./forge";
-import { stripArt, carryArt } from "./gameart";
+import { stripArt, carryArt, type GameHero } from "./gameart";
 import { writeBookDraft, buildBook, bookTextOnly, type Book } from "./book";
 import { buildMovie, type Movie } from "./movie";
 import { putMedia, discardMedia } from "./media";
@@ -135,6 +135,12 @@ const remixContexts = new Map<number, RemixContext>();
 /** Hidden request inputs written only by the routes, never by a form. */
 export const REMIX_FROM_KEY = "__remixFrom";
 export const PROJECT_KEY = "__projectId";
+
+/** A hero from the Remix workflow, as the game forge wants them: the player, with their portrait. */
+function heroForGame(ctx: RemixContext | undefined): GameHero | null {
+  const h = ctx?.hero;
+  return h ? { name: h.name, look: h.look, style: h.style, portraitPng: ctx?.portraitPng ?? null } : null;
+}
 
 function hiddenNumber(req: RequestRow, key: string): number | null {
   const n = Number(req.input?.[key]);
@@ -257,6 +263,7 @@ export async function runRequest(requestId: number): Promise<void> {
         maxTokens: studio ? aikConfig.studioMaxTokens : mode.maxTokens,
         light: !studio,
         paintArt: isImageConfigured(),
+        hero: heroForGame(remixContexts.get(req.id)),
         extraRules: studio ? undefined : "- This game is for a child to read and change: a <canvas> no larger than 640x400, and keep it simple enough to explain in one breath.",
         onProgress: (steps) => {
           writeChain = writeChain.then(() => store.setProgress(req.id, steps)).catch(() => {});
@@ -539,6 +546,8 @@ async function runMovie(req: RequestRow, storyboard: NewArtifact, flags: Flag[])
     shots: board.shots,
     onProgress: report,
     heroLook: remixContexts.get(req.id)?.hero?.look ?? null,
+    heroStyle: remixContexts.get(req.id)?.hero?.style ?? null,
+    heroPortraitPng: remixContexts.get(req.id)?.portraitPng ?? null,
     voice: remixContexts.get(req.id)?.voice ?? null,
   });
   await settle(built.steps);

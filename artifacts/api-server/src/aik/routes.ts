@@ -26,6 +26,7 @@ import { bookNarrationText, type Book } from "./book";
 import { LOUNGE_STARTERS, youtubeIdOf, validateLoungeUrl } from "./lounge";
 import { renderBookPdf } from "./bookpdf";
 import { registerConsoleRoutes } from "./console";
+import { registerHubExtrasRoutes } from "./hubextras";
 
 declare module "express-session" {
   interface SessionData {
@@ -189,6 +190,7 @@ export function registerAikRoutes(app: Express): void {
 
   const base = "/api/aik";
   registerConsoleRoutes(app, base, { requireFacilitator, requireAdmin, requireChild });
+  registerHubExtrasRoutes(app, base, { requireFacilitator });
 
   // Public: feature status + mode definitions for the forms.
   app.get(`${base}/config`, (_req, res) => {

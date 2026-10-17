@@ -66,11 +66,12 @@ import { WEEK_MODULES, SESSION_RHYTHM, type WeekModule } from "../content/weeks"
 import ClaudeConsole from "../ClaudeConsole";
 import { LibraryTab, RemixInto, RemixTab, type OpenTool, type ToolStart } from "./RemixWorkflow";
 import { FilesList } from "./components";
+import { HubMap, LoungeFinder, MenuAssist } from "./HubExtras";
 
 const STAFF_FIELD_CHARS = 1200;
 const STAFF_CHAT_CHARS = 4000;
 
-type Tab = "remix" | "library" | "claude" | "tools" | "projects" | "program" | "classes" | "review" | "lounge" | "people";
+type Tab = "map" | "remix" | "library" | "claude" | "tools" | "projects" | "program" | "classes" | "review" | "lounge" | "people";
 
 export default function HubApp() {
   const [location] = useLocation();
@@ -358,6 +359,8 @@ function HubShell() {
   const setTool = (id: ModeId | null) => setToolState(id ? { id } : null);
   const openTool: OpenTool = (id, start) => setToolState({ id, start });
   const [projectId, setProjectId] = useState<number | null>(null);
+  /** Bumped when the AI finder adds videos, so the Lounge list reloads. */
+  const [loungeKey, setLoungeKey] = useState(0);
 
   const load = useCallback(
     () =>
@@ -396,6 +399,7 @@ function HubShell() {
       <nav className="flex flex-wrap gap-2">
         {(
           [
+            ["map", "🗺️ Map"],
             ["remix", "🔁 Remix workflow"],
             ["library", "📚 Library"],
             ["claude", "🤖 Claude"],
@@ -422,6 +426,8 @@ function HubShell() {
         ))}
       </nav>
 
+      <MenuAssist menu={tab} />
+      {tab === "map" && <HubMap state={state} onGo={(id) => setTab(id as Tab)} />}
       {tab === "remix" && <RemixTab state={state} onOpenTool={openTool} onChanged={() => void load()} />}
       {tab === "library" && <LibraryTab state={state} onOpenTool={openTool} />}
       {tab === "claude" && <ClaudeConsole />}
@@ -431,7 +437,8 @@ function HubShell() {
       {tab === "classes" && <ClassesTab state={state} />}
       {tab === "review" && <ReviewTab />}
       {tab === "people" && <PeopleTab me={state.facilitator} />}
-      {tab === "lounge" && <LoungeTab classes={state.classes} />}
+      {tab === "lounge" && <LoungeFinder classes={state.classes} onAdded={() => setLoungeKey((k) => k + 1)} />}
+      {tab === "lounge" && <LoungeTab key={loungeKey} classes={state.classes} />}
     </div>
   );
 }
@@ -898,7 +905,9 @@ function ToolRunner({ state, mode, onBack, start, onOpenTool }: { state: HubStat
                   </p>
                   <p className="mt-0.5 text-xs text-violet-800">
                     {remix.sourceKind === "hero"
-                      ? "Their name, look and voice go into this. "
+                      ? mode.id === "game"
+                        ? "They become the character you play: painted from their portrait, named on the title screen. "
+                        : "Their name, look and voice go into this. "
                       : "Its characters, world and words go to the AI as source material. "}
                     {remix.ai ? "The boxes below were filled from it. Change anything you like." : "Fill in or change the boxes below."}
                     {remix.projectId ? " The result is saved in your project." : ""}

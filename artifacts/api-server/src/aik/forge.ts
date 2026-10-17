@@ -26,7 +26,7 @@ import { completeText } from "./ai";
 import { COMMON_RULES } from "./modes";
 import { issuesForModel, verifyGameHtml, type VerifyReport } from "./verify";
 import { logger } from "./../lib/logger";
-import { paintGameArt, artRules, injectArt, stripArt, type GameArt } from "./gameart";
+import { paintGameArt, artRules, injectArt, stripArt, type GameArt, type GameHero } from "./gameart";
 
 export type StepState = "running" | "done" | "skipped" | "failed";
 
@@ -223,6 +223,11 @@ function planForModel(plan: GamePlan): string {
  * The caller always gets a playable document or an exception, never a
  * half-finished one.
  */
+/** What the planner is told when the game is made from a hero: they are the player. */
+function heroPlanRule(hero: GameHero): string {
+  return `\n\nTHE PLAYER CHARACTER IS THE HERO. One entity must be named exactly "${hero.name}" with role "player" and this look: ${hero.look}. The child controls them, and the title screen says their name.`;
+}
+
 export async function forgeGame(opts: {
   brief: string;
   soundEnabled: boolean;
@@ -239,6 +244,8 @@ export async function forgeGame(opts: {
   extraRules?: string;
   /** Paint sprites and a background with the image model and hand them to the game. */
   paintArt?: boolean;
+  /** Remix workflow: the hero the child plays as, painted from their portrait. */
+  hero?: GameHero | null;
 }): Promise<ForgeResult> {
   const steps = new Steps(opts.onProgress);
   const { brief, soundEnabled, charBudget, maxTokens } = opts;
@@ -251,7 +258,7 @@ export async function forgeGame(opts: {
   steps.begin("plan", "Designing the game");
   let plan: GamePlan | null = null;
   try {
-    plan = await planGame(brief, soundEnabled);
+    plan = await planGame(opts.hero ? brief + heroPlanRule(opts.hero) : brief, soundEnabled);
     steps.end("plan", plan ? "done" : "skipped", plan?.title ?? "building straight from the brief");
   } catch (err) {
     logger.warn({ err }, "[forge] plan failed");
@@ -260,9 +267,9 @@ export async function forgeGame(opts: {
 
   /* 1b. Art, painted while the code is written ---------------------- */
   if (opts.paintArt && plan) {
-    build += artRules(plan);
+    build += artRules(plan, opts.hero);
     steps.begin("art", "Painting the characters");
-    artJob = paintGameArt(plan, (note) => steps.begin("art", note)).then(
+    artJob = paintGameArt(plan, (note) => steps.begin("art", note), { hero: opts.hero }).then(
       (a) => {
         const n = Object.keys(a.sprites).length;
         steps.end("art", n || a.background ? "done" : "failed", `${n} sprite${n === 1 ? "" : "s"}${a.background ? " + background" : ""}${a.missing.length ? `, ${a.missing.length} missing` : ""}`);
