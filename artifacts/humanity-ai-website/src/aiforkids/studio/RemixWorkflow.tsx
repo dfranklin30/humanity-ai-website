@@ -598,7 +598,7 @@ export function RemixTab({ state, onOpenTool, onChanged }: { state: HubState; on
           </section>
 
           {/* Step 4 */}
-          <SendProject project={project} me={state.facilitator.email} count={(items ?? []).filter((i) => i.approved).length} onChanged={onChanged} />
+          <SendProject key={project.id} project={project} me={state.facilitator.email} count={(items ?? []).filter((i) => i.approved).length} onChanged={onChanged} />
         </>
       )}
     </div>
