@@ -49,6 +49,10 @@ export type TextCallOptions = {
    * and then only the words survive.
    */
   photoDataUri?: string;
+  /** Optional: a specific model id; the adapter for the chosen provider decides whether to honour it. */
+  model?: string;
+  /** Optional: force a provider for this call (used by the staff console). */
+  provider?: TextProviderId;
 };
 
 function messagesOf(opts: TextCallOptions): ChatTurn[] {
@@ -70,7 +74,7 @@ function messagesOf(opts: TextCallOptions): ChatTurn[] {
  */
 export async function completeText(opts: TextCallOptions): Promise<string> {
   if (aikConfig.mockAI) return mockText(opts);
-  const provider: TextProviderId = opts.tier === "oss" ? aikConfig.providers.ossText : aikConfig.providers.text;
+  const provider: TextProviderId = opts.provider ?? (opts.tier === "oss" ? aikConfig.providers.ossText : aikConfig.providers.text);
   if (!textProviderConfigured(provider)) throw new Error(`Text provider "${provider}" not configured`);
   try {
     return await completeWith(provider, opts);
@@ -97,7 +101,7 @@ function parseDataUri(uri: string): { mime: string; data: string } | null {
 
 async function completeAnthropic(opts: TextCallOptions): Promise<string> {
   const started = Date.now();
-  const model = opts.tier === "fast" ? aikConfig.anthropic.fastModel : aikConfig.anthropic.model;
+  const model = opts.model ?? (opts.tier === "fast" ? aikConfig.anthropic.fastModel : aikConfig.anthropic.model);
   const turns = messagesOf(opts);
   // The photo rides on the newest user turn. Claude reads images as content
   // blocks, so that one turn becomes [image, text] and the others stay plain.

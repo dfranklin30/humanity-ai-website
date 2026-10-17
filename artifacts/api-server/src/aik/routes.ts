@@ -23,6 +23,7 @@ import { getMedia, referencedNames } from "./media";
 import { bookNarrationText, type Book } from "./book";
 import { LOUNGE_STARTERS, youtubeIdOf, validateLoungeUrl } from "./lounge";
 import { renderBookPdf } from "./bookpdf";
+import { registerConsoleRoutes } from "./console";
 
 declare module "express-session" {
   interface SessionData {
@@ -185,6 +186,7 @@ export function registerAikRoutes(app: Express): void {
   bootstrap().catch((err) => logger.error({ err }, "[aik] bootstrap failed"));
 
   const base = "/api/aik";
+  registerConsoleRoutes(app, base, { requireFacilitator, requireAdmin, requireChild });
 
   // Public: feature status + mode definitions for the forms.
   app.get(`${base}/config`, (_req, res) => {

@@ -15,7 +15,6 @@ import jofiaPhoto from "@assets/image_1775903668936.png";
 import williamPhoto from "@assets/william_portrait_opt.webp";
 import nirmalPhoto from "@assets/1profile-pic_1776517679611.jpg";
 import williamZhuPhoto from "@assets/william_zhu_portrait_opt.webp";
-import mikePhoto from "@assets/mike_portrait_opt.webp";
 import davidWoodPhoto from "@assets/David_Wood212_-_edit_may_2026_1779893283704.jpg";
 import vasuPhoto from "@assets/headshot_Vasu_AI_Advertisting_1779900210920.jpeg";
 import vinaPhoto from "@assets/image_1780429062430.png";
@@ -281,39 +280,6 @@ export default function About() {
               </BoardCard>
             </motion.div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.9, duration: 0.5 }}
-            >
-              <BoardCard slug="mike-klyce" testId="card-board-mike">
-                <div className="h-64 overflow-hidden">
-                  <img
-                    src={mikePhoto}
-                    alt="Mike Klyce"
-                    className="w-full h-full object-cover object-top"
-                    loading="lazy"
-                    decoding="async"
-                  />
-                </div>
-                <div className="p-6">
-                  <Badge variant="outline" className="text-[10px] mb-3 bg-rose-500/5 text-rose-700 dark:text-rose-400 border-rose-500/20">Seat 5 — Chief Legal & AI Governance Officer</Badge>
-                  <h3 className="font-semibold text-lg" data-testid="text-board-mike">Mike Klyce</h3>
-                  <p className="text-sm text-primary font-medium mb-3">Chief Legal & AI Governance Officer (CLAGO)</p>
-                  <p className="text-sm text-muted-foreground leading-relaxed mb-3">
-                    Founder & CEO of EnscribeAI and Founder of Artist in the Model. Duke Law-trained attorney and former Katten Muchin Rosenman partner working at the intersection of law, frontier AI, and human creativity — focused on rights-clear human training data, transparency, and human-AI alignment at global scale.
-                  </p>
-                  <p className="text-xs text-muted-foreground italic mb-4">
-                    AI Governance · Training-Data Rights & Provenance · Human-AI Alignment · Global AI Policy
-                  </p>
-                  <div className="flex items-center gap-2 text-primary text-xs font-medium">
-                    <ArrowRight className="h-3.5 w-3.5" />
-                    View Full Profile
-                  </div>
-                </div>
-              </BoardCard>
-            </motion.div>
 
             <motion.div
               initial={{ opacity: 0, y: 30 }}
@@ -332,7 +298,7 @@ export default function About() {
                   />
                 </div>
                 <div className="p-6">
-                  <Badge variant="outline" className="text-[10px] mb-3 bg-indigo-500/5 text-indigo-700 dark:text-indigo-400 border-indigo-500/20">Seat 6 — Strategic Partnerships & Human-Centered AI</Badge>
+                  <Badge variant="outline" className="text-[10px] mb-3 bg-indigo-500/5 text-indigo-700 dark:text-indigo-400 border-indigo-500/20">Seat 5 — Strategic Partnerships & Human-Centered AI</Badge>
                   <h3 className="font-semibold text-lg" data-testid="text-board-david-wood">David Wood</h3>
                   <p className="text-sm text-primary font-medium mb-3">Board Director, Strategic Partnerships & Human-Centered AI</p>
                   <p className="text-sm text-muted-foreground leading-relaxed mb-3">
@@ -366,7 +332,7 @@ export default function About() {
                   />
                 </div>
                 <div className="p-6">
-                  <Badge variant="outline" className="text-[10px] mb-3 bg-teal-500/5 text-teal-700 dark:text-teal-400 border-teal-500/20">Seat 7 — Chief of AI in Advertising & Media</Badge>
+                  <Badge variant="outline" className="text-[10px] mb-3 bg-teal-500/5 text-teal-700 dark:text-teal-400 border-teal-500/20">Seat 6 — Chief of AI in Advertising & Media</Badge>
                   <h3 className="font-semibold text-lg" data-testid="text-board-vasu">Vasu Raj Jain</h3>
                   <p className="text-sm text-primary font-medium mb-3">Chief of AI in Advertising & Media</p>
                   <p className="text-sm text-muted-foreground leading-relaxed mb-3">
@@ -400,7 +366,7 @@ export default function About() {
                   />
                 </div>
                 <div className="p-6">
-                  <Badge variant="outline" className="text-[10px] mb-3 bg-fuchsia-500/5 text-fuchsia-700 dark:text-fuchsia-400 border-fuchsia-500/20">Seat 8 — Director, Human Authenticity, Leadership, Consciousness &amp; AI, and Board Treasurer</Badge>
+                  <Badge variant="outline" className="text-[10px] mb-3 bg-fuchsia-500/5 text-fuchsia-700 dark:text-fuchsia-400 border-fuchsia-500/20">Seat 7 — Director, Human Authenticity, Leadership, Consciousness &amp; AI, and Board Treasurer</Badge>
                   <h3 className="font-semibold text-lg" data-testid="text-board-vina">Vina Torossian</h3>
                   <p className="text-sm text-primary font-medium mb-3">Director, Human Authenticity, Leadership, Consciousness &amp; AI, and Board Treasurer</p>
                   <p className="text-sm text-muted-foreground leading-relaxed mb-3">
@@ -432,12 +398,9 @@ export default function About() {
                     loading="lazy"
                     decoding="async"
                   />
-                  <div className="absolute top-3 right-3 bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-widest px-2 py-1 shadow-md" data-testid="badge-new-board-william-zhu">
-                    Newly Appointed
-                  </div>
                 </div>
                 <div className="p-6">
-                  <Badge variant="outline" className="text-[10px] mb-3 bg-sky-500/5 text-sky-700 dark:text-sky-400 border-sky-500/20">Seat 9 — Applied AI & Community Strategy</Badge>
+                  <Badge variant="outline" className="text-[10px] mb-3 bg-sky-500/5 text-sky-700 dark:text-sky-400 border-sky-500/20">Seat 8 — Applied AI & Community Strategy</Badge>
                   <h3 className="font-semibold text-lg" data-testid="text-board-william-zhu">William Zhu</h3>
                   <p className="text-sm text-primary font-medium mb-3">Board Director, Applied AI & Community Strategy</p>
                   <p className="text-sm text-muted-foreground leading-relaxed mb-3">
@@ -485,7 +448,7 @@ export default function About() {
                   </div>
                 </div>
                 <div className="p-6">
-                  <Badge variant="outline" className="text-[10px] mb-3 bg-amber-500/5 text-amber-700 dark:text-amber-400 border-amber-500/20">Seat 10 — AI Literacy &amp; Academic Integrity</Badge>
+                  <Badge variant="outline" className="text-[10px] mb-3 bg-amber-500/5 text-amber-700 dark:text-amber-400 border-amber-500/20">Seat 9 — AI Literacy &amp; Academic Integrity</Badge>
                   <h3 className="font-semibold text-lg" data-testid="text-board-alexis">Alexis Ramsey-Tobienne, PhD</h3>
                   <p className="text-sm text-primary font-medium mb-3">Director, AI Literacy &amp; Academic Integrity</p>
                   <p className="text-sm text-muted-foreground leading-relaxed mb-3">

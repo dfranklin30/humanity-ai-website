@@ -1004,7 +1004,7 @@ export default function Training() {
                     <Badge variant="outline" className="text-[10px]">Engineering Deep-Dive</Badge>
                   </div>
                   <p className="text-muted-foreground leading-relaxed mb-5">
-                    Six patterns that define production RAG architecture — what each one does, what it costs, and when it earns its complexity. Covering query understanding, context selection, evidence quality, evaluation, and production behaviour, with architecture diagrams and engineering reasoning for every pattern.
+                    Six patterns that define production RAG architecture — what each one does, what it costs, and when it earns its complexity. Covering query understanding, context selection, evidence quality, evaluation, and production behavior, with architecture diagrams and engineering reasoning for every pattern.
                   </p>
                   <div className="space-y-1.5 mb-6">
                     {[
