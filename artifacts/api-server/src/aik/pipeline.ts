@@ -20,6 +20,7 @@ import { writeBookDraft, buildBook, bookTextOnly, type Book } from "./book";
 import { buildMovie, type Movie } from "./movie";
 import { putMedia, discardMedia } from "./media";
 import { verifyMicrobitCode } from "./verify";
+import { loadRemixContext, remixBlock, type RemixContext } from "./remix";
 import { screenCare, CARE_REPLY, screenInput, screenOutputText, scanGameCode, hardenGameHtml, stripLinks, contentSafetyImage, KID_MESSAGES, type Flag } from "./safety";
 import { isContentSafetyConfigured, isImageConfigured, isVideoConfigured } from "./config";
 
@@ -124,7 +125,24 @@ export function toPublicClass(c: ClassRow): PublicClass {
  * The pipeline
  * ------------------------------------------------------------------ */
 
+/**
+ * Remix workflow state for a running request: which piece it came from, and
+ * the hero whose look and voice must carry over. Keyed by request id and
+ * dropped when the request finishes.
+ */
+const remixContexts = new Map<number, RemixContext>();
+
+/** Hidden request inputs written only by the routes, never by a form. */
+export const REMIX_FROM_KEY = "__remixFrom";
+export const PROJECT_KEY = "__projectId";
+
+function hiddenNumber(req: RequestRow, key: string): number | null {
+  const n = Number(req.input?.[key]);
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+
 async function finish(req: RequestRow, patch: Parameters<typeof store.finishRequest>[1]): Promise<RequestRow> {
+  remixContexts.delete(req.id);
   const updated = (await store.finishRequest(req.id, patch)) ?? req;
   publish(req.class_id, { type: "request", request: toPublicRequest(updated) });
   return updated;
@@ -187,6 +205,23 @@ export async function runRequest(requestId: number): Promise<void> {
       if (!current || current.class_id !== req.class_id || (req.child_id !== null && current.child_id !== req.child_id)) {
         await finish(req, { status: "failed", message: KID_MESSAGES.failed, flags: [...flags, { layer: "system", category: "project_not_owned" }] });
         return;
+      }
+    }
+
+    /* ---- Remix workflow --------------------------------------------------
+     * A create that starts from another piece (or a hero) gets that piece's
+     * words as source material, after the person's own words were screened.
+     * A change to a remixed piece keeps the hero's look and voice.         */
+    {
+      const sourceId = input.kind === "create" ? hiddenNumber(req, REMIX_FROM_KEY) : current?.remix_of ?? null;
+      const source = sourceId ? await store.getArtifact(sourceId) : null;
+      if (sourceId && (!source || !source.approved)) {
+        await finish(req, { status: "failed", message: "The piece you're remixing isn't available any more.", flags: [...flags, { layer: "system", category: "remix_source_missing" }] });
+        return;
+      }
+      if (source) {
+        remixContexts.set(req.id, await loadRemixContext(source));
+        if (input.kind === "create") input.text += remixBlock(source, mode.name);
       }
     }
 
@@ -358,6 +393,14 @@ export async function runRequest(requestId: number): Promise<void> {
   }
 }
 
+/** The Hub project a request asked to be saved into, if the person owns it. */
+async function projectFor(req: RequestRow): Promise<number | null> {
+  const id = hiddenNumber(req, PROJECT_KEY);
+  if (!id) return null;
+  const [project, klass] = await Promise.all([store.getProject(id), store.getClass(req.class_id)]);
+  return project && klass && project.facilitator_id === klass.facilitator_id ? project.id : null;
+}
+
 async function complete(req: RequestRow, artifactInput: NewArtifact, flags: Flag[]): Promise<void> {
   // In a staff workspace the facilitator is the approver, so there is no one
   // to hold media for. Screening still ran; only the human gate is skipped.
@@ -373,6 +416,9 @@ async function complete(req: RequestRow, artifactInput: NewArtifact, flags: Flag
     summary: artifactInput.summary,
     approved,
     parentArtifactId: req.project_artifact_id,
+    // A new piece remembers what it was remixed from; a new version inherits it.
+    remixOf: req.kind === "create" ? remixContexts.get(req.id)?.sourceId ?? null : null,
+    projectId: await projectFor(req),
   });
   await finish(req, { status: "done", message: artifactInput.kidNote ?? null, flags, resultArtifactId: artifact.id });
   if (!artifact.approved) {
@@ -442,7 +488,18 @@ async function runBook(req: RequestRow, mode: ModeDef, input: ReturnType<typeof 
   writing[0] = { ...writing[0], state: "done", detail: drafted.draft.title, ms: Date.now() - started };
   report(writing);
 
-  const built = await buildBook({ requestId: req.id, draft: drafted.draft, previous, onProgress: (steps) => report([...writing, ...steps]) });
+  // A hero from the Remix workflow is the main character exactly as they were made.
+  const remix = remixContexts.get(req.id);
+  if (remix?.hero) drafted.draft.hero = { name: remix.hero.name, look: remix.hero.look };
+
+  const built = await buildBook({
+    requestId: req.id,
+    draft: drafted.draft,
+    previous,
+    onProgress: (steps) => report([...writing, ...steps]),
+    heroReferencePng: remix?.portraitPng ?? null,
+    voice: remix?.voice ?? null,
+  });
   await settle([...writing, ...built.steps]);
   if (!built.ok) {
     await discardMedia(req.id);
@@ -481,6 +538,8 @@ async function runMovie(req: RequestRow, storyboard: NewArtifact, flags: Flag[])
     style: board.style,
     shots: board.shots,
     onProgress: report,
+    heroLook: remixContexts.get(req.id)?.hero?.look ?? null,
+    voice: remixContexts.get(req.id)?.voice ?? null,
   });
   await settle(built.steps);
   if (!built.ok) {

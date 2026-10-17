@@ -23,7 +23,7 @@
  * before a child sees it, because it contains generated pictures.
  */
 import { aikConfig, isImageConfigured, isTtsConfigured, isContentSafetyConfigured } from "./config";
-import { completeText, generateImage, speak, ContentFilteredError } from "./ai";
+import { completeText, generateImage, speak, ContentFilteredError, type VoiceChoice } from "./ai";
 import { COMMON_RULES, extractJson, type ModeDef } from "./modes";
 import { Steps, type ForgeStep } from "./forge";
 import { putMedia, getMedia, type MediaRef } from "./media";
@@ -50,6 +50,8 @@ export type Book = {
   /** A line for the last page. */
   theEnd: string;
   madeWith: { text: boolean; pictures: boolean; narration: boolean };
+  /** The voice that read it, when a hero's voice was used. */
+  voice?: VoiceChoice;
 };
 
 const STYLES = ["bright watercolor", "soft crayon", "cut-paper collage", "cheerful cartoon", "cozy gouache"];
@@ -135,6 +137,10 @@ export async function buildBook(opts: {
   draft: BookDraft;
   previous: Book | null;
   onProgress?: (steps: ForgeStep[]) => void;
+  /** Remix workflow: the hero's portrait, so the cover (and through it every page) draws the same character. */
+  heroReferencePng?: string | null;
+  /** Remix workflow: the hero's voice reads the book. */
+  voice?: VoiceChoice | null;
 }): Promise<BuildBookResult> {
   const steps = new Steps(opts.onProgress);
   const { draft, previous, requestId } = opts;
@@ -155,6 +161,7 @@ export async function buildBook(opts: {
     pages: draft.pages.map((p, i) => ({ n: i + 1, text: p.text, scene: p.scene })),
     theEnd: draft.theEnd,
     madeWith: { text: true, pictures, narration },
+    ...(opts.voice ? { voice: opts.voice } : {}),
   };
 
   const sameHero = previous && previous.hero?.look === draft.hero.look && previous.style === draft.style;
@@ -170,7 +177,7 @@ export async function buildBook(opts: {
       coverPng = m?.mime.startsWith("image/") ? m.bytes.toString("base64") : null;
     } else {
       steps.begin("cover", "Drawing the cover");
-      const made = await drawScreened(coverPrompt(draft), undefined, flags);
+      const made = await drawScreened(coverPrompt(draft), opts.heroReferencePng ?? undefined, flags);
       if (made.blocked) return { ok: false, blocked: true, message: made.message, flags, steps: steps.all() };
       if (made.png) {
         coverPng = made.png;
@@ -224,7 +231,7 @@ export async function buildBook(opts: {
   if (narration) {
     const todo = book.pages.filter((p, i) => {
       const prev = previous?.pages?.[i];
-      if (prev?.audio && prev.text === p.text) {
+      if (prev?.audio && prev.text === p.text && JSON.stringify(previous?.voice ?? null) === JSON.stringify(opts.voice ?? null)) {
         p.audio = prev.audio;
         return false;
       }
@@ -236,7 +243,7 @@ export async function buildBook(opts: {
       await Promise.all(
         todo.slice(i, i + 3).map(async (p) => {
           try {
-            const a = await speak(p.text);
+            const a = await speak(p.text, opts.voice);
             p.audio = await putMedia(requestId, `p${p.n}.mp3`, Buffer.from(a.base64, "base64"), a.mime);
             recorded++;
           } catch (err) {
@@ -262,7 +269,7 @@ export async function buildBook(opts: {
 type Drawn = { png: string | null; blocked: boolean; message: string };
 
 /** One picture, generated and screened. A screening hit blocks the whole book; a generation failure just loses that picture. */
-async function drawScreened(prompt: string, referencePng: string | undefined, flags: Flag[]): Promise<Drawn> {
+export async function drawScreened(prompt: string, referencePng: string | undefined, flags: Flag[]): Promise<Drawn> {
   try {
     const img = await generateImage(prompt, { reference: referencePng });
     if (isContentSafetyConfigured()) {

@@ -13,7 +13,7 @@
  * facilitator approval before a child sees anything.
  */
 import { AzureOpenAI } from "openai";
-import { aikConfig, isImageConfigured, isMusicConfigured, isTextConfigured, isTtsConfigured, isVideoConfigured, textProviderConfigured, textFallbackProvider, type TextProviderId } from "./config";
+import { aikConfig, isImageConfigured, isElevenLabsConfigured, isAzureSpeechConfigured, isMusicConfigured, isTextConfigured, isTtsConfigured, isVideoConfigured, textProviderConfigured, textFallbackProvider, type TextProviderId } from "./config";
 import { logger } from "../lib/logger";
 
 export class ContentFilteredError extends Error {
@@ -481,11 +481,35 @@ export async function generateMusic(prompt: string, seconds = 30, lyrics?: strin
   return { base64: Buffer.from(await res.arrayBuffer()).toString("base64"), mime: res.headers.get("content-type") || "audio/mpeg", provider: "elevenlabs", model: "eleven-music" };
 }
 
-export async function speak(text: string): Promise<MediaResult> {
+/**
+ * A chosen voice. A hero in the Remix workflow keeps one, so the same voice
+ * reads their storybook and narrates their movie. Absent = the house voice.
+ */
+export type VoiceChoice = { provider: "elevenlabs" | "azure"; id: string; name?: string };
+
+const AZURE_VOICE_RE = /^[a-z]{2}-[A-Z]{2}-[A-Za-z]+(?:Multilingual)?Neural$/;
+const ELEVEN_VOICE_RE = /^[A-Za-z0-9]{16,32}$/;
+
+/** Whether a voice can be used right now, so a stale choice falls back instead of failing the read-aloud. */
+export function usableVoice(v: VoiceChoice | null | undefined): VoiceChoice | null {
+  if (!v) return null;
+  if (v.provider === "elevenlabs" && isElevenLabsConfigured() && ELEVEN_VOICE_RE.test(v.id)) return v;
+  if (v.provider === "azure" && isAzureSpeechConfigured() && AZURE_VOICE_RE.test(v.id)) return v;
+  return null;
+}
+
+export async function speak(text: string, voice?: VoiceChoice | null): Promise<MediaResult> {
   if (aikConfig.mockAI) return { base64: MOCK_MP3, mime: "audio/mpeg", provider: "mock", model: "mock" };
+  const chosen = usableVoice(voice);
+  if (chosen?.provider === "elevenlabs") return speakEleven(text, chosen.id);
+  if (chosen?.provider === "azure") return speakAzure(text, chosen.id);
   if (!isTtsConfigured()) throw new Error("TTS provider not configured");
   if (aikConfig.providers.tts === "azure") return speakAzure(text);
-  const res = await fetchWithTimeout(`https://api.elevenlabs.io/v1/text-to-speech/${aikConfig.elevenlabs.voiceId}`, {
+  return speakEleven(text, aikConfig.elevenlabs.voiceId);
+}
+
+async function speakEleven(text: string, voiceId: string): Promise<MediaResult> {
+  const res = await fetchWithTimeout(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}`, {
     method: "POST",
     headers: { "content-type": "application/json", "xi-api-key": aikConfig.elevenlabs.apiKey, accept: "audio/mpeg" },
     body: JSON.stringify({ text: text.slice(0, 2500), model_id: "eleven_multilingual_v2" }),
@@ -499,8 +523,9 @@ export async function speak(text: string): Promise<MediaResult> {
  * resource that already serves Content Safety, so "Read it to me" needs no new
  * vendor and no new bill. One-way only: the Studio never records a child.
  */
-async function speakAzure(text: string): Promise<MediaResult> {
-  const { key, region, voice } = aikConfig.azureSpeech;
+async function speakAzure(text: string, voiceName?: string): Promise<MediaResult> {
+  const { key, region } = aikConfig.azureSpeech;
+  const voice = voiceName && AZURE_VOICE_RE.test(voiceName) ? voiceName : aikConfig.azureSpeech.voice;
   const safe = text.slice(0, 2500).replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" })[c] as string);
   const ssml = `<speak version="1.0" xml:lang="en-US"><voice name="${voice}"><prosody rate="-8%">${safe}</prosody></voice></speak>`;
   const res = await fetchWithTimeout(
@@ -606,6 +631,20 @@ function realRobotMock(): string {
 
 function mockText(opts: TextCallOptions): string {
   switch (opts.mockKind) {
+    // Remix workflow: a filled form for whatever tool was asked, and a few ideas.
+    case "remix": {
+      const keys = [...(opts.user ?? "").matchAll(/"key":"([a-z_]+)"/g)].map((m) => m[1]);
+      const sample: Record<string, string> = { title: "Pim's Big Day", hero: "Pim, a small round mint-green dragon with a striped scarf", what: "Pim the mint-green dragon", place: "a treehouse above a noisy kitchen", where: "a treehouse at sunset", problem: "the moon lost its glow", action: "flies up to polish the moon", good: "glowing moon crumbs", bad: "grumpy rain clouds", about: "Pim learning to be brave", topic: "dragons in stories", name: "Pim Bot", job: "finds lost scarves", mood: "warm and bright" };
+      return JSON.stringify(Object.fromEntries(keys.map((k) => [k, sample[k] ?? "something fun"])));
+    }
+    case "ideas":
+      return JSON.stringify({
+        ideas: [
+          { tool: "game", title: "Catch the moon crumbs", pitch: "Fly Pim around the sky catching glowing moon crumbs while dodging rain clouds.", values: { title: "Moon Crumbs", hero: "Pim the mint-green dragon", good: "glowing moon crumbs", bad: "rain clouds" } },
+          { tool: "music", title: "Pim's brave song", pitch: "A bouncy song about a shy dragon who finds her courage.", values: { about: "a shy dragon who gets brave", feeling: "brave and adventurous", style: "pop", chant: "Be brave like Pim!" } },
+          { tool: "video", title: "Polishing the moon", pitch: "A three-shot movie of Pim flying up to make the moon shine again.", values: { title: "Pim and the Moon", what: "Pim the mint-green dragon", action: "polishes the moon until it glows", where: "the night sky", style: "cartoon" } },
+        ],
+      });
     case "game":
       if (process.env.AIK_MOCK_BROKEN_GAME === "true" && mockBrokenGamesServed === 0) {
         mockBrokenGamesServed++;

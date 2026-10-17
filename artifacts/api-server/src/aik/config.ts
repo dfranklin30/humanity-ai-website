@@ -204,6 +204,10 @@ export const aikConfig = {
 
   /** Absolute base URL used in emailed links. */
   publicUrl: (env.AIK_PUBLIC_URL || "https://humanityplusai.org").replace(/\/$/, ""),
+  /** Remix workflow: always copied when a project is sent. Comma-separated. */
+  projectCc: (env.AIK_PROJECT_CC || "info@humanityplusai.org").split(",").map((x) => x.trim()).filter(Boolean),
+  /** Largest total attachment size for a project email; bigger files are listed instead. Gmail's limit is 25 MB. */
+  projectAttachBytes: Number(env.AIK_PROJECT_ATTACH_BYTES || 18 * 1024 * 1024),
 
   /** Sign in with Google. Both values come from a Google Cloud OAuth client. */
   google: {
@@ -303,6 +307,12 @@ export function isVideoConfigured(): boolean {
     (aikConfig.providers.video === "fal" && falConfigured) ||
     (aikConfig.providers.video === "oss" && ossVideoConfigured)
   );
+}
+export function isElevenLabsConfigured(): boolean {
+  return elevenConfigured;
+}
+export function isAzureSpeechConfigured(): boolean {
+  return azureSpeechConfigured;
 }
 export function isMusicConfigured(): boolean {
   if (aikConfig.mockAI) return true;

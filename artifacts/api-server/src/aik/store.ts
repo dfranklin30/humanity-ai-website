@@ -73,6 +73,9 @@ export type ProjectRow = {
   kind: ProjectKind;
   week: number | null;
   archived: boolean;
+  participant_name?: string | null;
+  participant_email?: string | null;
+  sent_at?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -136,7 +139,7 @@ export type RequestRow = {
   completed_at: string | null;
 };
 
-export type ArtifactKind = "game" | "story" | "image" | "quest" | "video" | "robot" | "chat" | "audio";
+export type ArtifactKind = "game" | "story" | "image" | "quest" | "video" | "robot" | "chat" | "audio" | "hero";
 
 export type ArtifactRow = {
   id: number;
@@ -152,6 +155,8 @@ export type ArtifactRow = {
   version: number;
   parent_artifact_id: number | null;
   project_id?: number | null;
+  /** The piece this one was remixed from (another tool's output, or a hero). */
+  remix_of?: number | null;
   created_at: string;
 };
 
@@ -314,6 +319,18 @@ export function ensureTables(): Promise<void> {
         CREATE INDEX IF NOT EXISTS aik_artifacts_project_idx ON aik_artifacts (project_id, created_at)`);
       await db.execute(sql`
         CREATE INDEX IF NOT EXISTS aik_projects_facilitator_idx ON aik_projects (facilitator_id, archived)`);
+      /* ---- Remix workflow --------------------------------------------- *
+       * remix_of links a piece to the one it was made from, so a hero's
+       * storybook, movie and game can be traced back to the hero. A project
+       * remembers who it is sent to.                                        */
+      await db.execute(sql`
+        ALTER TABLE aik_artifacts ADD COLUMN IF NOT EXISTS remix_of integer`);
+      await db.execute(sql`
+        ALTER TABLE aik_projects ADD COLUMN IF NOT EXISTS participant_name text`);
+      await db.execute(sql`
+        ALTER TABLE aik_projects ADD COLUMN IF NOT EXISTS participant_email text`);
+      await db.execute(sql`
+        ALTER TABLE aik_projects ADD COLUMN IF NOT EXISTS sent_at timestamptz`);
       /* The Screen Time Lounge: videos a facilitator picked for a class.
        * A null class_id is a video for every class of that facilitator. */
       await db.execute(sql`
@@ -712,7 +729,11 @@ export async function findChatArtifact(classId: number, childId: number | null, 
 }
 
 /** Replace the content of an artifact in place (used for chat transcripts). */
-export async function updateArtifactContent(id: number, content: string, summary: string | null): Promise<void> {
+export async function updateArtifactContent(id: number, content: string, summary: string | null, title?: string): Promise<void> {
+  if (title !== undefined) {
+    await db.execute(sql`UPDATE aik_artifacts SET content = ${content}, summary = ${summary}, title = ${title} WHERE id = ${id}`);
+    return;
+  }
   await ensureTables();
   await db.execute(sql`UPDATE aik_artifacts SET content = ${content}, summary = ${summary} WHERE id = ${id}`);
 }
@@ -758,18 +779,27 @@ export async function createArtifact(input: {
   summary: string | null;
   approved: boolean;
   parentArtifactId: number | null;
+  remixOf?: number | null;
+  projectId?: number | null;
 }): Promise<ArtifactRow> {
   await ensureTables();
   let version = 1;
+  let projectId = input.projectId ?? null;
+  let remixOf = input.remixOf ?? null;
   if (input.parentArtifactId) {
     const parent = await getArtifact(input.parentArtifactId);
-    if (parent) version = parent.version + 1;
+    if (parent) {
+      version = parent.version + 1;
+      // A new version stays in the same project and keeps its lineage.
+      projectId = projectId ?? parent.project_id ?? null;
+      remixOf = remixOf ?? parent.remix_of ?? null;
+    }
   }
   const r = one<ArtifactRow>(
     await db.execute(sql`
-      INSERT INTO aik_artifacts (class_id, child_id, kind, title, content, mime, summary, approved, version, parent_artifact_id)
+      INSERT INTO aik_artifacts (class_id, child_id, kind, title, content, mime, summary, approved, version, parent_artifact_id, remix_of, project_id)
       VALUES (${input.classId}, ${input.childId}, ${input.kind}, ${input.title}, ${input.content}, ${input.mime},
-              ${input.summary}, ${input.approved}, ${version}, ${input.parentArtifactId})
+              ${input.summary}, ${input.approved}, ${version}, ${input.parentArtifactId}, ${remixOf}, ${projectId})
       RETURNING *`),
   );
   return r!;
@@ -931,6 +961,52 @@ export async function updateProject(
   );
 }
 
+/** Who a project is sent to, and when it last went. */
+export async function setProjectParticipant(id: number, v: { name: string | null; email: string | null; sent?: boolean }): Promise<ProjectRow | null> {
+  await ensureTables();
+  return one<ProjectRow>(
+    await db.execute(sql`
+      UPDATE aik_projects SET participant_name = ${v.name}, participant_email = ${v.email},
+             sent_at = CASE WHEN ${Boolean(v.sent)} THEN now() ELSE sent_at END, updated_at = now()
+       WHERE id = ${id}
+      RETURNING *`),
+  );
+}
+
+export type LibraryRow = ArtifactRow & { class_name: string; class_kind: ClassKind; nickname: string | null; avatar: string | null; remix_title: string | null; project_name: string | null };
+
+/**
+ * Everything a facilitator can open, newest first: their own workspace and
+ * the children's work in the classes they run. Latest version of each chain
+ * only. Game HTML is left out (it can be megabytes of painted art); a game's
+ * only file is its own download, which needs no parsing.
+ */
+export async function listLibrary(classIds: number[], opts: { projectId?: number | null; limit?: number } = {}): Promise<LibraryRow[]> {
+  await ensureTables();
+  if (!classIds.length) return [];
+  const limit = Math.min(opts.limit ?? 200, 500);
+  const projectId = opts.projectId ?? null;
+  return rows<LibraryRow>(
+    await db.execute(sql`
+      SELECT a.id, a.class_id, a.child_id, a.kind, a.title, a.mime, a.summary, a.approved, a.published, a.version,
+             a.parent_artifact_id, a.project_id, a.remix_of, a.created_at,
+             CASE WHEN a.kind = 'game' THEN '' ELSE a.content END AS content,
+             k.name AS class_name, k.kind AS class_kind, c.nickname, c.avatar,
+             s.title AS remix_title, p.name AS project_name
+        FROM aik_artifacts a
+        JOIN aik_classes k ON k.id = a.class_id
+        LEFT JOIN aik_children c ON c.id = a.child_id
+        LEFT JOIN aik_artifacts s ON s.id = a.remix_of
+        LEFT JOIN aik_projects p ON p.id = a.project_id
+       WHERE a.class_id IN (${sql.join(classIds.map((id) => sql`${id}`), sql`, `)})
+         AND a.kind <> 'chat'
+         AND (${projectId === null} OR a.project_id = ${projectId})
+         AND NOT EXISTS (SELECT 1 FROM aik_artifacts b WHERE b.parent_artifact_id = a.id)
+       ORDER BY a.created_at DESC
+       LIMIT ${limit}`),
+  );
+}
+
 export async function deleteProject(id: number): Promise<void> {
   await ensureTables();
   await db.execute(sql`UPDATE aik_artifacts SET project_id = NULL WHERE project_id = ${id}`);
@@ -953,7 +1029,7 @@ export async function listWorkspaceArtifacts(
   return rows<Omit<ArtifactRow, "content">>(
     await db.execute(sql`
       SELECT a.id, a.class_id, a.child_id, a.kind, a.title, a.mime, a.summary, a.approved, a.published,
-             a.version, a.parent_artifact_id, a.project_id, a.created_at
+             a.version, a.parent_artifact_id, a.project_id, a.remix_of, a.created_at
         FROM aik_artifacts a
        WHERE a.class_id = ${classId}
          AND a.child_id IS NULL

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "wouter";
 import { cx } from "../components/ui";
-import { getArtifact, mediaSrc, downloadUrl, bookPdfUrl, type Artifact, type ArtifactMeta, type Book, type Movie, type FieldDef, type ModeDef, type StudioRequest } from "./api";
+import { getArtifact, mediaSrc, downloadUrl, bookPdfUrl, type Artifact, type ArtifactMeta, type Book, type Movie, type FieldDef, type ModeDef, type StudioRequest, type FileLink, type Hero } from "./api";
 
 /* ------------------------------------------------------------------ *
  * Primitives sized for small hands and projectors
@@ -111,6 +111,15 @@ export function GameFrame({ html, title, tall }: { html: string; title: string; 
  * ------------------------------------------------------------------ */
 
 export function ArtifactView({ artifact, compact }: { artifact: Artifact; compact?: boolean }) {
+  if (artifact.kind === "hero") {
+    let hero: Hero | null = null;
+    try {
+      hero = JSON.parse(artifact.content);
+    } catch {
+      /* ignore */
+    }
+    return hero ? <HeroView artifactId={artifact.id} hero={hero} compact={compact} /> : null;
+  }
   if (artifact.kind === "game")
     return (
       <div className="space-y-3">
@@ -435,7 +444,7 @@ export function ArtifactLoader({ id, compact }: { id: number; compact?: boolean 
 }
 
 export function kindEmoji(kind: ArtifactMeta["kind"]): string {
-  return { game: "🎮", story: "📚", image: "🎨", quest: "🧭", video: "🎬", robot: "🤖", chat: "💬", audio: "🎵" }[kind] ?? "✨";
+  return { game: "🎮", story: "📚", image: "🎨", quest: "🧭", video: "🎬", robot: "🤖", chat: "💬", audio: "🎵", hero: "🦸" }[kind] ?? "✨";
 }
 
 /* ------------------------------------------------------------------ *
@@ -634,14 +643,17 @@ export function ModeForm({
   onSubmit,
   busy,
   submitLabel = "Make it!",
+  initialValues,
 }: {
   mode: ModeDef;
   maxChars: number;
   onSubmit: (values: Record<string, string>) => void;
   busy?: boolean;
   submitLabel?: string;
+  /** Remix workflow: start from values carried over from another piece. */
+  initialValues?: Record<string, string>;
 }) {
-  const [values, setValues] = useState<Record<string, string>>({});
+  const [values, setValues] = useState<Record<string, string>>(() => ({ ...(initialValues ?? {}) }));
   const missing = useMemo(() => mode.createFields.filter((f) => f.required && !(values[f.key] ?? "").trim()), [mode, values]);
   const starters = (mode.starters ?? []).filter((s) => s.values);
   return (
@@ -934,4 +946,79 @@ export function summarizeInput(req: StudioRequest, modes: ModeDef[]): string {
     .filter((f) => req.input[f.key])
     .map((f) => `${f.label} ${req.input[f.key]}`)
     .join(" · ");
+}
+
+
+/* ------------------------------------------------------------------ *
+ * Remix workflow pieces
+ * ------------------------------------------------------------------ */
+
+/** A hero: what they look like and what they sound like. */
+export function HeroView({ artifactId, hero, compact }: { artifactId: number; hero: Hero; compact?: boolean }) {
+  const portrait = mediaSrc(artifactId, hero.portrait);
+  const sample = mediaSrc(artifactId, hero.sample);
+  return (
+    <div className={compact ? "flex gap-3" : "grid gap-4 sm:grid-cols-[minmax(0,220px)_1fr]"}>
+      {portrait ? (
+        <img src={portrait} alt={`${hero.name}`} className={compact ? "h-20 w-20 rounded-2xl object-cover ring-2 ring-violet-100" : "w-full rounded-3xl object-cover ring-2 ring-violet-100"} />
+      ) : (
+        <div className={compact ? "flex h-20 w-20 items-center justify-center rounded-2xl bg-violet-50 text-3xl" : "flex aspect-square w-full items-center justify-center rounded-3xl bg-violet-50 text-6xl"}>🦸</div>
+      )}
+      <div className="min-w-0 space-y-2">
+        <p className="text-xl font-extrabold">{hero.name}</p>
+        {!compact && (
+          <>
+            <p className="text-sm text-slate-700">
+              <span className="font-bold">Looks like:</span> {hero.look}
+            </p>
+            {hero.personality && (
+              <p className="text-sm text-slate-700">
+                <span className="font-bold">Personality:</span> {hero.personality}
+              </p>
+            )}
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{hero.style}</p>
+          </>
+        )}
+        <p className="text-sm text-slate-700">
+          <span className="font-bold">Voice:</span> {hero.voice?.name ?? "the house voice"}
+          {hero.voice?.provider === "elevenlabs" && <span className="text-xs text-slate-500"> · ElevenLabs</span>}
+          {hero.voice?.provider === "azure" && <span className="text-xs text-slate-500"> · Azure</span>}
+        </p>
+        {sample && <audio controls src={sample} className="w-full max-w-sm" preload="none" />}
+      </div>
+    </div>
+  );
+}
+
+const FILE_ICON: Record<FileLink["type"], string> = { pdf: "📕", image: "🖼️", audio: "🔊", video: "🎞️", html: "🕹️", text: "📝", json: "🗂️" };
+
+/** Every file of a piece, each one a link that opens or downloads it. */
+export function FilesList({ files, title = "Files", dense }: { files: FileLink[]; title?: string; dense?: boolean }) {
+  if (!files.length) return null;
+  const main = files.filter((f) => !/^(Page \d+|Shot \d+)/.test(f.label));
+  const parts = files.filter((f) => /^(Page \d+|Shot \d+)/.test(f.label));
+  const link = (f: FileLink) => (
+    <a
+      key={f.url + f.label}
+      href={f.url}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-xs font-bold text-violet-800 ring-1 ring-violet-200 hover:bg-violet-50"
+    >
+      <span>{FILE_ICON[f.type]}</span>
+      {f.label}
+    </a>
+  );
+  return (
+    <div className={dense ? "space-y-1" : "space-y-2"}>
+      {!dense && <p className="text-xs font-black uppercase tracking-wide text-slate-500">{title}</p>}
+      <div className="flex flex-wrap gap-1.5">{main.map(link)}</div>
+      {parts.length > 0 && (
+        <details className="text-xs">
+          <summary className="cursor-pointer font-semibold text-slate-500">{parts.length} more: every page and shot on its own</summary>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">{parts.map(link)}</div>
+        </details>
+      )}
+    </div>
+  );
 }

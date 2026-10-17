@@ -11,13 +11,15 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { randomBytes, createHash } from "node:crypto";
 import { aikConfig, isAiConfigured, isContentSafetyConfigured, isImageConfigured, isTtsConfigured, isGoogleConfigured, capabilitySummary } from "./config";
-import { sendVerification, sendReset } from "./mail";
+import { sendVerification, sendReset, sendProjectEmail, type ProjectPiece, type ProjectAttachment } from "./mail";
 import { speak } from "./ai";
 import * as store from "./store";
 import { hashPassword, verifyPassword } from "../auth";
 import { logger } from "../lib/logger";
 import { publicModes, getMode } from "./modes";
-import { runRequest, stashPhoto, subscribe, publish, toPublicRequest, toChildRequest, toPublicClass } from "./pipeline";
+import { runRequest, stashPhoto, subscribe, publish, toPublicRequest, toChildRequest, toPublicClass, REMIX_FROM_KEY, PROJECT_KEY } from "./pipeline";
+import { filesOf, representation, kindName, suggestValues, generateIdeas, runHeroJob, validateHero, parseHero, REMIX_TOOLS, HERO_STYLES } from "./remix";
+import { listVoices, findVoice } from "./voices";
 import { KID_MESSAGES, contentSafetyImage } from "./safety";
 import { getMedia, referencedNames } from "./media";
 import { bookNarrationText, type Book } from "./book";
@@ -913,7 +915,7 @@ export function registerAikRoutes(app: Express): void {
     wrap(async (req, res) => {
       const { child, klass } = req as CReq;
       if (!allow(`creq:${child.id}`, aikConfig.childRequestsPerMinute)) return void res.status(429).json({ error: "Whoa, fast fingers! Wait a moment and try again." });
-      const body = z.object({ mode: z.enum(["game", "story", "prompt", "music", "quest", "video", "robot", "homework"]), kind: z.enum(["create", "change", "chat"]), projectArtifactId: z.number().int().optional(), input: z.record(z.any()) }).safeParse(req.body);
+      const body = z.object({ mode: z.enum(["game", "story", "prompt", "music", "quest", "video", "robot", "homework"]), kind: z.enum(["create", "change", "chat"]), projectArtifactId: z.number().int().optional(), remixFrom: z.number().int().optional(), input: z.record(z.any()) }).safeParse(req.body);
       if (!body.success) return void res.status(400).json({ error: "That order didn't look right." });
 
       if (klass.paused) return void res.status(423).json({ error: KID_MESSAGES.paused });
@@ -941,6 +943,13 @@ export function registerAikRoutes(app: Express): void {
       if (body.data.kind === "change") input.change = String(body.data.input.change ?? "").slice(0, aikConfig.maxFieldChars);
       else if (body.data.kind === "chat") input.message = String(body.data.input.message ?? "").slice(0, aikConfig.maxChatChars);
       else for (const f of mode.createFields) if (body.data.input[f.key] !== undefined) input[f.key] = String(body.data.input[f.key]).slice(0, f.maxChars ?? aikConfig.maxFieldChars);
+      // Remix: a child may start from their own piece, or from one a classmate put in the Arcade.
+      if (body.data.kind === "create" && body.data.remixFrom) {
+        const src = await store.getArtifact(body.data.remixFrom);
+        const ok = src && src.class_id === klass.id && src.approved && (src.child_id === child.id || src.published) && src.kind !== "chat";
+        if (!ok) return void res.status(404).json({ error: "Pick something you made, or something from the Arcade, to remix." });
+        input[REMIX_FROM_KEY] = String(src!.id);
+      }
 
       const request = await store.createRequest({ classId: klass.id, childId: child.id, mode: body.data.mode, kind: body.data.kind, projectArtifactId: body.data.projectArtifactId ?? null, input });
       publish(klass.id, { type: "request", request: toPublicRequest(request) });
@@ -1220,6 +1229,7 @@ export function registerAikRoutes(app: Express): void {
           projectArtifactId: z.number().int().optional(),
           projectId: z.number().int().nullable().optional(),
           quality: z.enum(["fast", "studio"]).optional(),
+          remixFrom: z.number().int().optional(),
           input: z.record(z.any()),
           // A picture the person is asking about, as a data URI. Screened here,
           // used once, never written anywhere. ~6MB of base64 is roughly a 4MB photo.
@@ -1241,6 +1251,15 @@ export function registerAikRoutes(app: Express): void {
       if (body.data.kind === "change") input.change = String(body.data.input.change ?? "").slice(0, cap);
       else if (body.data.kind === "chat") input.message = String(body.data.input.message ?? "").slice(0, aikConfig.staffChatChars);
       else for (const fd of mode.createFields) if (body.data.input[fd.key] !== undefined) input[fd.key] = String(body.data.input[fd.key]).slice(0, cap);
+      if (body.data.kind === "create" && body.data.remixFrom) {
+        const src = await hubVisible(req, body.data.remixFrom);
+        if (!src || !src.approved || src.kind === "chat") return void res.status(404).json({ error: "That piece isn't available to remix." });
+        input[REMIX_FROM_KEY] = String(src.id);
+      }
+      if (body.data.projectId) {
+        const p = await store.getProject(body.data.projectId);
+        if (p && (p.facilitator_id === f.id || f.is_admin)) input[PROJECT_KEY] = String(p.id);
+      }
 
       const request = await store.createRequest({
         classId: workspace.id,
@@ -1304,6 +1323,236 @@ export function registerAikRoutes(app: Express): void {
       const text = a.summary || a.title;
       const audio = await speak(text);
       res.json({ audio: audio.base64, mime: audio.mime });
+    }),
+  );
+
+  /* ---------------- Remix workflow (Hub) ---------------- */
+
+  /** An artifact the signed-in facilitator may open: their workspace or a class they run. */
+  async function hubVisible(req: Request, id: number): Promise<store.ArtifactRow | null> {
+    const f = (req as FReq).facilitator;
+    const a = Number.isInteger(id) ? await store.getArtifact(id) : null;
+    if (!a) return null;
+    const klass = await store.getClass(a.class_id);
+    return klass && (klass.facilitator_id === f.id || f.is_admin) ? a : null;
+  }
+
+  async function hubClassIds(req: Request): Promise<number[]> {
+    const f = (req as FReq).facilitator;
+    const workspace = await workspaceFor(req);
+    const classes = await store.listClasses(f.id, false);
+    return [workspace.id, ...classes.filter((c) => c.id !== workspace.id).map((c) => c.id)];
+  }
+
+  function libraryItem(a: store.LibraryRow) {
+    return {
+      id: a.id,
+      classId: a.class_id,
+      childId: a.child_id,
+      kind: a.kind,
+      title: a.title,
+      summary: a.summary,
+      approved: a.approved,
+      published: a.published,
+      version: a.version,
+      projectId: a.project_id ?? null,
+      projectName: a.project_name,
+      remixOf: a.remix_of ?? null,
+      remixTitle: a.remix_title,
+      className: a.class_kind === "workspace" ? "My workspace" : a.class_name,
+      maker: a.child_id ? `${a.avatar ?? ""} ${a.nickname ?? "a child"}`.trim() : "You",
+      createdAt: a.created_at,
+      hero: a.kind === "hero" ? parseHero(a.content) : null,
+      files: a.approved ? filesOf(a) : [],
+    };
+  }
+
+  /* Every file you can open, in one place. */
+  app.get(
+    `${base}/hub/library`,
+    requireFacilitator,
+    wrap(async (req, res) => {
+      const pid = req.query.projectId ? Number(req.query.projectId) : null;
+      const items = await store.listLibrary(await hubClassIds(req), { projectId: Number.isInteger(pid) ? pid : null, limit: 300 });
+      res.setHeader("Cache-Control", "private, no-store");
+      res.json({ items: items.map(libraryItem) });
+    }),
+  );
+
+  app.get(
+    `${base}/hub/voices`,
+    requireFacilitator,
+    wrap(async (_req, res) => {
+      res.json({ ...(await listVoices()), styles: HERO_STYLES });
+    }),
+  );
+
+  /* Create a hero, or a new version of one (new look, new voice). Runs in the
+   * background like any tool; poll /hub/requests/:rid. */
+  app.post(
+    `${base}/hub/heroes`,
+    requireFacilitator,
+    wrap(async (req, res) => {
+      const f = (req as FReq).facilitator;
+      if (!allow(`hero:${f.id}`, 10)) return void res.status(429).json({ error: "Slow down a moment and try again." });
+      const v = validateHero(req.body);
+      if (!v.ok) return void res.status(400).json({ error: v.error });
+      const workspace = await workspaceFor(req);
+      let previous: store.ArtifactRow | null = null;
+      if (req.body?.heroId) {
+        previous = await hubVisible(req, Number(req.body.heroId));
+        if (!previous || previous.kind !== "hero" || previous.class_id !== workspace.id) return void res.status(404).json({ error: "Hero not found." });
+      }
+      let voice = null;
+      if (req.body?.voice?.provider && req.body?.voice?.id) {
+        const found = await findVoice(String(req.body.voice.provider), String(req.body.voice.id));
+        if (!found) return void res.status(400).json({ error: "That voice isn't available. Pick another one." });
+        voice = { provider: found.provider, id: found.id, name: found.name };
+      }
+      let projectId: number | null = null;
+      if (req.body?.projectId) {
+        const p = await store.getProject(Number(req.body.projectId));
+        if (p && (p.facilitator_id === f.id || f.is_admin)) projectId = p.id;
+      }
+      projectId = projectId ?? previous?.project_id ?? null;
+      const request = await store.createRequest({
+        classId: workspace.id,
+        childId: null,
+        mode: "prompt",
+        kind: previous ? "change" : "create",
+        projectArtifactId: previous?.id ?? null,
+        // "what"/"where"/"mood" are Prompt Craft's fields, so the class feed shows the hero sensibly.
+        input: previous
+          ? { change: `Hero ${v.hero.name}: new look or voice${voice?.name ? ` (${voice.name})` : ""}` }
+          : { what: `Hero: ${v.hero.name}, ${v.hero.look}`, mood: v.hero.personality, style: v.hero.style, voice: voice?.name ?? "" },
+      });
+      await store.audit(workspace.id, "facilitator", f.id, previous ? "hero_updated" : "hero_created", { requestId: request.id, name: v.hero.name });
+      void runHeroJob({ requestId: request.id, classId: workspace.id, projectId, input: v.hero, voice, previous });
+      res.json({ request: toPublicRequest(request) });
+    }),
+  );
+
+  /* Fill another tool's form from a piece, ready to edit. */
+  app.post(
+    `${base}/hub/remix/suggest`,
+    requireFacilitator,
+    wrap(async (req, res) => {
+      const f = (req as FReq).facilitator;
+      if (!allow(`rsug:${f.id}`, 20)) return void res.status(429).json({ error: "Slow down a moment and try again." });
+      const body = z.object({ artifactId: z.number().int(), mode: z.enum(["game", "story", "prompt", "music", "quest", "video", "robot"]) }).safeParse(req.body);
+      if (!body.success) return void res.status(400).json({ error: "Pick a piece and a tool." });
+      const src = await hubVisible(req, body.data.artifactId);
+      if (!src || !src.approved) return void res.status(404).json({ error: "That piece isn't available to remix." });
+      const mode = getMode(body.data.mode)!;
+      const { values, ai } = await suggestValues(src, mode, { staff: true });
+      res.json({ source: { id: src.id, title: src.title, kind: src.kind }, mode: mode.id, values, ai });
+    }),
+  );
+
+  /* "Generate ideas": next things to make from a piece. */
+  app.post(
+    `${base}/hub/remix/ideas`,
+    requireFacilitator,
+    wrap(async (req, res) => {
+      const f = (req as FReq).facilitator;
+      if (!allow(`ridea:${f.id}`, 10)) return void res.status(429).json({ error: "Slow down a moment and try again." });
+      const id = Number(req.body?.artifactId);
+      const src = await hubVisible(req, id);
+      if (!src || !src.approved) return void res.status(404).json({ error: "That piece isn't available." });
+      const tools = REMIX_TOOLS.filter((t) => t !== (src.kind === "audio" ? "music" : src.kind === "image" ? "prompt" : src.kind === "video" ? "video" : src.kind));
+      try {
+        const ideas = await generateIdeas(src, tools);
+        res.json({ source: { id: src.id, title: src.title, kind: src.kind }, ideas });
+      } catch (err) {
+        logger.warn({ err: String((err as Error)?.message ?? err).slice(0, 200) }, "[aik] ideas failed");
+        res.status(503).json({ error: "Couldn't come up with ideas right now. Try again in a moment." });
+      }
+    }),
+  );
+
+  /* Save the project and send it: to the participant, copying the facilitator and the org. */
+  app.post(
+    `${base}/hub/projects/:pid/send`,
+    requireFacilitator,
+    wrap(async (req, res) => {
+      const f = (req as FReq).facilitator;
+      const project = await ownedProject(req, res);
+      if (!project) return;
+      if (!allow(`psend:${f.id}`, 5)) return void res.status(429).json({ error: "Slow down a moment and try again." });
+      const body = z
+        .object({
+          participantName: z.string().trim().max(80).optional(),
+          participantEmail: z.string().trim().email().max(200),
+          note: z.string().trim().max(1000).optional(),
+          send: z.boolean().optional(),
+        })
+        .safeParse(req.body);
+      if (!body.success) return void res.status(400).json({ error: "Enter the participant's email address." });
+      const saved = await store.setProjectParticipant(project.id, { name: body.data.participantName || null, email: body.data.participantEmail, sent: false });
+      if (body.data.send === false) return void res.json({ project: saved, sent: false, saved: true });
+
+      const items = (await store.listLibrary(await hubClassIds(req), { projectId: project.id, limit: 100 })).filter((a) => a.approved);
+      if (!items.length) return void res.status(400).json({ error: "This project has nothing in it yet. Make something first." });
+
+      // Attach the real files, biggest last, within the size budget; list the rest.
+      const pieces: ProjectPiece[] = [];
+      const attachments: ProjectAttachment[] = [];
+      let budget = aikConfig.projectAttachBytes;
+      const safe = (t: string) => t.replace(/[^a-z0-9 _-]/gi, "").trim().slice(0, 50) || "piece";
+      const byId = new Map(items.map((a) => [a.id, a.title]));
+      for (const a of items) {
+        const piece: ProjectPiece = { title: a.title, kind: kindName(a.kind), description: representation(a, 400).replace(/\n/g, " · "), madeFrom: a.remix_title ?? (a.remix_of ? byId.get(a.remix_of) ?? null : null), attached: [], tooBig: [] };
+        const full = a.kind === "game" ? await store.getArtifact(a.id) : a;
+        const files: { name: string; bytes: Buffer; type: string } [] = [];
+        try {
+          if (a.kind === "game" && full) files.push({ name: `${safe(a.title)}.html`, bytes: Buffer.from(full.content), type: "text/html" });
+          else if (a.kind === "story") {
+            const book = JSON.parse(a.content);
+            if (book?.format === "book") files.push({ name: `${safe(a.title)}.pdf`, bytes: Buffer.from(await renderBookPdf(book)), type: "application/pdf" });
+          } else if (a.kind === "video") {
+            const m = JSON.parse(a.content);
+            const got = m?.movie ? await getMedia(m.movie) : null;
+            if (got) files.push({ name: `${safe(a.title)}.mp4`, bytes: got.bytes, type: got.mime });
+          } else if ((a.kind === "audio" || a.kind === "image") && a.content) {
+            const got = await getMedia(a.content);
+            if (got) files.push({ name: `${safe(a.title)}.${a.kind === "audio" ? "mp3" : got.mime.includes("jpeg") ? "jpg" : "png"}`, bytes: got.bytes, type: got.mime });
+          } else if (a.kind === "hero") {
+            const h = parseHero(a.content);
+            const pic = h?.portrait ? await getMedia(h.portrait) : null;
+            if (pic) files.push({ name: `${safe(a.title)}-portrait.${pic.mime.includes("jpeg") ? "jpg" : "png"}`, bytes: pic.bytes, type: pic.mime });
+            const vox = h?.sample ? await getMedia(h.sample) : null;
+            if (vox) files.push({ name: `${safe(a.title)}-voice.mp3`, bytes: vox.bytes, type: vox.mime });
+          }
+        } catch (err) {
+          logger.warn({ err: String((err as Error)?.message ?? err).slice(0, 160), artifactId: a.id }, "[aik] project file could not be read");
+        }
+        if (a.kind !== "game") files.push({ name: `${safe(a.title)}-words.txt`, bytes: Buffer.from(representation(a)), type: "text/plain" });
+        for (const file of files) {
+          if (file.bytes.length <= budget) {
+            attachments.push({ filename: file.name, content: file.bytes, contentType: file.type });
+            budget -= file.bytes.length;
+            piece.attached.push(file.name);
+          } else piece.tooBig.push(file.name);
+        }
+        pieces.push(piece);
+      }
+      const to = body.data.participantEmail;
+      const cc = Array.from(new Set([f.email, ...aikConfig.projectCc].map((x) => x.toLowerCase()))).filter((x) => x && x !== to.toLowerCase());
+      const result = await sendProjectEmail({
+        to,
+        cc,
+        replyTo: f.email,
+        participantName: body.data.participantName || null,
+        facilitatorName: f.display_name || "your facilitator",
+        projectName: project.name,
+        note: body.data.note ?? "",
+        pieces,
+        attachments,
+        hubUrl: `${aikConfig.publicUrl}/aiforkids/hub`,
+      });
+      const after = result.sent ? await store.setProjectParticipant(project.id, { name: body.data.participantName || null, email: to, sent: true }) : saved;
+      await store.audit(project.class_id ?? (await workspaceFor(req)).id, "facilitator", f.id, result.sent ? "project_sent" : "project_send_failed", { projectId: project.id, to, cc, files: attachments.length });
+      res.json({ project: after, sent: result.sent, reason: result.reason ?? null, to, cc, attached: attachments.length, pieces: pieces.length });
     }),
   );
 
@@ -1392,6 +1641,13 @@ export function registerAikRoutes(app: Express): void {
         res.setHeader("Cache-Control", "private, no-store");
         return void res.end(a.content);
       }
+      if (a.kind === "story") return void res.redirect(302, `${base}/artifacts/${a.id}/book.pdf`);
+      if (a.kind === "quest" || a.kind === "robot" || a.kind === "hero") {
+        res.setHeader("Content-Type", "application/json; charset=utf-8");
+        res.setHeader("Content-Disposition", `attachment; filename="${safeName}.json"`);
+        res.setHeader("Cache-Control", "private, no-store");
+        return void res.end(a.content);
+      }
       let ref = a.content;
       let ext = a.mime.includes("mpeg") ? "mp3" : a.mime.includes("mp4") ? "mp4" : a.mime.includes("png") || a.mime.includes("jpeg") ? (a.mime.includes("jpeg") ? "jpg" : "png") : "bin";
       if (a.kind === "video" && a.mime === "application/json") {
@@ -1410,6 +1666,31 @@ export function registerAikRoutes(app: Express): void {
       res.setHeader("Content-Disposition", `attachment; filename="${safeName}.${ext}"`);
       res.setHeader("Cache-Control", "private, no-store");
       res.end(m.bytes);
+    }),
+  );
+
+  /* The words of any piece, as plain text: the representation that travels between tools. */
+  app.get(
+    `${base}/artifacts/:aid/words.txt`,
+    wrap(async (req, res) => {
+      const a = await artifactAccess(req, res);
+      if (!a) return;
+      const safeName = a.title.replace(/[^a-z0-9 _-]/gi, "").trim().slice(0, 60) || "my-project";
+      res.setHeader("Content-Type", "text/plain; charset=utf-8");
+      res.setHeader("Content-Disposition", `inline; filename="${safeName}.txt"`);
+      res.setHeader("Cache-Control", "private, no-store");
+      res.end(representation(a, 20_000));
+    }),
+  );
+
+  /* Every file of one piece. */
+  app.get(
+    `${base}/artifacts/:aid/files`,
+    wrap(async (req, res) => {
+      const a = await artifactAccess(req, res);
+      if (!a) return;
+      res.setHeader("Cache-Control", "private, no-store");
+      res.json({ files: filesOf(a) });
     }),
   );
 

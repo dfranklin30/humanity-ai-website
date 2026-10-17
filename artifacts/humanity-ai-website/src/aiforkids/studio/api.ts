@@ -70,7 +70,7 @@ export type ArtifactMeta = {
   id: number;
   classId: number;
   childId: number | null;
-  kind: "game" | "story" | "image" | "quest" | "video" | "robot" | "chat" | "audio";
+  kind: "game" | "story" | "image" | "quest" | "video" | "robot" | "chat" | "audio" | "hero";
   title: string;
   mime: string;
   summary: string | null;
@@ -202,7 +202,7 @@ export type ChildMe = {
   sessionExpiresAt: number;
 };
 export const childMe = () => call<ChildMe>("GET", "/child/me");
-export const childSubmit = (body: { mode: ModeId; kind: "create" | "change" | "chat"; projectArtifactId?: number; input: Record<string, string> }) =>
+export const childSubmit = (body: { mode: ModeId; kind: "create" | "change" | "chat"; projectArtifactId?: number; remixFrom?: number; input: Record<string, string> }) =>
   call<{ request: StudioRequest; used: number }>("POST", "/child/requests", body);
 export const childSpeak = (artifactId: number) => call<{ audio: string; mime: string }>("POST", `/child/artifacts/${artifactId}/speak`);
 export const childRequest = (id: number) => call<{ request: StudioRequest }>("GET", `/child/requests/${id}`);
@@ -292,6 +292,9 @@ export type Project = {
   created_at: string;
   updated_at: string;
   artifacts?: number;
+  participant_name?: string | null;
+  participant_email?: string | null;
+  sent_at?: string | null;
 };
 
 export type HubState = {
@@ -313,7 +316,7 @@ export const hubPatchProject = (id: number, patch: Partial<{ name: string; summa
 export const hubDeleteProject = (id: number) => call<{ ok: true }>("DELETE", `/hub/projects/${id}`);
 export const hubFileArtifact = (artifactId: number, projectId: number | null) =>
   call<{ ok: true }>("PATCH", `/hub/artifacts/${artifactId}/project`, { projectId });
-export const hubSubmit = (body: { mode: ModeId; kind: "create" | "change" | "chat"; projectArtifactId?: number; projectId?: number | null; quality?: "fast" | "studio"; input: Record<string, string>; photo?: string }) =>
+export const hubSubmit = (body: { mode: ModeId; kind: "create" | "change" | "chat"; projectArtifactId?: number; projectId?: number | null; remixFrom?: number; quality?: "fast" | "studio"; input: Record<string, string>; photo?: string }) =>
   call<{ request: StudioRequest; projectId: number | null }>("POST", "/hub/requests", body);
 export const hubRequest = (id: number) => call<{ request: StudioRequest }>("GET", `/hub/requests/${id}`);
 export const hubSpeak = (artifactId: number) => call<{ audio: string; mime: string }>("POST", `/hub/artifacts/${artifactId}/speak`);
@@ -352,3 +355,48 @@ export const hubReview = () => call<{ pending: PendingItem[] }>("GET", "/hub/rev
 export const hubAudit = (limit = 200) => call<{ entries: AuditEntry[] }>("GET", `/hub/audit?limit=${limit}`);
 export const fApproveArtifact = (artifactId: number, approve: boolean) =>
   call<{ ok: true }>("POST", `/facilitator/artifacts/${artifactId}/approve`, { approve });
+
+
+/* ------------------------------------------------------------------ *
+ * Remix workflow
+ * ------------------------------------------------------------------ */
+
+export type FileLink = { label: string; url: string; type: "pdf" | "image" | "audio" | "video" | "html" | "text" | "json" };
+export type VoiceChoice = { provider: "elevenlabs" | "azure"; id: string; name?: string };
+export type VoiceOption = { provider: "elevenlabs" | "azure"; id: string; name: string; description: string };
+export type Hero = { format: "hero"; name: string; look: string; personality: string; style: string; portrait?: string; voice?: VoiceChoice; sample?: string; sampleText?: string };
+
+export type LibraryItem = {
+  id: number;
+  classId: number;
+  childId: number | null;
+  kind: ArtifactMeta["kind"];
+  title: string;
+  summary: string | null;
+  approved: boolean;
+  published: boolean;
+  version: number;
+  projectId: number | null;
+  projectName: string | null;
+  remixOf: number | null;
+  remixTitle: string | null;
+  className: string;
+  maker: string;
+  createdAt: string;
+  hero: Hero | null;
+  files: FileLink[];
+};
+
+export type Idea = { tool: ModeId; title: string; pitch: string; values: Record<string, string> };
+export type RemixStart = { source: { id: number; title: string; kind: string }; values: Record<string, string> };
+
+export const hubLibrary = (projectId?: number | null) => call<{ items: LibraryItem[] }>("GET", `/hub/library${projectId ? `?projectId=${projectId}` : ""}`);
+export const hubVoices = () => call<{ voices: VoiceOption[]; elevenlabs: boolean; azure: boolean; styles: string[] }>("GET", "/hub/voices");
+export const hubSaveHero = (body: { name: string; look: string; personality?: string; style: string; voice?: { provider: string; id: string } | null; projectId?: number | null; heroId?: number }) =>
+  call<{ request: StudioRequest }>("POST", "/hub/heroes", body);
+export const hubRemixSuggest = (artifactId: number, mode: ModeId) =>
+  call<{ source: { id: number; title: string; kind: string }; mode: ModeId; values: Record<string, string>; ai: boolean }>("POST", "/hub/remix/suggest", { artifactId, mode });
+export const hubRemixIdeas = (artifactId: number) => call<{ source: { id: number; title: string; kind: string }; ideas: Idea[] }>("POST", "/hub/remix/ideas", { artifactId });
+export const hubSendProject = (projectId: number, body: { participantName?: string; participantEmail: string; note?: string; send?: boolean }) =>
+  call<{ project: Project; sent: boolean; saved?: boolean; reason?: string | null; to?: string; cc?: string[]; attached?: number; pieces?: number }>("POST", `/hub/projects/${projectId}/send`, body);
+export const wordsUrl = (artifactId: number) => `/api/aik/artifacts/${artifactId}/words.txt`;

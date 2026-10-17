@@ -64,11 +64,13 @@ import { fLounge, fLoungeAdd, fLoungeRemove, type LoungeItem } from "./api";
 import { BASE } from "../content/program";
 import { WEEK_MODULES, SESSION_RHYTHM, type WeekModule } from "../content/weeks";
 import ClaudeConsole from "../ClaudeConsole";
+import { LibraryTab, RemixInto, RemixTab, type OpenTool, type ToolStart } from "./RemixWorkflow";
+import { FilesList } from "./components";
 
 const STAFF_FIELD_CHARS = 1200;
 const STAFF_CHAT_CHARS = 4000;
 
-type Tab = "claude" | "tools" | "projects" | "program" | "classes" | "review" | "lounge" | "people";
+type Tab = "remix" | "library" | "claude" | "tools" | "projects" | "program" | "classes" | "review" | "lounge" | "people";
 
 export default function HubApp() {
   const [location] = useLocation();
@@ -351,8 +353,10 @@ const inputCls = "w-full rounded-xl border-2 border-slate-200 px-3 py-2 text-bas
 function HubShell() {
   const [state, setState] = useState<HubState | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>("tools");
-  const [tool, setTool] = useState<ModeId | null>(null);
+  const [tab, setTab] = useState<Tab>("remix");
+  const [tool, setToolState] = useState<{ id: ModeId; start?: ToolStart } | null>(null);
+  const setTool = (id: ModeId | null) => setToolState(id ? { id } : null);
+  const openTool: OpenTool = (id, start) => setToolState({ id, start });
   const [projectId, setProjectId] = useState<number | null>(null);
 
   const load = useCallback(
@@ -369,8 +373,21 @@ function HubShell() {
   if (error) return <Notice>{error}</Notice>;
   if (!state) return <Spinner label="Opening your workspace…" />;
 
-  const activeTool = tool ? state.tools.find((t) => t.id === tool) ?? null : null;
-  if (activeTool) return <ToolRunner state={state} mode={activeTool} onBack={() => { setTool(null); void load(); }} />;
+  const activeTool = tool ? state.tools.find((t) => t.id === tool.id) ?? null : null;
+  if (activeTool)
+    return (
+      <ToolRunner
+        key={`${tool!.id}:${tool!.start?.remixFrom ?? "new"}:${JSON.stringify(tool!.start?.values ?? {}).length}`}
+        state={state}
+        mode={activeTool}
+        start={tool!.start}
+        onOpenTool={openTool}
+        onBack={() => {
+          setToolState(null);
+          void load();
+        }}
+      />
+    );
   if (projectId !== null) return <ProjectView id={projectId} projects={state.projects} onBack={() => { setProjectId(null); void load(); }} />;
 
   return (
@@ -379,6 +396,8 @@ function HubShell() {
       <nav className="flex flex-wrap gap-2">
         {(
           [
+            ["remix", "🔁 Remix workflow"],
+            ["library", "📚 Library"],
             ["claude", "🤖 Claude"],
             ["tools", `🧰 Tools · ${state.tools.length}`],
             ["projects", `📁 Projects · ${state.projects.length}`],
@@ -403,6 +422,8 @@ function HubShell() {
         ))}
       </nav>
 
+      {tab === "remix" && <RemixTab state={state} onOpenTool={openTool} onChanged={() => void load()} />}
+      {tab === "library" && <LibraryTab state={state} onOpenTool={openTool} />}
       {tab === "claude" && <ClaudeConsole />}
       {tab === "tools" && <ToolsTab state={state} onOpen={setTool} />}
       {tab === "projects" && <ProjectsTab state={state} onOpen={setProjectId} onChanged={load} />}
@@ -747,7 +768,11 @@ function FileItBar({
   );
 }
 
-function ToolRunner({ state, mode, onBack }: { state: HubState; mode: ModeDef; onBack: () => void }) {
+function ToolRunner({ state, mode, onBack, start, onOpenTool }: { state: HubState; mode: ModeDef; onBack: () => void; start?: ToolStart; onOpenTool?: OpenTool }) {
+  /* Remix workflow: the piece this run starts from. It stays attached to the
+     create; once something is made, changes are ordinary changes. */
+  const [remix, setRemix] = useState<ToolStart | undefined>(start);
+  const [files, setFiles] = useState<import("./api").FileLink[]>([]);
   const [request, setRequest] = useState<StudioRequest | null>(null);
   const [artifact, setArtifact] = useState<Artifact | null>(null);
   const [busy, setBusy] = useState(false);
@@ -774,6 +799,7 @@ function ToolRunner({ state, mode, onBack }: { state: HubState; mode: ModeDef; o
    */
   useEffect(() => {
     if (artifact || restored) return;
+    if (start) return void setRestored(true); // a remix starts fresh, never on the last draft
     const id = readDraft(mode.id);
     setRestored(true);
     if (id === null) return;
@@ -792,6 +818,8 @@ function ToolRunner({ state, mode, onBack }: { state: HubState; mode: ModeDef; o
           kind,
           photo,
           projectArtifactId: kind !== "create" && artifact ? artifact.id : undefined,
+          remixFrom: kind === "create" ? remix?.remixFrom : undefined,
+          projectId: kind === "create" ? remix?.projectId ?? undefined : undefined,
           input,
         });
         setRequest(started);
@@ -813,7 +841,7 @@ function ToolRunner({ state, mode, onBack }: { state: HubState; mode: ModeDef; o
             }
           } else {
             setArtifact(a);
-            setFiled(false);
+            setFiled(Boolean(remix?.projectId));
             writeDraft(mode.id, a.id);
           }
         }
@@ -823,8 +851,21 @@ function ToolRunner({ state, mode, onBack }: { state: HubState; mode: ModeDef; o
         setBusy(false);
       }
     },
-    [mode.id, artifact],
+    [mode.id, artifact, remix],
   );
+
+  // Every file of the piece, so nothing made here is ever hard to find.
+  useEffect(() => {
+    if (!artifact || artifact.kind === "chat") return setFiles([]);
+    let gone = false;
+    fetch(`/api/aik/artifacts/${artifact.id}/files`, { credentials: "same-origin" })
+      .then((r) => (r.ok ? r.json() : { files: [] }))
+      .then((j) => !gone && setFiles(j.files ?? []))
+      .catch(() => !gone && setFiles([]));
+    return () => {
+      gone = true;
+    };
+  }, [artifact]);
 
   const canChat = mode.interaction !== "form";
   const canForm = mode.interaction !== "chat";
@@ -849,8 +890,25 @@ function ToolRunner({ state, mode, onBack }: { state: HubState; mode: ModeDef; o
         <div className="space-y-4">
           {canForm && !artifact && (
             <Card>
-              <h2 className="mb-3 text-lg font-extrabold">Make something</h2>
-              <ModeForm mode={mode} maxChars={STAFF_FIELD_CHARS} busy={busy} onSubmit={(v) => void run("create", v)} submitLabel="Run it" />
+              <h2 className="mb-3 text-lg font-extrabold">{remix ? "Remix it" : "Make something"}</h2>
+              {remix && (
+                <div className="mb-4 rounded-2xl bg-violet-50 p-3 text-sm text-violet-900 ring-1 ring-violet-200">
+                  <p className="font-bold">
+                    🔁 Starting from {remix.sourceKind === "hero" ? "the hero" : `the ${remix.sourceKind}`} “{remix.sourceTitle}”
+                  </p>
+                  <p className="mt-0.5 text-xs text-violet-800">
+                    {remix.sourceKind === "hero"
+                      ? "Their name, look and voice go into this. "
+                      : "Its characters, world and words go to the AI as source material. "}
+                    {remix.ai ? "The boxes below were filled from it. Change anything you like." : "Fill in or change the boxes below."}
+                    {remix.projectId ? " The result is saved in your project." : ""}
+                  </p>
+                  <button type="button" className="mt-1 text-xs font-semibold underline underline-offset-2" onClick={() => setRemix(undefined)}>
+                    Don't use it — start from scratch
+                  </button>
+                </div>
+              )}
+              <ModeForm key={remix ? `remix-${remix.remixFrom}` : "blank"} mode={mode} maxChars={STAFF_FIELD_CHARS} busy={busy} initialValues={remix?.values} onSubmit={(v) => void run("create", v)} submitLabel={remix ? "Remix it" : "Run it"} />
             </Card>
           )}
 
@@ -995,6 +1053,16 @@ function ToolRunner({ state, mode, onBack }: { state: HubState; mode: ModeDef; o
                 <span className="text-xs font-semibold text-slate-500">v{artifact.version}</span>
               </div>
               <ArtifactView artifact={artifact} />
+              {files.length > 0 && (
+                <div className="mt-4 border-t border-slate-100 pt-4">
+                  <FilesList files={files} title="Saved files: open or download" />
+                </div>
+              )}
+              {onOpenTool && artifact.approved !== false && (
+                <div className="mt-4 border-t border-slate-100 pt-4">
+                  <RemixInto item={{ id: artifact.id, title: artifact.title, kind: artifact.kind }} tools={state.tools.map((t) => t.id)} projectId={remix?.projectId ?? null} onOpenTool={onOpenTool} label="Keep going: remix this into" />
+                </div>
+              )}
               <FileItBar
                 artifact={artifact}
                 projects={projects}

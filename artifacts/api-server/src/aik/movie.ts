@@ -23,7 +23,7 @@
  */
 import sharp from "sharp";
 import { aikConfig, isContentSafetyConfigured, isTtsConfigured, isVideoConfigured } from "./config";
-import { generateVideo, speak, ContentFilteredError } from "./ai";
+import { generateVideo, speak, ContentFilteredError, usableVoice, type VoiceChoice } from "./ai";
 import { Steps, type ForgeStep } from "./forge";
 import { putMedia, type MediaRef } from "./media";
 import { contentSafetyImage, type Flag } from "./safety";
@@ -45,8 +45,10 @@ export type Movie = {
 
 const NO_TEXT = "No text, no words, no letters, no real people, no logos, no scary moments. Bright, kid-friendly.";
 
-export function shotPrompt(style: string, shot: { videoPrompt: string }): string {
-  return `${shot.videoPrompt} ${style} style, smooth gentle motion, one continuous shot. ${NO_TEXT}`;
+export function shotPrompt(style: string, shot: { videoPrompt: string }, heroLook?: string | null): string {
+  // A hero from the Remix workflow is described in every shot, so all three shots film the same character.
+  const hero = heroLook ? ` The main character, the same in every shot: ${heroLook}.` : "";
+  return `${shot.videoPrompt}${hero} ${style} style, smooth gentle motion, one continuous shot. ${NO_TEXT}`;
 }
 
 export type BuildMovieResult =
@@ -59,6 +61,10 @@ export async function buildMovie(opts: {
   style: string;
   shots: { description: string; seconds: number; videoPrompt: string }[];
   onProgress?: (steps: ForgeStep[]) => void;
+  /** Remix workflow: keep a hero looking the same in every shot. */
+  heroLook?: string | null;
+  /** Remix workflow: the hero's voice narrates. */
+  voice?: VoiceChoice | null;
 }): Promise<BuildMovieResult> {
   const steps = new Steps(opts.onProgress);
   const flags: Flag[] = [];
@@ -89,7 +95,7 @@ export async function buildMovie(opts: {
         // a shot the provider refuses on content grounds does not.
         for (let take = 1; take <= 2; take++) {
           try {
-            const m = await generateVideo(shotPrompt(movie.style, s), { seconds: s.seconds, size: aikConfig.videoSize });
+            const m = await generateVideo(shotPrompt(movie.style, s, opts.heroLook), { seconds: s.seconds, size: aikConfig.videoSize });
             return Buffer.from(m.base64, "base64");
           } catch (err) {
             if (err instanceof ContentFilteredError) throw err;
@@ -154,11 +160,11 @@ export async function buildMovie(opts: {
 
     /* 4. Narration ---------------------------------------------------- */
     let narration: Buffer | null = null;
-    if (isTtsConfigured()) {
-      steps.begin("narration", "Recording the narration");
+    if (isTtsConfigured() || usableVoice(opts.voice)) {
+      steps.begin("narration", opts.voice?.name ? `Recording the narration (${opts.voice.name})` : "Recording the narration");
       try {
         const text = [movie.title, ...movie.shots.filter((s) => s.clip).map((s) => s.description)].join(". ");
-        const a = await speak(text);
+        const a = await speak(text, opts.voice);
         narration = Buffer.from(a.base64, "base64");
         movie.narration = await putMedia(requestId, "narration.mp3", narration, a.mime);
         steps.end("narration", "done");

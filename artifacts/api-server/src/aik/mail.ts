@@ -113,3 +113,67 @@ export async function sendCareAlert(to: string, info: { className: string; child
   </div>`;
   return send(to, `${BRAND}: a child in ${info.className} may need you`, html, "care-alert");
 }
+
+/* ------------------------------------------------------------------ *
+ * Remix workflow: "Save project" sends the work to the participant
+ * ------------------------------------------------------------------ */
+
+export type ProjectPiece = { title: string; kind: string; description: string; madeFrom: string | null; attached: string[]; tooBig: string[] };
+export type ProjectAttachment = { filename: string; content: Buffer; contentType: string };
+
+const escHtml = (t: string) => t.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] as string);
+
+export async function sendProjectEmail(v: {
+  to: string;
+  cc: string[];
+  replyTo: string | null;
+  participantName: string | null;
+  facilitatorName: string;
+  projectName: string;
+  note: string;
+  pieces: ProjectPiece[];
+  attachments: ProjectAttachment[];
+  hubUrl: string;
+}): Promise<{ sent: boolean; reason?: string }> {
+  const transporter = getTransporter();
+  if (!transporter || !isEmailConfigured()) {
+    logger.warn({ to: v.to, project: v.projectName }, "[aik] project email not sent: mail is not configured on this app");
+    return { sent: false, reason: "Email isn't set up on the kids app yet (GMAIL_USER and GMAIL_APP_PASSWORD)." };
+  }
+  const first = (v.participantName ?? "").trim().split(/\s+/)[0] || "there";
+  const list = v.pieces
+    .map(
+      (p) => `<li style="margin:0 0 14px;">
+        <b>${escHtml(p.title)}</b> <span style="color:#6b7280;">(${escHtml(p.kind)}${p.madeFrom ? `, remixed from ${escHtml(p.madeFrom)}` : ""})</span><br/>
+        <span style="color:#374151;">${escHtml(p.description)}</span>
+        ${p.attached.length ? `<br/><span style="color:#059669;font-size:13px;">Attached: ${escHtml(p.attached.join(", "))}</span>` : ""}
+        ${p.tooBig.length ? `<br/><span style="color:#b45309;font-size:13px;">Too large to attach (ask your facilitator for a copy): ${escHtml(p.tooBig.join(", "))}</span>` : ""}
+      </li>`,
+    )
+    .join("");
+  const html = shell(
+    escHtml(v.projectName),
+    `<p style="font-size:16px;line-height:1.6;">Hi ${escHtml(first)},</p>
+     <p style="font-size:16px;line-height:1.6;">Here is everything made in <b>${escHtml(v.projectName)}</b> with ${escHtml(v.facilitatorName)} at ${BRAND}.</p>
+     ${v.note ? `<blockquote style="border-left:4px solid #7c3aed;margin:16px 0;padding:8px 16px;background:#f5f3ff;font-size:15px;">${escHtml(v.note)}</blockquote>` : ""}
+     <ul style="padding-left:20px;font-size:15px;line-height:1.5;">${list}</ul>
+     <p style="font-size:14px;line-height:1.6;color:#6b7280;">Games open in any web browser. Picture books are PDFs. Songs and read-alouds are MP3s, movies are MP4s.</p>
+     <p style="font-size:14px;line-height:1.6;color:#6b7280;">Facilitators can open the full project in the Hub: <a href="${v.hubUrl}" style="color:#7c3aed;">${v.hubUrl}</a></p>`,
+  );
+  try {
+    await transporter.sendMail({
+      from: `"${BRAND}" <${FROM_EMAIL}>`,
+      to: v.to,
+      cc: v.cc,
+      replyTo: v.replyTo ?? undefined,
+      subject: `${BRAND}: ${v.projectName}`,
+      html,
+      attachments: v.attachments,
+    });
+    logger.info({ to: v.to, cc: v.cc, project: v.projectName, files: v.attachments.length }, "[aik] project email sent");
+    return { sent: true };
+  } catch (err) {
+    logger.error({ err, to: v.to }, "[aik] project email failed");
+    return { sent: false, reason: "The email service refused the message. Try again, or send fewer files." };
+  }
+}
