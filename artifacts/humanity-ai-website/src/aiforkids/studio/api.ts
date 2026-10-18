@@ -4,7 +4,7 @@
  */
 
 export type FieldDef = { key: string; label: string; hint: string; required?: boolean; choices?: string[]; maxChars?: number };
-export type ModeId = "game" | "story" | "prompt" | "music" | "quest" | "video" | "robot" | "homework";
+export type ModeId = "game" | "story" | "prompt" | "music" | "quest" | "video" | "robot" | "homework" | "language";
 export type ModeDef = {
   id: ModeId;
   name: string;
@@ -112,6 +112,21 @@ export type Book = {
   pages: BookPage[];
   theEnd: string;
   madeWith: { text: boolean; pictures: boolean; narration: boolean };
+  /** Language Passport: the woven words, each with its recording. */
+  lang?: LangBlock;
+};
+/** Language Passport: what a woven-word book adds. Page text marks a woven word as [[word|english]]. */
+export type LangWord = { word: string; english: string; say: string; roman?: string; emoji: string; audio?: string };
+export type LangBlock = {
+  code: string;
+  label: string;
+  flag: string;
+  hello: string;
+  rtl: boolean;
+  topic: string;
+  words: LangWord[];
+  phrase: { text: string; english: string; say: string; roman?: string; audio?: string };
+  checked: boolean;
 };
 /** A finished movie, as Video Maker stores it. */
 export type MovieShot = { shot: number; description: string; seconds: number; videoPrompt: string; clip?: string };

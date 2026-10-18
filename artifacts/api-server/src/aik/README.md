@@ -96,6 +96,7 @@ key per provider; children never hold licenses.
 | `AIK_TTS_PROVIDER` | `azure` (Azure AI Speech) · `elevenlabs` · `none` |
 | `AIK_AZURE_SPEECH_KEY`, `AIK_AZURE_SPEECH_REGION`, `AIK_AZURE_SPEECH_VOICE` | Azure AI Speech. **The same multi-service AIServices resource that serves Content Safety also serves Speech**, so "Read it to me" needs no new vendor — reuse that key and its region. Default voice `en-US-AvaMultilingualNeural`. |
 | `AIK_ELEVENLABS_API_KEY`, `AIK_ELEVENLABS_VOICE_ID` | ElevenLabs alternative |
+| Language Passport | Word recordings use `AIK_ELEVENLABS_VOICE_ID` with the language enforced (`eleven_flash_v2_5` + `language_code`; `eleven_v3` for Swahili), falling back to `eleven_multilingual_v2`, then to Azure Speech's native voice for that language. The API key needs Text to Speech and Voices (read) access. |
 | **Screening** | |
 | `AIK_CONTENT_SAFETY_ENDPOINT`, `AIK_CONTENT_SAFETY_KEY` | Azure AI Content Safety |
 | `AIK_REQUIRE_CONTENT_SAFETY` | default `true` in production: fail closed |

@@ -8,7 +8,7 @@ import type { ReactElement } from "react";
  * so a child learns "green is the game room" without reading anything.
  */
 
-export type RoomId = "game" | "story" | "prompt" | "music" | "quest" | "video" | "robot" | "homework" | "lounge" | "arcade" | "portfolio";
+export type RoomId = "game" | "story" | "prompt" | "music" | "quest" | "video" | "robot" | "homework" | "language" | "lounge" | "arcade" | "portfolio";
 
 export const ROOM_THEME: Record<RoomId, { accent: string; tile: string; ring: string; name: string }> = {
   game: { accent: "#16a34a", tile: "#dcfce7", ring: "ring-green-200", name: "Game Maker" },
@@ -19,6 +19,7 @@ export const ROOM_THEME: Record<RoomId, { accent: string; tile: string; ring: st
   video: { accent: "#dc2626", tile: "#fee2e2", ring: "ring-red-200", name: "Video Maker" },
   robot: { accent: "#475569", tile: "#e2e8f0", ring: "ring-slate-300", name: "Robotics Lab" },
   homework: { accent: "#2563eb", tile: "#dbeafe", ring: "ring-blue-200", name: "Study Desk" },
+  language: { accent: "#059669", tile: "#d1fae5", ring: "ring-emerald-200", name: "Language Passport" },
   lounge: { accent: "#0d9488", tile: "#ccfbf1", ring: "ring-teal-200", name: "Screen Time Lounge" },
   arcade: { accent: "#ca8a04", tile: "#fef9c3", ring: "ring-yellow-200", name: "Arcade" },
   portfolio: { accent: "#9333ea", tile: "#f3e8ff", ring: "ring-purple-200", name: "My stuff" },
@@ -142,7 +143,22 @@ function Portfolio() {
   );
 }
 
-const DRAW: Record<RoomId, () => ReactElement> = { game: Game, story: Story, prompt: Prompt, music: Music, quest: Quest, video: Video, robot: Robot, homework: Homework, lounge: Lounge, arcade: Arcade, portfolio: Portfolio };
+/** Language Passport: a passport with a speech bubble. */
+function Language() {
+  return (
+    <g>
+      <rect x="10" y="8" width="30" height="44" rx="4" fill="currentColor" opacity=".18" />
+      <rect {...S} x="10" y="8" width="30" height="44" rx="4" />
+      <circle {...S} cx="25" cy="26" r="7" />
+      <path {...S} d="M18 26h14M25 19c-3 4-3 10 0 14M25 19c3 4 3 10 0 14" strokeWidth={2.5} />
+      <path {...S} d="M17 42h16" />
+      <path d="M42 30h14a4 4 0 0 1 4 4v8a4 4 0 0 1-4 4h-6l-5 5v-5h-3a4 4 0 0 1-4-4v-8a4 4 0 0 1 4-4z" fill="currentColor" opacity=".25" />
+      <path {...S} d="M42 30h14a4 4 0 0 1 4 4v8a4 4 0 0 1-4 4h-6l-5 5v-5h-3a4 4 0 0 1-4-4v-8a4 4 0 0 1 4-4z" strokeWidth={3} />
+    </g>
+  );
+}
+
+const DRAW: Record<RoomId, () => ReactElement> = { game: Game, story: Story, prompt: Prompt, music: Music, quest: Quest, video: Video, robot: Robot, homework: Homework, language: Language, lounge: Lounge, arcade: Arcade, portfolio: Portfolio };
 
 /** A sticker: the icon on its pastel tile, in the room's colour. */
 export function RoomIcon({ id, size = 56, tile = true, className = "" }: { id: RoomId; size?: number; tile?: boolean; className?: string }) {

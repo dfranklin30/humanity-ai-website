@@ -272,6 +272,7 @@ const MODE_LABELS: Record<ModeId, string> = {
   video: "🎬 Video Maker",
   robot: "🤖 Robotics Lab",
   homework: "📝 Homework Help",
+  language: "🛂 Language Passport",
 };
 
 function ClassDashboard({ config, me, classId, onGone }: { config: StudioConfig; me: Facilitator; classId: number; onGone: () => void }) {

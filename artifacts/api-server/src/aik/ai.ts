@@ -15,6 +15,7 @@
 import { AzureOpenAI } from "openai";
 import { aikConfig, isImageConfigured, isElevenLabsConfigured, isAzureSpeechConfigured, isMusicConfigured, isTextConfigured, isTtsConfigured, isVideoConfigured, textProviderConfigured, textFallbackProvider, type TextProviderId } from "./config";
 import { logger } from "../lib/logger";
+import { mockLanguageBook, mockLanguageCheck } from "./langdata";
 
 export class ContentFilteredError extends Error {
   constructor(provider: string) {
@@ -519,15 +520,65 @@ async function speakEleven(text: string, voiceId: string): Promise<MediaResult> 
 }
 
 /**
+ * One word (or a short phrase) said in a given language — Language Passport.
+ *
+ * A single word is the hardest thing to say in the right language: with no
+ * sentence around it, "pain" or "gift" is read as English. So ElevenLabs is
+ * asked to *enforce* the language (language_code on Flash v2.5, or Eleven v3
+ * for languages Flash does not speak, such as Swahili), a little slower than
+ * normal for a learner. If that call is refused, the multilingual model tries
+ * without enforcement, and Azure Speech — which has a native voice for every
+ * language here — is the last resort.
+ */
+export async function speakWord(
+  text: string,
+  lang: { code: string; elevenModel: string; azureVoice: string; azureLang: string },
+  voice?: VoiceChoice | null,
+): Promise<MediaResult> {
+  if (aikConfig.mockAI) return { base64: MOCK_MP3, mime: "audio/mpeg", provider: "mock", model: "mock" };
+  const said = text.slice(0, 200);
+  const chosen = usableVoice(voice);
+  const elevenVoice = chosen?.provider === "elevenlabs" ? chosen.id : aikConfig.elevenlabs.voiceId;
+  if (isElevenLabsConfigured() && ELEVEN_VOICE_RE.test(elevenVoice)) {
+    const attempt = async (body: Record<string, unknown>) => {
+      const res = await fetchWithTimeout(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(elevenVoice)}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "xi-api-key": aikConfig.elevenlabs.apiKey, accept: "audio/mpeg" },
+        body: JSON.stringify({ text: said, ...body }),
+      }, 30_000);
+      if (!res.ok) throw new Error(`ElevenLabs word ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
+      return Buffer.from(await res.arrayBuffer()).toString("base64");
+    };
+    try {
+      const b64 = await attempt({ model_id: lang.elevenModel, language_code: lang.code, voice_settings: { stability: 0.6, similarity_boost: 0.8, speed: 0.85 } });
+      return { base64: b64, mime: "audio/mpeg", provider: "elevenlabs", model: lang.elevenModel };
+    } catch (err) {
+      logger.warn({ lang: lang.code, err: String((err as Error)?.message ?? err).slice(0, 200) }, "[aik] enforced-language word failed; trying multilingual");
+    }
+    if (lang.elevenModel !== "eleven_v3") {
+      try {
+        const b64 = await attempt({ model_id: "eleven_multilingual_v2" });
+        return { base64: b64, mime: "audio/mpeg", provider: "elevenlabs", model: "eleven_multilingual_v2" };
+      } catch (err) {
+        logger.warn({ lang: lang.code, err: String((err as Error)?.message ?? err).slice(0, 200) }, "[aik] multilingual word failed");
+      }
+    }
+  }
+  if (isAzureSpeechConfigured()) return speakAzure(said, lang.azureVoice, lang.azureLang);
+  throw new Error("No voice can say this language right now");
+}
+
+/**
  * Azure AI Speech text-to-speech. Runs on the same multi-service AIServices
  * resource that already serves Content Safety, so "Read it to me" needs no new
  * vendor and no new bill. One-way only: the Studio never records a child.
  */
-async function speakAzure(text: string, voiceName?: string): Promise<MediaResult> {
+async function speakAzure(text: string, voiceName?: string, xmlLang = "en-US"): Promise<MediaResult> {
   const { key, region } = aikConfig.azureSpeech;
   const voice = voiceName && AZURE_VOICE_RE.test(voiceName) ? voiceName : aikConfig.azureSpeech.voice;
   const safe = text.slice(0, 2500).replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" })[c] as string);
-  const ssml = `<speak version="1.0" xml:lang="en-US"><voice name="${voice}"><prosody rate="-8%">${safe}</prosody></voice></speak>`;
+  const lang = /^[a-z]{2}-[A-Z]{2}$/.test(xmlLang) ? xmlLang : "en-US";
+  const ssml = `<speak version="1.0" xml:lang="${lang}"><voice name="${voice}"><prosody rate="${lang === "en-US" ? "-8%" : "-15%"}">${safe}</prosody></voice></speak>`;
   const res = await fetchWithTimeout(
     `https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`,
     {
@@ -631,6 +682,10 @@ function realRobotMock(): string {
 
 function mockText(opts: TextCallOptions): string {
   switch (opts.mockKind) {
+    case "language":
+      return mockLanguageBook();
+    case "langcheck":
+      return mockLanguageCheck(opts.user ?? "");
     // Remix workflow: a filled form for whatever tool was asked, and a few ideas.
     case "remix": {
       const keys = [...(opts.user ?? "").matchAll(/"key":"([a-z_]+)"/g)].map((m) => m[1]);

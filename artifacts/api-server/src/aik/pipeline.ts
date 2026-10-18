@@ -16,7 +16,8 @@ import { completeText, generateImage, generateMusic, ContentFilteredError, type 
 import { sendCareAlert } from "./mail";
 import { forgeGame, refineJson, type ForgeStep } from "./forge";
 import { stripArt, carryArt, type GameHero } from "./gameart";
-import { writeBookDraft, buildBook, bookTextOnly, type Book } from "./book";
+import { writeBookDraft, buildBook, bookTextOnly, type Book, type BookDraft } from "./book";
+import { findLanguage, writeLanguageDraft, languageUserPrompt, languageTextOnly, langBlock, recordWords, spokenText, type LangBook, type LangDef, type LangDraft } from "./language";
 import { buildMovie, type Movie } from "./movie";
 import { putMedia, discardMedia } from "./media";
 import { verifyMicrobitCode } from "./verify";
@@ -234,7 +235,7 @@ export async function runRequest(requestId: number): Promise<void> {
     /* ---- Story Maker: the picture-book path ----------------------------
      * Writing, drawing, narrating and screening a book is its own pipeline
      * (book.ts). Create and change both go there; chat went up above.    */
-    if (mode.id === "story") {
+    if (mode.id === "story" || mode.id === "language") {
       await runBook(req, mode, input, current, flags);
       return;
     }
@@ -473,13 +474,39 @@ function safeParseBook(content: string): Book | null {
 async function runBook(req: RequestRow, mode: ModeDef, input: ReturnType<typeof validateInput> & { ok: true }, current: ArtifactRow | null, flags: Flag[]): Promise<void> {
   const fallbackTitle = input.kind === "create" ? input.values.hero || "My story" : current?.title || "My story";
   const previous = current ? safeParseBook(current.content) : null;
-  const usr = userPrompt(mode, input, current ? bookTextOnly(current.content) : null);
   const { report, settle } = progressReporter(req);
 
-  const writing: ForgeStep[] = [{ key: "write", label: "Writing the story", state: "running" }];
+  /* Language Passport: the same book, written as a story weave, every word checked and recorded. */
+  const isLang = mode.id === "language";
+  const prevLang = isLang && previous ? ((previous as LangBook).lang ?? null) : null;
+  let lang: LangDef | null = null;
+  let topic = "";
+  if (isLang) {
+    lang = input.kind === "create" ? findLanguage(input.values.language) : findLanguage(prevLang?.label);
+    topic = input.kind === "create" ? input.values.topic || "Everyday words" : prevLang?.topic || "Everyday words";
+    if (!lang) {
+      await finish(req, { status: "failed", message: "Pick a language first.", flags: [...flags, { layer: "system", category: "bad_language" }] });
+      return;
+    }
+  }
+  const usr = isLang && lang
+    ? input.kind === "create"
+      ? languageUserPrompt(input.values, lang, topic)
+      : userPrompt(mode, input, previous && prevLang ? languageTextOnly(previous as LangBook) : null)
+    : userPrompt(mode, input, current ? bookTextOnly(current.content) : null);
+
+  const writing: ForgeStep[] = [{ key: "write", label: isLang ? `Weaving in ${lang?.label} words` : "Writing the story", state: "running" }];
   report(writing);
   const started = Date.now();
-  const drafted = await writeBookDraft({ mode, user: usr, fallbackTitle });
+  let langResult: { draft: LangDraft; checked: boolean; fixes: number } | null = null;
+  const drafted: { draft: BookDraft } | { error: "redirect" | "shape" | "filtered"; flags?: Flag[] } =
+    isLang && lang
+      ? await writeLanguageDraft({ mode, user: usr, fallbackTitle, lang, topic }).then((r) => {
+          if ("error" in r) return r;
+          langResult = r;
+          return { draft: r.draft.book };
+        })
+      : await writeBookDraft({ mode, user: usr, fallbackTitle });
   if ("error" in drafted) {
     writing[0] = { ...writing[0], state: "failed", ms: Date.now() - started };
     await settle(writing);
@@ -493,6 +520,15 @@ async function runBook(req: RequestRow, mode: ModeDef, input: ReturnType<typeof 
     return;
   }
   writing[0] = { ...writing[0], state: "done", detail: drafted.draft.title, ms: Date.now() - started };
+  const lr = langResult as { draft: LangDraft; checked: boolean; fixes: number } | null;
+  if (isLang && lr) {
+    writing.push({
+      key: "check",
+      label: "Checking every word",
+      state: lr.checked ? "done" : "failed",
+      detail: lr.checked ? (lr.fixes ? `${lr.fixes} fixed` : `${lr.draft.words.length} words OK`) : "the checker was unavailable",
+    });
+  }
   report(writing);
 
   // A hero from the Remix workflow is the main character exactly as they were made.
@@ -506,13 +542,26 @@ async function runBook(req: RequestRow, mode: ModeDef, input: ReturnType<typeof 
     onProgress: (steps) => report([...writing, ...steps]),
     heroReferencePng: remix?.portraitPng ?? null,
     voice: remix?.voice ?? null,
+    ...(isLang ? { spoken: spokenText } : {}),
   });
-  await settle([...writing, ...built.steps]);
   if (!built.ok) {
+    await settle([...writing, ...built.steps]);
     await discardMedia(req.id);
     await finish(req, { status: built.blocked ? "blocked" : "failed", message: built.message, flags: [...flags, ...built.flags] });
     return;
   }
+  const extraSteps: ForgeStep[] = [];
+  if (isLang && lang && lr) {
+    const block = langBlock(lang, topic, lr.draft, lr.checked);
+    const wordStep: ForgeStep = { key: "words", label: `Recording every ${lang.label} word`, state: "running" };
+    report([...writing, ...built.steps, wordStep]);
+    const t0 = Date.now();
+    const rec = await recordWords(req.id, lang, block, prevLang, remix?.voice ?? null);
+    extraSteps.push({ ...wordStep, state: rec.total === 0 || rec.recorded === rec.total ? "done" : "failed", detail: rec.total ? `${rec.recorded} of ${rec.total}` : "no voice switched on", ms: Date.now() - t0 });
+    (built.book as LangBook).lang = block;
+    if (!rec.total) built.kidNote += " Word sounds aren't switched on yet.";
+  }
+  await settle([...writing, ...built.steps, ...extraSteps]);
   const hasPictures = Boolean(built.book.cover.image || built.book.pages.some((p) => p.image));
   await complete(
     req,
@@ -521,7 +570,7 @@ async function runBook(req: RequestRow, mode: ModeDef, input: ReturnType<typeof 
       title: built.book.title,
       content: JSON.stringify(built.book),
       mime: "application/json",
-      summary: built.book.pages[0]?.text ?? null,
+      summary: built.book.pages[0] ? (isLang ? spokenText(built.book.pages[0].text) : built.book.pages[0].text) : null,
       // Words alone need no gate; generated pictures always wait for a facilitator.
       approved: !hasPictures,
       kidNote: built.kidNote,

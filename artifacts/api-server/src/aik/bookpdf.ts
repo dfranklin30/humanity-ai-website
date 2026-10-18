@@ -11,12 +11,19 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import { getMedia, sniffImageMime } from "./media";
 import type { Book } from "./book";
+import { latinText, type LangBook } from "./language";
 
 const W = 792;
 const H = 612;
 const MARGIN = 40;
 
-export async function renderBookPdf(book: Book): Promise<Uint8Array> {
+export async function renderBookPdf(input: Book): Promise<Uint8Array> {
+  // A Language Passport book: woven words are written in Latin letters with their meaning,
+  // and a word list closes the book. The standard PDF fonts cover Latin text only.
+  const lang = (input as LangBook).lang ?? null;
+  const book: Book = lang
+    ? { ...input, title: latin(input.title) || "My Language Passport book", theEnd: /[A-Za-z0-9]/.test(latin(input.theEnd)) ? latin(input.theEnd) : "The End", pages: input.pages.map((p) => ({ ...p, text: latin(latinText(p.text, lang.words)), scene: latin(p.scene) })) }
+    : { ...input, title: latin(input.title), theEnd: latin(input.theEnd), pages: input.pages.map((p) => ({ ...p, text: latin(p.text), scene: latin(p.scene) })) };
   const doc = await PDFDocument.create();
   doc.setTitle(book.title);
   doc.setAuthor("Kids AI Studio · Humanity + AI");
@@ -52,6 +59,23 @@ export async function renderBookPdf(book: Book): Promise<Uint8Array> {
     const textW = W - textX - MARGIN;
     drawWrapped(page, p.text, body, 20, textX, H - MARGIN - 40, textW, rgb(0.12, 0.12, 0.16), 1.45);
     page.drawText(String(p.n), { x: W - MARGIN - 10, y: MARGIN - 18, size: 11, font: body, color: rgb(0.5, 0.5, 0.55) });
+  }
+
+  /* My new words (Language Passport) --------------------------------- */
+  if (lang) {
+    const page = doc.addPage([W, H]);
+    page.drawRectangle({ x: 0, y: 0, width: W, height: H, color: rgb(0.94, 0.98, 0.96) });
+    drawCentered(page, latin(`My new ${lang.label} words`), bold, 28, H - MARGIN - 30, rgb(0.05, 0.4, 0.3));
+    let y = H - MARGIN - 80;
+    for (const w of lang.words) {
+      const shown = latin(w.roman || w.word) || latin(w.say);
+      page.drawText(shown, { x: MARGIN + 30, y, size: 18, font: bold, color: rgb(0.12, 0.12, 0.16) });
+      page.drawText(latin(`${w.english}${w.say ? `   say: ${w.say}` : ""}`), { x: MARGIN + 290, y, size: 15, font: body, color: rgb(0.3, 0.3, 0.35) });
+      y -= 34;
+      if (y < MARGIN + 60) break;
+    }
+    const ph = latin(`${lang.phrase.roman || lang.phrase.text} = ${lang.phrase.english}`);
+    if (y > MARGIN + 30) drawCentered(page, ph, body, 14, Math.max(MARGIN + 20, y - 10), rgb(0.05, 0.4, 0.3));
   }
 
   /* The End --------------------------------------------------------- */
@@ -114,4 +138,19 @@ function wrap(text: string, font: PDFFont, size: number, width: number): string[
   }
   if (line) lines.push(line);
   return lines;
+}
+
+/** Text the standard (WinAnsi) PDF fonts can draw: accents kept where possible, anything else dropped. */
+const WIN_ANSI_EXTRA = new Set([..."‘’“”–—…•€™‚„†‡ˆ‰Š‹ŒŽ˜šœžŸ"]);
+function latin(text: string): string {
+  let out = "";
+  for (const ch of (text ?? "").normalize("NFC")) {
+    if (ch.charCodeAt(0) <= 0xff || WIN_ANSI_EXTRA.has(ch)) {
+      out += ch;
+      continue;
+    }
+    const base = ch.normalize("NFD").replace(/\p{M}/gu, "");
+    if (base && [...base].every((c) => c.charCodeAt(0) <= 0xff)) out += base;
+  }
+  return out.replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g, "").replace(/\s{2,}/g, " ").trim();
 }

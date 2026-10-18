@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "wouter";
 import { cx } from "../components/ui";
+import { WovenText, LanguageExtras } from "./LanguagePassport";
 import { getArtifact, mediaSrc, downloadUrl, bookPdfUrl, type Artifact, type ArtifactMeta, type Book, type Movie, type FieldDef, type ModeDef, type StudioRequest, type FileLink, type Hero } from "./api";
 
 /* ------------------------------------------------------------------ *
@@ -380,7 +381,7 @@ export function BookView({ artifactId, book, compact }: { artifactId: number; bo
           <div className="flex flex-col justify-center gap-3 p-5 sm:p-7">
             {index === 0 && (
               <>
-                <p className="text-xs font-bold uppercase tracking-wide text-violet-600">A picture book</p>
+                <p className="text-xs font-bold uppercase tracking-wide text-violet-600">{book.lang ? `${book.lang.flag} A Language Passport book · ${book.lang.label}` : "A picture book"}</p>
                 <h3 className="text-2xl font-black text-slate-900 sm:text-3xl">{book.title}</h3>
                 <p className="text-sm text-slate-600">Starring {book.hero.name}. {book.pages.length} pages.</p>
               </>
@@ -388,7 +389,11 @@ export function BookView({ artifactId, book, compact }: { artifactId: number; bo
             {page && (
               <>
                 <p className="text-xs font-bold uppercase tracking-wide text-violet-600">Page {page.n} of {book.pages.length}</p>
-                <p className="text-lg leading-relaxed text-slate-800 sm:text-xl">{page.text}</p>
+                {book.lang ? (
+                  <WovenText text={page.text} lang={book.lang} artifactId={artifactId} className="text-lg leading-loose text-slate-800 sm:text-xl" />
+                ) : (
+                  <p className="text-lg leading-relaxed text-slate-800 sm:text-xl">{page.text}</p>
+                )}
                 {audio && (
                   <button type="button" onClick={readAloud} className="mt-1 inline-flex w-fit items-center gap-2 rounded-2xl bg-violet-100 px-4 py-2 text-base font-bold text-violet-900 hover:bg-violet-200">
                     {playing ? "⏸ Stop" : "🔊 Read it to me"}
@@ -400,6 +405,7 @@ export function BookView({ artifactId, book, compact }: { artifactId: number; bo
               <>
                 <h3 className="text-3xl font-black text-violet-800">{book.theEnd || "The End"}</h3>
                 <p className="text-sm text-slate-600">Written by the director{book.madeWith.pictures ? ", with pictures" : ""}{book.madeWith.narration ? " and a voice" : ""} from the Studio.</p>
+                {book.lang && <p className="text-base font-bold text-emerald-800">You met {book.lang.words.length} {book.lang.label} words! Play Word Catch below to earn your stamp.</p>}
               </>
             )}
           </div>
@@ -419,6 +425,7 @@ export function BookView({ artifactId, book, compact }: { artifactId: number; bo
           </a>
         )}
       </div>
+      {book.lang && !compact && <LanguageExtras lang={book.lang} artifactId={artifactId} />}
     </div>
   );
 }

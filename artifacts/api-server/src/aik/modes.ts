@@ -9,6 +9,7 @@
  */
 import { aikConfig } from "./config";
 import type { ModeId, ArtifactKind } from "./store";
+import { LANGUAGE_LABELS, LANGUAGE_TOPICS } from "./langdata";
 
 export type FieldDef = {
   key: string;
@@ -131,6 +132,32 @@ export const MODES: Record<ModeId, ModeDef> = {
       { label: "A shy dragon", values: { hero: "a shy dragon named Pim", place: "a treehouse above a noisy kitchen", problem: "the moon lost its glow", ending: "happy and a little funny", detail: "Pim is afraid of butterflies" } },
       { label: "A lost robot", values: { hero: "a small robot named Bolt", place: "a library that never closes", problem: "Bolt forgot its own name", ending: "warm and surprising", detail: "Bolt hums when it is thinking" } },
       { label: "The pancake that ran", values: { hero: "a pancake who wants to see the sea", place: "a busy breakfast kitchen", problem: "everyone keeps trying to eat it", ending: "funny and kind", detail: "it leaves a trail of syrup footprints" } },
+    ],
+  },
+  language: {
+    id: "language",
+    name: "Language Passport",
+    emoji: "🛂",
+    tagline: "A picture book that teaches you a new language.",
+    blurb: "Pick a language, a hero and a topic. Your story starts in English and sneaks in new words page by page. Tap any word to hear it, then play Word Catch to earn your passport stamp.",
+    artifactKind: "story",
+    interaction: "form",
+    tier: "default",
+    needsApproval: true,
+    createFields: [
+      { key: "language", label: "Language", hint: "Which language do you want to learn?", required: true, choices: LANGUAGE_LABELS },
+      { key: "topic", label: "Words about…", hint: "What kind of words?", required: true, choices: LANGUAGE_TOPICS },
+      { key: "hero", label: "Hero", hint: "a curious otter, a kid detective, a talking backpack", required: true },
+      { key: "place", label: "Place", hint: "a busy market, a snowy mountain, a school garden", required: false },
+      { key: "detail", label: "One surprising detail", hint: "the otter collects shiny spoons", required: false },
+    ],
+    changeHint: "Add a word about colours, make page 2 funnier, use fewer new words, change the hero's name…",
+    maxTokens: 5000,
+    temperature: 0.7,
+    starters: [
+      { label: "🇪🇸 Snacks at the market", values: { language: "Spanish", topic: "Food", hero: "a small round mint-green dragon named Pim", place: "a busy fruit market", detail: "Pim is looking for the reddest apple in town" } },
+      { label: "🇯🇵 Lost in the zoo", values: { language: "Japanese", topic: "Animals", hero: "a kid inventor named Sora with a tiny robot helper", place: "a big friendly zoo", detail: "the robot can only say animal sounds" } },
+      { label: "🇰🇪 Rainy day rescue", values: { language: "Swahili", topic: "Weather", hero: "a brave little tortoise named Kobe", place: "a hill above a village", detail: "Kobe carries an umbrella made from a leaf" } },
     ],
   },
   prompt: {
@@ -441,6 +468,9 @@ OUTPUT FORMAT: reply with ONLY a JSON object, no markdown fences:
 - steps: short build steps in order, one sentence each.
 - The code MUST drive the parts the child chose. If the build has wheels or motors, the program must actually run them — a robot whose parts list says "two motors" and whose code only beeps and smiles has not been built. Match the movement to what they asked for: wheels turn, servos sweep, sensors are read and acted on.
 - code: a SHORT MakeCode-style JavaScript program for micro:bit (under 25 lines) that does the robot's job. Prefer core APIs only: basic, input, music, pins, led, control. 'radio' is not allowed. If the robot genuinely needs an extension (for example 'sonar' for an ultrasonic sensor), that is fine, but the FIRST line must be a comment telling the child to add it, like: // First: in MakeCode click Extensions and add \"sonar\". Never invent an API: every name you call must be a real micro:bit function. The code is parsed automatically before a child sees it. Add one comment per block explaining what it does in kid words.`;
+    case "language":
+      // Language Passport writes through language.ts; this is only reached if that path is bypassed.
+      return `You write short picture books that teach children their first words in a new language.${COMMON_RULES}`;
     case "homework":
       return `You are a patient homework helper for children aged 8–11 (grades 3–5).${COMMON_RULES}
 

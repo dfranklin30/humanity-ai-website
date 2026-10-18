@@ -506,6 +506,7 @@ const TOOL_ICON: Record<ModeId, string> = {
   video: "🎬",
   robot: "🤖",
   homework: "📝",
+  language: "🛂",
 };
 
 /**
@@ -521,6 +522,7 @@ const STAFF_BLURB: Record<ModeId, string> = {
   robot: "A parts list, build steps, micro:bit starter code and a safety note. Good for Robotics Lab planning and the Inventor Quest path.",
   music: "Lyrics a child can sing on first hearing, plus a sound description for a music model. Listen to it yourself before you play it to a class. Good for the Week 3 club anthem.",
   homework: "Socratic tutoring: it asks questions and works step by step rather than handing over an answer. Good for testing what children will actually get back.",
+  language: "A six-page picture book that teaches 8–12 first words in Spanish, French, Mandarin, Swahili, Arabic, Hindi or Japanese by weaving them into an English story. Every word is checked by a second model, recorded in a voice that speaks the language, and practised in Word Catch. Check the words yourself before a class sees them.",
 };
 
 function toolReady(state: HubState, id: ModeId): boolean {

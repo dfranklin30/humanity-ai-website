@@ -141,6 +141,8 @@ export async function buildBook(opts: {
   heroReferencePng?: string | null;
   /** Remix workflow: the hero's voice reads the book. */
   voice?: VoiceChoice | null;
+  /** What the read-aloud says for a page's text (Language Passport strips its word markers). */
+  spoken?: (text: string) => string;
 }): Promise<BuildBookResult> {
   const steps = new Steps(opts.onProgress);
   const { draft, previous, requestId } = opts;
@@ -243,7 +245,7 @@ export async function buildBook(opts: {
       await Promise.all(
         todo.slice(i, i + 3).map(async (p) => {
           try {
-            const a = await speak(p.text, opts.voice);
+            const a = await speak(opts.spoken ? opts.spoken(p.text) : p.text, opts.voice);
             p.audio = await putMedia(requestId, `p${p.n}.mp3`, Buffer.from(a.base64, "base64"), a.mime);
             recorded++;
           } catch (err) {
@@ -291,7 +293,8 @@ export async function drawScreened(prompt: string, referencePng: string | undefi
 
 /** Everything a read-aloud of the whole book should say, in order. */
 export function bookNarrationText(book: Book): string {
-  return [book.title, ...book.pages.map((p) => p.text), book.theEnd].join(". ");
+  // Language Passport pages mark woven words as [[word|english]]; the voice says the word.
+  return [book.title, ...book.pages.map((p) => p.text.replace(/\[\[([^|\]]{1,40})\|[^\]]{1,40}\]\]/g, "$1")), book.theEnd].join(". ");
 }
 
 /** Writes the story draft, retrying once on a malformed reply. */
