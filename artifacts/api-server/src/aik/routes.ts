@@ -1049,6 +1049,24 @@ export function registerAikRoutes(app: Express): void {
 
   /* ---------------- Read aloud (ElevenLabs TTS of an approved text artifact) ---------------- */
 
+  /** A voice from the request body, checked against the catalog. Unknown or missing = the house voice. */
+  async function pickedVoice(v: any): Promise<{ provider: "elevenlabs" | "azure"; id: string; name: string } | null> {
+    if (!v?.provider || !v?.id) return null;
+    const found = await findVoice(String(v.provider), String(v.id));
+    return found ? { provider: found.provider, id: found.id, name: found.name } : null;
+  }
+
+  /** Voices a child can pick for "Read it to me". Names and descriptions only. */
+  app.get(
+    `${base}/child/voices`,
+    requireChild,
+    wrap(async (_req, res) => {
+      if (!isTtsConfigured()) return void res.json({ voices: [] });
+      const { voices } = await listVoices();
+      res.json({ voices });
+    }),
+  );
+
   app.post(
     `${base}/child/artifacts/:aid/speak`,
     requireChild,
@@ -1069,7 +1087,7 @@ export function registerAikRoutes(app: Express): void {
         text = a.summary ?? "";
       }
       if (!text) return void res.status(400).json({ error: "Nothing to read here." });
-      const audio = await speak(text);
+      const audio = await speak(text, await pickedVoice(req.body?.voice));
       await store.audit(a.class_id, "child", child.id, "read_aloud", { artifactId: a.id });
       res.json({ audio: audio.base64, mime: audio.mime });
     }),
@@ -1323,7 +1341,7 @@ export function registerAikRoutes(app: Express): void {
       const a = await store.getArtifact(Number(req.params.aid));
       if (!a || a.class_id !== workspace.id) return void res.status(404).json({ error: "Not found." });
       const text = a.summary || a.title;
-      const audio = await speak(text);
+      const audio = await speak(text, await pickedVoice(req.body?.voice));
       res.json({ audio: audio.base64, mime: audio.mime });
     }),
   );

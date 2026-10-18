@@ -219,7 +219,9 @@ export type ChildMe = {
 export const childMe = () => call<ChildMe>("GET", "/child/me");
 export const childSubmit = (body: { mode: ModeId; kind: "create" | "change" | "chat"; projectArtifactId?: number; remixFrom?: number; input: Record<string, string> }) =>
   call<{ request: StudioRequest; used: number }>("POST", "/child/requests", body);
-export const childSpeak = (artifactId: number) => call<{ audio: string; mime: string }>("POST", `/child/artifacts/${artifactId}/speak`);
+export const childSpeak = (artifactId: number, voice?: VoiceChoice | null) =>
+  call<{ audio: string; mime: string }>("POST", `/child/artifacts/${artifactId}/speak`, voice ? { voice } : undefined);
+export const childVoices = () => call<{ voices: VoiceOption[] }>("GET", "/child/voices");
 export const childRequest = (id: number) => call<{ request: StudioRequest }>("GET", `/child/requests/${id}`);
 export const childArcade = () => call<{ items: ArtifactMeta[] }>("GET", "/child/arcade");
 
@@ -334,7 +336,8 @@ export const hubFileArtifact = (artifactId: number, projectId: number | null) =>
 export const hubSubmit = (body: { mode: ModeId; kind: "create" | "change" | "chat"; projectArtifactId?: number; projectId?: number | null; remixFrom?: number; quality?: "fast" | "studio"; input: Record<string, string>; photo?: string }) =>
   call<{ request: StudioRequest; projectId: number | null }>("POST", "/hub/requests", body);
 export const hubRequest = (id: number) => call<{ request: StudioRequest }>("GET", `/hub/requests/${id}`);
-export const hubSpeak = (artifactId: number) => call<{ audio: string; mime: string }>("POST", `/hub/artifacts/${artifactId}/speak`);
+export const hubSpeak = (artifactId: number, voice?: VoiceChoice | null) =>
+  call<{ audio: string; mime: string }>("POST", `/hub/artifacts/${artifactId}/speak`, voice ? { voice } : undefined);
 
 /** Poll a child request until it settles (done/blocked/failed). */
 export async function waitForRequest(id: number, getter: (id: number) => Promise<{ request: StudioRequest }>, onTick?: (r: StudioRequest) => void, timeoutMs = 120_000): Promise<StudioRequest> {

@@ -16,6 +16,7 @@ import { AzureOpenAI } from "openai";
 import { aikConfig, isImageConfigured, isElevenLabsConfigured, isAzureSpeechConfigured, isMusicConfigured, isTextConfigured, isTtsConfigured, isVideoConfigured, textProviderConfigured, textFallbackProvider, type TextProviderId } from "./config";
 import { logger } from "../lib/logger";
 import { mockLanguageBook, mockLanguageCheck } from "./langdata";
+import { defaultElevenVoiceId } from "./voices";
 
 export class ContentFilteredError extends Error {
   constructor(provider: string) {
@@ -502,11 +503,23 @@ export function usableVoice(v: VoiceChoice | null | undefined): VoiceChoice | nu
 export async function speak(text: string, voice?: VoiceChoice | null): Promise<MediaResult> {
   if (aikConfig.mockAI) return { base64: MOCK_MP3, mime: "audio/mpeg", provider: "mock", model: "mock" };
   const chosen = usableVoice(voice);
-  if (chosen?.provider === "elevenlabs") return speakEleven(text, chosen.id);
-  if (chosen?.provider === "azure") return speakAzure(text, chosen.id);
-  if (!isTtsConfigured()) throw new Error("TTS provider not configured");
-  if (aikConfig.providers.tts === "azure") return speakAzure(text);
-  return speakEleven(text, aikConfig.elevenlabs.voiceId);
+  const viaEleven = chosen ? chosen.provider === "elevenlabs" : aikConfig.providers.tts === "elevenlabs";
+  try {
+    if (chosen?.provider === "elevenlabs") return await speakEleven(text, chosen.id);
+    if (chosen?.provider === "azure") return await speakAzure(text, chosen.id);
+    if (!isTtsConfigured()) throw new Error("TTS provider not configured");
+    if (aikConfig.providers.tts === "azure") return await speakAzure(text);
+    const houseVoice = await defaultElevenVoiceId();
+    if (!houseVoice) throw new Error("No ElevenLabs voice: set AIK_ELEVENLABS_VOICE_ID or give the key Voices: Read");
+    return await speakEleven(text, houseVoice);
+  } catch (err) {
+    // ElevenLabs out of quota or unreachable: read it with Azure rather than go silent.
+    if (viaEleven && isAzureSpeechConfigured()) {
+      logger.warn({ err: String((err as Error)?.message ?? err).slice(0, 200) }, "[aik] ElevenLabs speech failed; reading with Azure");
+      return speakAzure(text);
+    }
+    throw err;
+  }
 }
 
 async function speakEleven(text: string, voiceId: string): Promise<MediaResult> {
@@ -538,7 +551,7 @@ export async function speakWord(
   if (aikConfig.mockAI) return { base64: MOCK_MP3, mime: "audio/mpeg", provider: "mock", model: "mock" };
   const said = text.slice(0, 200);
   const chosen = usableVoice(voice);
-  const elevenVoice = chosen?.provider === "elevenlabs" ? chosen.id : aikConfig.elevenlabs.voiceId;
+  const elevenVoice = chosen?.provider === "elevenlabs" ? chosen.id : await defaultElevenVoiceId();
   if (isElevenLabsConfigured() && ELEVEN_VOICE_RE.test(elevenVoice)) {
     const attempt = async (body: Record<string, unknown>) => {
       const res = await fetchWithTimeout(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(elevenVoice)}`, {

@@ -18,6 +18,7 @@ import {
   childPublish,
   childRequest,
   childSpeak,
+  childVoices,
   childSubmit,
   getArtifact,
   getConfig,
@@ -28,6 +29,8 @@ import {
   type ModeId,
   type StudioConfig,
   type StudioRequest,
+  type VoiceChoice,
+  type VoiceOption,
 } from "./api";
 import { ArtifactLoader, BigButton, Card, ChangeBox, ChatPanel, ModeForm, Notice, RequestStatus, Spinner, kindEmoji, type ChatMsg } from "./components";
 import { RoomIcon, ROOM_THEME, roomIdFor } from "./icons";
@@ -610,27 +613,82 @@ function StudioHall({ modes, onOpen }: { modes: ModeDef[]; onOpen: (id: ModeId) 
   );
 }
 
+const VOICE_KEY = "aik.readVoice";
+
+/** The reader voice a child picked last time on this device, if any. */
+function savedVoice(): VoiceChoice | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(VOICE_KEY) || "null");
+    return v && typeof v.provider === "string" && typeof v.id === "string" ? v : null;
+  } catch {
+    return null;
+  }
+}
+
 function SpeakButton({ artifactId }: { artifactId: number }) {
   const [busy, setBusy] = useState(false);
+  const [voices, setVoices] = useState<VoiceOption[]>([]);
+  const [voice, setVoice] = useState<VoiceChoice | null>(savedVoice);
+
+  useEffect(() => {
+    childVoices()
+      .then((r) => setVoices(r.voices))
+      .catch(() => setVoices([]));
+  }, []);
+
+  const pick = (key: string) => {
+    const v = voices.find((o) => `${o.provider}:${o.id}` === key);
+    const next = v ? { provider: v.provider, id: v.id, name: v.name } : null;
+    setVoice(next);
+    try {
+      if (next) localStorage.setItem(VOICE_KEY, JSON.stringify(next));
+      else localStorage.removeItem(VOICE_KEY);
+    } catch {
+      /* private window: the choice just isn't remembered */
+    }
+  };
+  const current = voice && voices.some((o) => o.provider === voice.provider && o.id === voice.id) ? `${voice.provider}:${voice.id}` : "";
+
   return (
-    <BigButton
-      variant="secondary"
-      disabled={busy}
-      onClick={async () => {
-        setBusy(true);
-        try {
-          const { audio, mime } = await childSpeak(artifactId);
-          const a = new Audio(`data:${mime};base64,${audio}`);
-          await a.play();
-        } catch {
-          /* ignore */
-        } finally {
-          setBusy(false);
-        }
-      }}
-    >
-      {busy ? "…" : "🔊 Read it to me"}
-    </BigButton>
+    <div className="flex items-center gap-2">
+      {voices.length > 1 && (
+        <label className="flex items-center gap-1 text-sm font-semibold text-slate-600">
+          <span aria-hidden>🎙️</span>
+          <span className="sr-only">Reader voice</span>
+          <select
+            value={current}
+            onChange={(e) => pick(e.target.value)}
+            disabled={busy}
+            className="max-w-[11rem] rounded-xl border border-slate-300 bg-white px-2 py-2 text-sm"
+          >
+            <option value="">Usual voice</option>
+            {voices.map((o) => (
+              <option key={`${o.provider}:${o.id}`} value={`${o.provider}:${o.id}`} title={o.description}>
+                {o.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <BigButton
+        variant="secondary"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          try {
+            const { audio, mime } = await childSpeak(artifactId, current ? voice : null);
+            const a = new Audio(`data:${mime};base64,${audio}`);
+            await a.play();
+          } catch {
+            /* ignore */
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        {busy ? "…" : "🔊 Read it to me"}
+      </BigButton>
+    </div>
   );
 }
 

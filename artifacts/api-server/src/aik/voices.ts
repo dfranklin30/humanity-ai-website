@@ -41,7 +41,12 @@ async function elevenVoices(): Promise<VoiceOption[]> {
   try {
     const res = await fetch("https://api.elevenlabs.io/v1/voices", { headers: { "xi-api-key": aikConfig.elevenlabs.apiKey }, signal: AbortSignal.timeout(15_000) });
     if (!res.ok) {
-      logger.warn({ status: res.status, body: (await res.text().catch(() => "")).slice(0, 200) }, "[aik] ElevenLabs voice list failed");
+      const body = (await res.text().catch(() => "")).slice(0, 200);
+      const hint = res.status === 401 && /voices_read|permission/i.test(body)
+        ? "the API key needs Voices: Read in ElevenLabs (Developers > API Keys > Edit) for the voice picker"
+        : undefined;
+      logger.warn({ status: res.status, body, hint }, "[aik] ElevenLabs voice list failed");
+      elevenCache = { at: Date.now() - 55 * 60_000, voices: [] }; // retry in ~5 min, not on every request
       return [];
     }
     const j: any = await res.json();
@@ -71,4 +76,21 @@ export async function listVoices(): Promise<{ voices: VoiceOption[]; elevenlabs:
 export async function findVoice(provider: string, id: string): Promise<VoiceOption | null> {
   const { voices } = await listVoices();
   return voices.find((v) => v.provider === provider && v.id === id) ?? null;
+}
+
+/** Library voices that read well to children, best first. Matched on the start of the voice name. */
+const KID_FRIENDLY = ["Jessica", "Alice", "Bella", "Matilda", "Lily", "Laura", "Sarah", "George"];
+
+/**
+ * The ElevenLabs house voice: AIK_ELEVENLABS_VOICE_ID when set, otherwise the
+ * first kid-friendly voice in the account's library. Empty when neither exists.
+ */
+export async function defaultElevenVoiceId(): Promise<string> {
+  if (aikConfig.elevenlabs.voiceId) return aikConfig.elevenlabs.voiceId;
+  const voices = await elevenVoices();
+  for (const name of KID_FRIENDLY) {
+    const hit = voices.find((v) => v.name.toLowerCase().startsWith(name.toLowerCase()));
+    if (hit) return hit.id;
+  }
+  return voices[0]?.id ?? "";
 }

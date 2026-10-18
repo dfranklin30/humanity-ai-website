@@ -49,7 +49,8 @@
  *
  * ── ElevenLabs (voice / music) ──────────────────────────────────────────
  *   AIK_ELEVENLABS_API_KEY
- *   AIK_ELEVENLABS_VOICE_ID           a warm, kid-friendly stock voice id
+ *   AIK_ELEVENLABS_VOICE_ID           the house voice (optional: without it a kid-friendly
+ *                                     voice is picked from the account's library)
  *
  * ── Azure AI Content Safety (screening; fail closed in production) ──────
  *   AIK_CONTENT_SAFETY_ENDPOINT, AIK_CONTENT_SAFETY_KEY
@@ -323,7 +324,7 @@ export function isTtsConfigured(): boolean {
   if (aikConfig.mockAI) return true;
   const p = aikConfig.providers.tts;
   if (p === "azure") return azureSpeechConfigured;
-  return p === "elevenlabs" && elevenConfigured && Boolean(aikConfig.elevenlabs.voiceId);
+  return p === "elevenlabs" && elevenConfigured;
 }
 /** True when the Studio can serve the text modes at all. */
 export function isAiConfigured(): boolean {
