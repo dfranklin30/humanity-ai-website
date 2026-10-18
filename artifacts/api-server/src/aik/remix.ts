@@ -340,7 +340,7 @@ export function filesOf(a: Pick<ArtifactRow, "id" | "kind" | "title" | "content"
  * ------------------------------------------------------------------ */
 
 /** Tools a piece can be remixed into. Study Desk is a conversation, not a product. */
-export const REMIX_TOOLS: ModeId[] = ["story", "video", "game", "music", "prompt", "quest", "robot"];
+export const REMIX_TOOLS: ModeId[] = ["story", "language", "video", "game", "music", "prompt", "quest", "robot"];
 
 function fitChoice(v: string, choices: string[]): string {
   const low = v.toLowerCase();

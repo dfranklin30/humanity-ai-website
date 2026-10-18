@@ -491,7 +491,8 @@ async function runBook(req: RequestRow, mode: ModeDef, input: ReturnType<typeof 
   }
   const usr = isLang && lang
     ? input.kind === "create"
-      ? languageUserPrompt(input.values, lang, topic)
+      ? // A remixed hero comes with the remix block on input.text: the story is written about them.
+        languageUserPrompt(input.values, lang, topic) + (remixContexts.get(req.id) ? `\n\nREMIX SOURCE (the hero must be this character, by name):\n${input.text}` : "")
       : userPrompt(mode, input, previous && prevLang ? languageTextOnly(previous as LangBook) : null)
     : userPrompt(mode, input, current ? bookTextOnly(current.content) : null);
 

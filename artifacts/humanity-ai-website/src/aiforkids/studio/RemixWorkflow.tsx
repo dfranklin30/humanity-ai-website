@@ -40,6 +40,7 @@ export type OpenTool = (mode: ModeId, start?: ToolStart) => void;
 /** The tools a piece can go into, in the order the sketch lists them. */
 export const PUT_IN: { mode: ModeId; label: string; emoji: string }[] = [
   { mode: "story", label: "Storybook", emoji: "📚" },
+  { mode: "language", label: "Language book", emoji: "🛂" },
   { mode: "video", label: "Movie", emoji: "🎬" },
   { mode: "game", label: "Game", emoji: "🎮" },
   { mode: "music", label: "Song", emoji: "🎵" },

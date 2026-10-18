@@ -564,7 +564,11 @@ export async function speakWord(
       }
     }
   }
-  if (isAzureSpeechConfigured()) return speakAzure(said, lang.azureVoice, lang.azureLang);
+  if (isAzureSpeechConfigured()) {
+    // A hero with an Azure *Multilingual* voice keeps their own voice in the new language.
+    if (chosen?.provider === "azure" && /Multilingual/.test(chosen.id)) return speakAzure(said, chosen.id, lang.azureLang, true);
+    return speakAzure(said, lang.azureVoice, lang.azureLang);
+  }
   throw new Error("No voice can say this language right now");
 }
 
@@ -573,12 +577,15 @@ export async function speakWord(
  * resource that already serves Content Safety, so "Read it to me" needs no new
  * vendor and no new bill. One-way only: the Studio never records a child.
  */
-async function speakAzure(text: string, voiceName?: string, xmlLang = "en-US"): Promise<MediaResult> {
+async function speakAzure(text: string, voiceName?: string, xmlLang = "en-US", switchLang = false): Promise<MediaResult> {
   const { key, region } = aikConfig.azureSpeech;
   const voice = voiceName && AZURE_VOICE_RE.test(voiceName) ? voiceName : aikConfig.azureSpeech.voice;
   const safe = text.slice(0, 2500).replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" })[c] as string);
   const lang = /^[a-z]{2}-[A-Z]{2}$/.test(xmlLang) ? xmlLang : "en-US";
-  const ssml = `<speak version="1.0" xml:lang="${lang}"><voice name="${voice}"><prosody rate="${lang === "en-US" ? "-8%" : "-15%"}">${safe}</prosody></voice></speak>`;
+  const body = `<prosody rate="${lang === "en-US" ? "-8%" : "-15%"}">${safe}</prosody>`;
+  const ssml = switchLang
+    ? `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US"><voice name="${voice}"><lang xml:lang="${lang}">${body}</lang></voice></speak>`
+    : `<speak version="1.0" xml:lang="${lang}"><voice name="${voice}">${body}</voice></speak>`;
   const res = await fetchWithTimeout(
     `https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`,
     {
