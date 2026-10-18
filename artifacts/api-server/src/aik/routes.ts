@@ -108,7 +108,7 @@ async function requireChild(req: Request, res: Response, next: NextFunction) {
   }
   const child = await store.getChild(s.id);
   const klass = child ? await store.getClass(child.class_id) : null;
-  if (!child || !klass || child.class_id !== s.classId || !child.consent_recorded || child.pin_locked) {
+  if (!child || !klass || child.class_id !== s.classId) {
     delete req.session.aikChild;
     return void res.status(401).json({ error: "Time to sign in again!" });
   }
@@ -637,15 +637,15 @@ export function registerAikRoutes(app: Express): void {
         .object({
           nickname: z.string().min(2).max(20).regex(/^[A-Za-z0-9 _-]+$/, "Letters and numbers only"),
           avatar: z.string().min(1).max(4),
-          pin: z.string().regex(/^\d{4}$/, "4 digits"),
+          pin: z.string().regex(/^\d{4}$/, "4 digits").optional(),
           consentRecorded: z.boolean().optional(),
         })
         .safeParse(req.body);
-      if (!body.success) return void res.status(400).json({ error: "Nickname (letters/numbers), an avatar and a 4-digit PIN are required." });
+      if (!body.success) return void res.status(400).json({ error: "A nickname (letters/numbers) and an avatar are required." });
       if (!AVATARS.includes(body.data.avatar)) return void res.status(400).json({ error: "Pick an avatar from the list." });
       const existing = await store.listChildren(klass.id);
       if (existing.some((c) => c.nickname.toLowerCase() === body.data.nickname.trim().toLowerCase())) return void res.status(409).json({ error: "That nickname is already in this class." });
-      let child = await store.createChild(klass.id, body.data.nickname.trim(), body.data.avatar, await hashPassword(body.data.pin));
+      let child = await store.createChild(klass.id, body.data.nickname.trim(), body.data.avatar, await hashPassword(body.data.pin ?? randomBytes(16).toString("hex")));
       if (body.data.consentRecorded) child = (await store.updateChild(child.id, { consent_recorded: true, consent_recorded_by: (req as FReq).facilitator.id })) ?? child;
       await store.audit(klass.id, "facilitator", (req as FReq).facilitator.id, "child_created", { childId: child.id, consent: child.consent_recorded });
       res.json({ child: publicChild(child, 0) });
@@ -831,16 +831,62 @@ export function registerAikRoutes(app: Express): void {
 
   /* ---------------- Child: sign-in ---------------- */
 
-  // Step 1: class code → roster (nicknames + avatars only). Only consented, unlocked children are listed.
+  // Step 1: class code → roster (nicknames + avatars only). The class key is the gate:
+  // every child in the class is listed, and a new child can join with a nickname.
   app.post(
     `${base}/child/class`,
     wrap(async (req, res) => {
       if (!allow(`ccode:${ip(req)}`, aikConfig.loginAttemptsPerMinute)) return void res.status(429).json({ error: "Slow down a little and try again." });
       const code = store.normalizeCode(String(req.body?.code ?? ""));
       const klass = code.length === 6 ? await store.getClassByCode(code) : null;
-      if (!klass) return void res.status(404).json({ error: "That class code isn't right. Check the board!" });
-      const children = (await store.listChildren(klass.id)).filter((c) => c.consent_recorded && !c.pin_locked);
+      if (!klass || klass.kind === "workspace") return void res.status(404).json({ error: "That class code isn't right. Check the board!" });
+      if (klass.paused) return void res.status(423).json({ error: KID_MESSAGES.closed });
+      const children = await store.listChildren(klass.id);
       res.json({ className: klass.name, children: children.map((c) => ({ id: c.id, nickname: c.nickname, avatar: c.avatar })) });
+    }),
+  );
+
+  // Step 2: tap your name (or type a new nickname) → you're in. No PIN: the class key is the key.
+  app.post(
+    `${base}/child/join`,
+    wrap(async (req, res) => {
+      if (!allow(`cjoin:${ip(req)}`, aikConfig.loginAttemptsPerMinute)) return void res.status(429).json({ error: "Slow down a little and try again." });
+      const body = z
+        .object({
+          code: z.string(),
+          childId: z.number().int().optional(),
+          nickname: z.string().min(2).max(20).regex(/^[A-Za-z0-9 _-]+$/).optional(),
+          avatar: z.string().min(1).max(4).optional(),
+        })
+        .safeParse(req.body);
+      if (!body.success) return void res.status(400).json({ error: "Pick a nickname with letters and numbers (2–20)." });
+      const klass = await store.getClassByCode(body.data.code);
+      if (!klass || klass.kind === "workspace") return void res.status(404).json({ error: "That class code isn't right. Check the board!" });
+      if (klass.paused) return void res.status(423).json({ error: KID_MESSAGES.closed });
+
+      let child: store.ChildRow | null = null;
+      if (body.data.childId !== undefined) {
+        child = await store.getChild(body.data.childId);
+        if (!child || child.class_id !== klass.id) return void res.status(404).json({ error: "Hmm, that didn't match. Ask your facilitator." });
+      } else {
+        const nickname = (body.data.nickname ?? "").trim();
+        if (nickname.length < 2) return void res.status(400).json({ error: "Pick a nickname with letters and numbers (2–20)." });
+        const avatar = body.data.avatar && AVATARS.includes(body.data.avatar) ? body.data.avatar : AVATARS[Math.floor(Math.random() * AVATARS.length)];
+        const existing = (await store.listChildren(klass.id)).find((c) => c.nickname.toLowerCase() === nickname.toLowerCase());
+        if (existing) {
+          child = existing;
+        } else {
+          // No PIN is used any more; store an unguessable hash so the column stays non-null.
+          child = await store.createChild(klass.id, nickname, avatar, await hashPassword(randomBytes(16).toString("hex")));
+          child = (await store.updateChild(child.id, { consent_recorded: true })) ?? child;
+          await store.audit(klass.id, "child", child.id, "child_joined", { nickname });
+        }
+      }
+      await store.updateChild(child.id, { pin_attempts: 0, pin_locked: false });
+      delete req.session.aikFacilitator;
+      req.session.aikChild = { id: child.id, classId: klass.id, at: Date.now() };
+      await store.audit(klass.id, "child", child.id, "login");
+      res.json({ ok: true });
     }),
   );
 
@@ -891,7 +937,7 @@ export function registerAikRoutes(app: Express): void {
       ]);
       res.json({
         child: { id: child.id, nickname: child.nickname, avatar: child.avatar, muted: child.muted },
-        class: { id: klass.id, name: klass.name, modes: store.parseModes(klass.modes), paused: klass.paused, locked: klass.locked, ticketLimit: klass.ticket_limit, chatTurnLimit: klass.chat_turn_limit },
+        class: { id: klass.id, name: klass.name, modes: store.ALL_MODES, paused: klass.paused, locked: klass.locked, ticketLimit: klass.ticket_limit, chatTurnLimit: klass.chat_turn_limit },
         ticketsUsed: tickets,
         chatTurnsUsed: chatTurns,
         requests: requests.map(toChildRequest),
@@ -913,7 +959,7 @@ export function registerAikRoutes(app: Express): void {
       if (klass.paused) return void res.status(423).json({ error: KID_MESSAGES.paused });
       if (klass.locked) return void res.status(423).json({ error: "Your portfolio is locked for the Expo. Nice work!" });
       if (child.muted) return void res.status(423).json({ error: "Your facilitator paused your orders. Look up front!" });
-      if (!store.parseModes(klass.modes).includes(body.data.mode) || !getMode(body.data.mode)) return void res.status(423).json({ error: "That mode isn't unlocked today." });
+      if (!getMode(body.data.mode)) return void res.status(404).json({ error: "That studio doesn't exist." });
       const mode = getMode(body.data.mode)!;
       let used: number;
       if (body.data.kind === "chat") {

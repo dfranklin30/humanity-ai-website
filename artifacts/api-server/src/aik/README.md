@@ -39,7 +39,7 @@ as they do to a child's. Only the limits differ:
 
 | | Children | Staff Hub |
 |---|---|---|
-| Modules | only what the facilitator unlocked | all |
+| Modules | all (the class code is the only key; the facilitator can close the Studio) | all |
 | Orders per session | ticket limit (2 by default) | unlimited |
 | Field length | 160 chars (`maxFieldChars`) | 1,200 (`staffFieldChars`) |
 | Chat length | 300 chars | 4,000 (`staffChatChars`) |
@@ -114,13 +114,13 @@ DATABASE_URL=... SESSION_SECRET=... PORT=8080 node dist/index.mjs
 ```
 
 Sign in at `/aiforkids/facilitator`, create a class, add a child with a PIN and
-record consent, unlock studios, then sign the child in at `/aiforkids/studio`.
+then have the child sign in at `/aiforkids/studio` with the class code and a nickname (no PIN).
 
 ## Privacy rules baked in
 
 Child rows hold nickname, avatar, PIN hash, consent flag and class only. Never
 add a column for a legal name, email, birth date, photo, voice or address.
-Children cannot sign in until consent is recorded. Every order, chat turn,
+Consent is recorded on the roster for your records. Every order, chat turn,
 result and facilitator action is logged in `aik_audit`; a facilitator can
 export or permanently delete a class from the dashboard. Children's voices are
 never recorded; read-aloud is one-way.

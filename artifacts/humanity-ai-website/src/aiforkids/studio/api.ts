@@ -158,6 +158,8 @@ export const getConfig = () => call<StudioConfig>("GET", "/config");
 /* Child */
 export const childLookupClass = (code: string) => call<{ className: string; children: { id: number; nickname: string; avatar: string }[] }>("POST", "/child/class", { code });
 export const childLogin = (code: string, childId: number, pin: string) => call<{ ok: true }>("POST", "/child/login", { code, childId, pin });
+/** Sign in with just the class key: tap an existing name, or join with a new nickname + avatar. */
+export const childJoin = (code: string, who: { childId: number } | { nickname: string; avatar: string }) => call<{ ok: true }>("POST", "/child/join", { code, ...who });
 export const childLogout = () => call<{ ok: true }>("POST", "/child/logout");
 export type ChildMe = {
   child: { id: number; nickname: string; avatar: string; muted: boolean };
@@ -204,7 +206,7 @@ export const fPatchClass = (id: number, patch: Partial<{ name: string; modes: Mo
 export const fNewSession = (id: number) => call<{ class: PublicClass }>("POST", `/facilitator/classes/${id}/new-session`);
 export const fRotateCode = (id: number) => call<{ class: PublicClass }>("POST", `/facilitator/classes/${id}/rotate-code`);
 export const fDeleteClass = (id: number, confirmName: string) => call<{ ok: true }>("DELETE", `/facilitator/classes/${id}`, { confirmName });
-export const fAddChild = (classId: number, body: { nickname: string; avatar: string; pin: string; consentRecorded?: boolean }) => call<{ child: ChildSummary }>("POST", `/facilitator/classes/${classId}/children`, body);
+export const fAddChild = (classId: number, body: { nickname: string; avatar: string; pin?: string; consentRecorded?: boolean }) => call<{ child: ChildSummary }>("POST", `/facilitator/classes/${classId}/children`, body);
 export const fPatchChild = (classId: number, childId: number, patch: Partial<{ nickname: string; avatar: string; pin: string; consentRecorded: boolean; muted: boolean; unlock: boolean }>) =>
   call<{ child: ChildSummary }>("PATCH", `/facilitator/classes/${classId}/children/${childId}`, patch);
 export const fDeleteChild = (classId: number, childId: number) => call<{ ok: true }>("DELETE", `/facilitator/classes/${classId}/children/${childId}`);

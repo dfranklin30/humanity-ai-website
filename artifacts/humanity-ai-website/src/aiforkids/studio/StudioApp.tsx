@@ -1,8 +1,10 @@
 /**
  * Kids AI Studio — the child's side. /aiforkids/studio
  *
- * Flow: class code → pick yourself → PIN → workspace.
- * The workspace shows only the modes the facilitator has unlocked, a
+ * Flow: class code → tap your name (or join with a nickname) → workspace.
+ * The class key is the only key: no PIN, and every studio is open. The
+ * facilitator can close the Studio for the class from the dashboard.
+ * The workspace shows all studios, a
  * Director's Order form (never a chat box), the result in a locked sandbox,
  * the child's portfolio, and the class Arcade.
  */
@@ -11,7 +13,7 @@ import { cx } from "../components/ui";
 import {
   ApiError,
   childArcade,
-  childLogin,
+  childJoin,
   childLogout,
   childLookupClass,
   childMe,
@@ -31,7 +33,7 @@ import {
 } from "./api";
 import { ArtifactLoader, BigButton, Card, ChangeBox, ChatPanel, ModeForm, Notice, RequestStatus, Spinner, kindEmoji, type ChatMsg } from "./components";
 
-type Stage = { step: "code" } | { step: "pick"; code: string; className: string; children: { id: number; nickname: string; avatar: string }[] } | { step: "pin"; code: string; child: { id: number; nickname: string; avatar: string } } | { step: "in" };
+type Stage = { step: "code" } | { step: "pick"; code: string; className: string; children: { id: number; nickname: string; avatar: string }[] } | { step: "in" };
 
 export default function StudioApp() {
   const [config, setConfig] = useState<StudioConfig | null>(null);
@@ -86,7 +88,8 @@ export default function StudioApp() {
 
 function SignIn({ config, stage, setStage }: { config: StudioConfig; stage: Stage; setStage: (s: Stage) => void }) {
   const [code, setCode] = useState("");
-  const [pin, setPin] = useState("");
+  const [nickname, setNickname] = useState("");
+  const [avatar, setAvatar] = useState(config.avatars[0] ?? "🦊");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -131,78 +134,83 @@ function SignIn({ config, stage, setStage }: { config: StudioConfig; stage: Stag
     );
   }
 
-  if (stage.step === "pick") {
-    return (
-      <Card className="mx-auto max-w-3xl">
-        <div className="text-center">
-          <p className="text-sm font-bold uppercase tracking-wide text-violet-600">{stage.className}</p>
-          <h1 className="text-3xl font-extrabold">Who are you?</h1>
-        </div>
-        {stage.children.length === 0 && <Notice>No one is unlocked in this class yet. Ask your facilitator.</Notice>}
+  if (stage.step !== "pick") return null;
+
+  const join = async (who: { childId: number } | { nickname: string; avatar: string }) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await childJoin(stage.code, who);
+      setStage({ step: "in" });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Try again!");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card className="mx-auto max-w-3xl">
+      <div className="text-center">
+        <p className="text-sm font-bold uppercase tracking-wide text-violet-600">{stage.className}</p>
+        <h1 className="text-3xl font-extrabold">Who are you?</h1>
+        <p className="mt-1 text-slate-600">{stage.children.length ? "Tap your name, or join as someone new." : "You're the first one here! Pick a nickname and an avatar."}</p>
+      </div>
+      {stage.children.length > 0 && (
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
           {stage.children.map((c) => (
             <button
               key={c.id}
-              onClick={() => setStage({ step: "pin", code: stage.code, child: c })}
-              className="flex flex-col items-center gap-1 rounded-3xl bg-white p-4 ring-2 ring-violet-100 transition hover:-translate-y-0.5 hover:ring-violet-400 focus:outline-none focus-visible:ring-4 focus-visible:ring-amber-300"
+              disabled={busy}
+              onClick={() => join({ childId: c.id })}
+              className="flex flex-col items-center gap-1 rounded-3xl bg-white p-4 ring-2 ring-violet-100 transition hover:-translate-y-0.5 hover:ring-violet-400 focus:outline-none focus-visible:ring-4 focus-visible:ring-amber-300 disabled:opacity-60"
             >
               <span className="text-5xl">{c.avatar}</span>
               <span className="text-lg font-bold text-slate-800">{c.nickname}</span>
             </button>
           ))}
         </div>
-        <div className="mt-6 text-center">
-          <BigButton variant="ghost" onClick={() => setStage({ step: "code" })}>
-            ← Different class
-          </BigButton>
-        </div>
-      </Card>
-    );
-  }
-
-  if (stage.step !== "pin") return null;
-  return (
-    <Card className="mx-auto max-w-md text-center">
-      <p className="text-6xl">{stage.child.avatar}</p>
-      <h1 className="mt-2 text-3xl font-extrabold">Hi, {stage.child.nickname}!</h1>
-      <p className="mt-1 text-slate-600">Type your 4-digit PIN.</p>
+      )}
       <form
-        className="mt-6 space-y-4"
-        onSubmit={async (e) => {
+        className="mt-8 rounded-3xl bg-violet-50 p-5"
+        onSubmit={(e) => {
           e.preventDefault();
-          setBusy(true);
-          setError(null);
-          try {
-            await childLogin(stage.code, stage.child.id, pin);
-            setStage({ step: "in" });
-          } catch (err) {
-            setError(err instanceof ApiError ? err.message : "Try again!");
-            setPin("");
-          } finally {
-            setBusy(false);
-          }
+          void join({ nickname: nickname.trim(), avatar });
         }}
       >
+        <p className="text-center text-lg font-extrabold text-violet-900">{stage.children.length ? "New here? Join the class" : "Join the class"}</p>
         <input
-          type="password"
-          inputMode="numeric"
-          value={pin}
-          autoFocus
-          onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
-          className="w-full rounded-2xl border-4 border-violet-200 px-4 py-4 text-center font-mono text-4xl font-extrabold tracking-[0.6em] text-violet-900 focus:border-violet-500 focus:outline-none"
-          placeholder="••••"
+          value={nickname}
+          onChange={(e) => setNickname(e.target.value.replace(/[^A-Za-z0-9 _-]/g, "").slice(0, 20))}
+          autoFocus={stage.children.length === 0}
+          autoComplete="off"
+          className="mt-3 w-full rounded-2xl border-4 border-violet-200 bg-white px-4 py-3 text-center text-2xl font-extrabold text-violet-900 focus:border-violet-500 focus:outline-none"
+          placeholder="Pick a nickname (not your real name)"
         />
-        {error && <Notice>{error}</Notice>}
-        <BigButton type="submit" disabled={pin.length !== 4 || busy} className="w-full">
-          {busy ? "Checking…" : "Let's go! 🚀"}
+        <div className="mt-3 flex flex-wrap justify-center gap-2">
+          {config.avatars.map((a) => (
+            <button
+              key={a}
+              type="button"
+              onClick={() => setAvatar(a)}
+              aria-label={`Avatar ${a}`}
+              className={cx("rounded-2xl p-2 text-3xl ring-2 transition", avatar === a ? "bg-white ring-violet-500" : "ring-transparent hover:bg-white/60")}
+            >
+              {a}
+            </button>
+          ))}
+        </div>
+        {error && <div className="mt-3"><Notice>{error}</Notice></div>}
+        <BigButton type="submit" disabled={nickname.trim().length < 2 || busy} className="mt-4 w-full">
+          {busy ? "Opening…" : "Let's go! 🚀"}
         </BigButton>
       </form>
-      <div className="mt-4">
+      <div className="mt-6 text-center">
         <BigButton variant="ghost" onClick={() => setStage({ step: "code" })}>
-          ← Not me
+          ← Different class
         </BigButton>
       </div>
-      <p className="mt-6 text-xs text-slate-500">Avatars shown: {config.avatars.length}. Only your facilitator can change your PIN.</p>
+      <p className="mt-6 text-center text-xs text-slate-500">A grown-up facilitator can see everything you make. Never type your real name or private stuff.</p>
     </Card>
   );
 }
@@ -489,7 +497,7 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
 }
 
 function StudioHall({ modes, onOpen }: { modes: ModeDef[]; onOpen: (id: ModeId) => void }) {
-  if (!modes.length) return <Card tone="tint">No studios are unlocked yet. Your facilitator will open one soon!</Card>;
+  if (!modes.length) return <Card tone="tint">The studios are getting ready. Try again in a moment!</Card>;
   return (
     <div>
       <h2 className="mb-3 text-2xl font-extrabold text-violet-900">Pick a studio</h2>
