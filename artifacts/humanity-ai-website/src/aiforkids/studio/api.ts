@@ -196,7 +196,12 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   } catch {
     /* no body */
   }
-  if (!res.ok) throw new ApiError(res.status, data?.error || "Something went wrong.");
+  if (!res.ok) {
+    // A lost session anywhere in the Hub shows the sign-in screen in place, and
+    // the Hub returns to the same tab or tool afterwards.
+    if (res.status === 401 && typeof window !== "undefined") window.dispatchEvent(new CustomEvent("aik:unauthorized", { detail: { path } }));
+    throw new ApiError(res.status, data?.error || "Something went wrong.");
+  }
   return data as T;
 }
 
@@ -226,6 +231,13 @@ export const childSpeak = (artifactId: number, voice?: VoiceChoice | null) =>
 export const childVoices = () => call<{ voices: VoiceOption[] }>("GET", "/child/voices");
 export const childRequest = (id: number) => call<{ request: StudioRequest }>("GET", `/child/requests/${id}`);
 export const childArcade = () => call<{ items: ArtifactMeta[] }>("GET", "/child/arcade");
+/* Child: the Remix workflow (hero → put them in → remix → ideas) */
+export const childRemixInfo = () => call<{ styles: string[]; tools: ModeId[] }>("GET", "/child/remix");
+export const childSaveHero = (body: { name: string; look: string; personality?: string; style: string; voice?: { provider: string; id: string } | null; heroId?: number }) =>
+  call<{ request: StudioRequest; used: number }>("POST", "/child/heroes", body);
+export const childRemixSuggest = (artifactId: number, mode: ModeId) =>
+  call<{ source: { id: number; title: string; kind: string }; mode: ModeId; values: Record<string, string>; ai: boolean }>("POST", "/child/remix/suggest", { artifactId, mode });
+export const childRemixIdeas = (artifactId: number) => call<{ source: { id: number; title: string; kind: string }; ideas: Idea[] }>("POST", "/child/remix/ideas", { artifactId });
 
 export type LoungeItem = { id: number | string; title: string; url: string; source: string; note: string; youtubeId?: string; starter?: boolean; class_id?: number | null };
 export const fLounge = () => call<{ items: LoungeItem[]; starters: LoungeItem[] }>("GET", "/facilitator/lounge");

@@ -52,6 +52,22 @@ Endpoints live under `/api/aik/hub` and all require a facilitator session.
 Week modules render at `/aiforkids/week/1..8` and `/aiforkids/hub/week/1..8`,
 both behind the same sign-in.
 
+## The Remix workflow for children (`/aiforkids/studio` → Remix)
+
+The same cycle staff have in the Hub, kid-sized: make a hero (`POST /child/heroes`),
+put them in a storybook / language book / movie / game / song / picture
+(`POST /child/remix/suggest` fills the room's form; the order then carries
+`remixFrom`), remix any saved piece into any other room, or ask for ideas
+(`POST /child/remix/ideas`). A child may remix their own pieces or anything a
+classmate put in the Arcade. Each step is one Director's Order; the default is
+12 per session (`defaultTicketLimit`), and classes still on the old default of 2
+were moved up once (`aik_classes.limits_v`).
+
+Pictures, clips and songs a child makes are theirs straight away: Content
+Safety screened them when they were generated, and the facilitator can still
+pull anything from the dashboard. Set `AIK_CLASS_AUTO_APPROVE=false` to hold
+every one for a click in the Review queue again.
+
 ## Turning it on
 
 The Studio is **off** unless `AIK_ENABLED=true`. With it off, nothing under

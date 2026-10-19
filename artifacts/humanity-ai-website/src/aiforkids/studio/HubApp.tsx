@@ -76,11 +76,28 @@ type Tab = "map" | "remix" | "library" | "claude" | "tools" | "projects" | "prog
 export default function HubApp() {
   const [location] = useLocation();
   const [me, setMe] = useState<Facilitator | null | undefined>(undefined);
+  const [expired, setExpired] = useState(false);
 
   useEffect(() => {
     fMe()
       .then((r) => setMe(r.facilitator))
       .catch(() => setMe(null));
+  }, []);
+
+  // If the session lapses mid-work (any Hub call answers 401), show the sign-in
+  // form right here; HubShell remembers the tab and tool, so signing in picks up
+  // where you were instead of starting over.
+  useEffect(() => {
+    const onLost = (e: Event) => {
+      const path = String((e as CustomEvent).detail?.path ?? "");
+      if (path.startsWith("/child") || path.startsWith("/auth") || path === "/facilitator/login") return;
+      setMe((m) => {
+        if (m) setExpired(true);
+        return m ? null : m;
+      });
+    };
+    window.addEventListener("aik:unauthorized", onLost);
+    return () => window.removeEventListener("aik:unauthorized", onLost);
   }, []);
 
   // /aiforkids/week/3 and /aiforkids/hub/week/3 both open a week module.
@@ -121,7 +138,12 @@ export default function HubApp() {
 
       <main className="mx-auto max-w-7xl px-5 py-6">
         {me === undefined && <Spinner label="Loading the Hub…" />}
-        {me === null && <HubLogin onDone={setMe} />}
+        {me === null && (
+          <div className="space-y-4">
+            {expired && <Notice tone="info">You were signed out (sessions end after a while). Sign in and you'll be right back where you were.</Notice>}
+            <HubLogin onDone={(f) => { setExpired(false); setMe(f); }} />
+          </div>
+        )}
         {me && week && <WeekView week={week} />}
         {me && !week && <HubShell />}
       </main>
@@ -351,14 +373,39 @@ const inputCls = "w-full rounded-xl border-2 border-slate-200 px-3 py-2 text-bas
  * The Hub itself
  * ------------------------------------------------------------------ */
 
+const VIEW_KEY = "aik.hub.view";
+type SavedView = { tab?: Tab; tool?: { id: ModeId; start?: ToolStart } | null; projectId?: number | null };
+function readView(): SavedView {
+  try {
+    const v = JSON.parse(sessionStorage.getItem(VIEW_KEY) || localStorage.getItem(VIEW_KEY) || "null");
+    return v && typeof v === "object" ? (v as SavedView) : {};
+  } catch {
+    return {};
+  }
+}
+function writeView(v: SavedView) {
+  try {
+    const s = JSON.stringify(v);
+    sessionStorage.setItem(VIEW_KEY, s);
+    localStorage.setItem(VIEW_KEY, s);
+  } catch {
+    /* storage unavailable */
+  }
+}
+
 function HubShell() {
+  const saved = useMemo(readView, []);
   const [state, setState] = useState<HubState | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>("remix");
-  const [tool, setToolState] = useState<{ id: ModeId; start?: ToolStart } | null>(null);
+  const [tab, setTab] = useState<Tab>(saved.tab ?? "remix");
+  const [tool, setToolState] = useState<{ id: ModeId; start?: ToolStart } | null>(saved.tool ?? null);
   const setTool = (id: ModeId | null) => setToolState(id ? { id } : null);
   const openTool: OpenTool = (id, start) => setToolState({ id, start });
-  const [projectId, setProjectId] = useState<number | null>(null);
+  const [projectId, setProjectId] = useState<number | null>(saved.projectId ?? null);
+  // Remember where you are, so a reload or a fresh sign-in lands back here.
+  useEffect(() => {
+    writeView({ tab, tool, projectId });
+  }, [tab, tool, projectId]);
   /** Bumped when the AI finder adds videos, so the Lounge list reloads. */
   const [loungeKey, setLoungeKey] = useState(0);
 

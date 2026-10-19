@@ -4,6 +4,8 @@
  * Two audiences, two session shapes, kept strictly apart:
  *   req.session.aikFacilitator  — { id, at }      facilitator dashboard
  *   req.session.aikChild        — { id, classId, at }  child workspace
+ *   Both may be present at once: a facilitator trying the Studio as a child
+ *   in the same browser stays signed in to the Hub.
  * Both ride on the site's existing express-session (Postgres-backed,
  * httpOnly, secure in production). Expiry is enforced here per audience.
  */
@@ -279,7 +281,6 @@ export function registerAikRoutes(app: Express): void {
       const account = await store.consumeToken("verify", hashToken(token));
       if (!account) return void res.status(400).json({ error: "That link has expired or was already used. Ask for a new one." });
       await store.markEmailVerified(account.id);
-      delete req.session.aikChild;
       req.session.aikFacilitator = { id: account.id, at: Date.now() };
       await store.audit(null, "facilitator", account.id, "email_verified");
       res.json({ facilitator: publicFacilitator({ ...account, email_verified: true }) });
@@ -315,7 +316,6 @@ export function registerAikRoutes(app: Express): void {
       await store.updateFacilitatorPassword(account.id, await hashPassword(body.data.password));
       // A successful reset proves control of the inbox.
       if (!account.email_verified) await store.markEmailVerified(account.id);
-      delete req.session.aikChild;
       req.session.aikFacilitator = { id: account.id, at: Date.now() };
       await store.audit(null, "facilitator", account.id, "password_reset_completed");
       res.json({ facilitator: publicFacilitator({ ...account, email_verified: true }) });
@@ -400,7 +400,6 @@ export function registerAikRoutes(app: Express): void {
           await store.audit(null, "system", account.id, "account_signup", { email, via: "google" });
         }
       }
-      delete req.session.aikChild;
       req.session.aikFacilitator = { id: account.id, at: Date.now() };
       await store.audit(null, "facilitator", account.id, "login", { via: "google" });
       res.redirect("/aiforkids/hub");
@@ -452,7 +451,6 @@ export function registerAikRoutes(app: Express): void {
       if (!f.email_verified) {
         return void res.status(403).json({ error: "Check your email and click the link to confirm your address first.", needsVerification: true });
       }
-      delete req.session.aikChild;
       req.session.aikFacilitator = { id: f.id, at: Date.now() };
       await store.audit(null, "facilitator", f.id, "login");
       res.json({ facilitator: publicFacilitator(f) });
@@ -559,7 +557,7 @@ export function registerAikRoutes(app: Express): void {
         .object({
           name: z.string().min(1).max(80).optional(),
           modes: z.array(z.enum(["game", "story", "prompt", "music", "quest", "video", "robot", "homework", "language"])).optional(),
-          ticketLimit: z.number().int().min(0).max(20).optional(),
+          ticketLimit: z.number().int().min(0).max(50).optional(),
           chatTurnLimit: z.number().int().min(0).max(60).optional(),
           paused: z.boolean().optional(),
           locked: z.boolean().optional(),
@@ -893,7 +891,6 @@ export function registerAikRoutes(app: Express): void {
         }
       }
       await store.updateChild(child.id, { pin_attempts: 0, pin_locked: false });
-      delete req.session.aikFacilitator;
       req.session.aikChild = { id: child.id, classId: klass.id, at: Date.now() };
       await store.audit(klass.id, "child", child.id, "login");
       res.json({ ok: true });
@@ -920,7 +917,6 @@ export function registerAikRoutes(app: Express): void {
         return void res.status(401).json({ error: locked ? "Your PIN is locked. Ask your facilitator to reset it." : `That PIN isn't right. ${aikConfig.maxPinAttempts - attempts} tries left.` });
       }
       await store.updateChild(child.id, { pin_attempts: 0 });
-      delete req.session.aikFacilitator;
       req.session.aikChild = { id: child.id, classId: klass.id, at: Date.now() };
       await store.audit(klass.id, "child", child.id, "login");
       res.json({ ok: true });
@@ -1066,6 +1062,102 @@ export function registerAikRoutes(app: Express): void {
       const ok = await store.removeLounge(Number(req.params.lid), (req as FReq).facilitator.id);
       if (!ok) return void res.status(404).json({ error: "Not found." });
       res.json({ ok: true });
+    }),
+  );
+
+  /* ---------------- Child: the Remix workflow ----------------
+   * The same cycle staff have in the Hub, kid-sized: make a hero, put them in a
+   * storybook / movie / game / song / picture, remix any saved piece into any
+   * other room, or ask for ideas. Everything stays in the child's own portfolio
+   * and runs through the same screening as every other order. */
+
+  /** A piece a child may remix: their own, or a classmate's from the Arcade. */
+  async function childVisible(child: store.ChildRow, klass: store.ClassRow, id: number): Promise<store.ArtifactRow | null> {
+    const a = Number.isInteger(id) ? await store.getArtifact(id) : null;
+    if (!a || a.class_id !== klass.id || a.kind === "chat") return null;
+    return a.child_id === child.id || (a.published && a.approved) ? a : null;
+  }
+
+  app.get(
+    `${base}/child/remix`,
+    requireChild,
+    wrap(async (_req, res) => {
+      res.json({ styles: HERO_STYLES, tools: REMIX_TOOLS.filter((t) => getMode(t)) });
+    }),
+  );
+
+  app.post(
+    `${base}/child/heroes`,
+    requireChild,
+    wrap(async (req, res) => {
+      const { child, klass } = req as CReq;
+      if (!allow(`chero:${child.id}`, 6)) return void res.status(429).json({ error: "Whoa, fast fingers! Wait a moment and try again." });
+      if (klass.paused) return void res.status(423).json({ error: KID_MESSAGES.paused });
+      if (klass.locked) return void res.status(423).json({ error: "Your portfolio is locked for the Expo. Nice work!" });
+      if (child.muted) return void res.status(423).json({ error: "Your facilitator paused your orders. Look up front!" });
+      const used = await store.countTicketsThisSession(child.id, klass.id);
+      if (used >= klass.ticket_limit) return void res.status(429).json({ error: KID_MESSAGES.tickets });
+      const v = validateHero(req.body);
+      if (!v.ok) return void res.status(400).json({ error: v.error });
+      let previous: store.ArtifactRow | null = null;
+      if (req.body?.heroId) {
+        previous = await store.getArtifact(Number(req.body.heroId));
+        if (!previous || previous.kind !== "hero" || previous.child_id !== child.id) return void res.status(404).json({ error: "Hero not found." });
+      }
+      let voice = null;
+      if (req.body?.voice?.provider && req.body?.voice?.id) {
+        const found = await findVoice(String(req.body.voice.provider), String(req.body.voice.id));
+        if (found) voice = { provider: found.provider, id: found.id, name: found.name };
+      }
+      const request = await store.createRequest({
+        classId: klass.id,
+        childId: child.id,
+        mode: "prompt",
+        kind: previous ? "change" : "create",
+        projectArtifactId: previous?.id ?? null,
+        input: previous
+          ? { change: `Hero ${v.hero.name}: new look or voice${voice?.name ? ` (${voice.name})` : ""}` }
+          : { what: `Hero: ${v.hero.name}, ${v.hero.look}`, mood: v.hero.personality, style: v.hero.style, voice: voice?.name ?? "" },
+      });
+      await store.audit(klass.id, "child", child.id, previous ? "hero_updated" : "hero_created", { requestId: request.id, name: v.hero.name });
+      publish(klass.id, { type: "request", request: toPublicRequest(request) });
+      void runHeroJob({ requestId: request.id, classId: klass.id, childId: child.id, projectId: null, input: v.hero, voice, previous });
+      res.json({ request: toChildRequest(request), used: used + 1 });
+    }),
+  );
+
+  app.post(
+    `${base}/child/remix/suggest`,
+    requireChild,
+    wrap(async (req, res) => {
+      const { child, klass } = req as CReq;
+      if (!allow(`crsug:${child.id}`, 20)) return void res.status(429).json({ error: "Whoa, fast fingers! Wait a moment and try again." });
+      const body = z.object({ artifactId: z.number().int(), mode: z.enum(["game", "story", "language", "prompt", "music", "quest", "video", "robot"]) }).safeParse(req.body);
+      if (!body.success) return void res.status(400).json({ error: "Pick a piece and a room." });
+      const src = await childVisible(child, klass, body.data.artifactId);
+      if (!src || !src.approved) return void res.status(404).json({ error: "Pick something you made, or something from the Arcade, to remix." });
+      const mode = getMode(body.data.mode)!;
+      const { values, ai } = await suggestValues(src, mode, { staff: false });
+      res.json({ source: { id: src.id, title: src.title, kind: src.kind }, mode: mode.id, values, ai });
+    }),
+  );
+
+  app.post(
+    `${base}/child/remix/ideas`,
+    requireChild,
+    wrap(async (req, res) => {
+      const { child, klass } = req as CReq;
+      if (!allow(`cridea:${child.id}`, 8)) return void res.status(429).json({ error: "Whoa, fast fingers! Wait a moment and try again." });
+      const src = await childVisible(child, klass, Number(req.body?.artifactId));
+      if (!src || !src.approved) return void res.status(404).json({ error: "Pick something you made, or something from the Arcade, to remix." });
+      const tools = REMIX_TOOLS.filter((t) => t !== (src.kind === "audio" ? "music" : src.kind === "image" ? "prompt" : src.kind === "video" ? "video" : src.kind));
+      try {
+        const ideas = await generateIdeas(src, tools);
+        res.json({ source: { id: src.id, title: src.title, kind: src.kind }, ideas });
+      } catch (err) {
+        logger.warn({ err: String((err as Error)?.message ?? err).slice(0, 200) }, "[aik] child ideas failed");
+        res.status(503).json({ error: "The idea machine is taking a break. Try again in a moment!" });
+      }
     }),
   );
 
@@ -1505,7 +1597,7 @@ export function registerAikRoutes(app: Express): void {
     wrap(async (req, res) => {
       const f = (req as FReq).facilitator;
       if (!allow(`rsug:${f.id}`, 20)) return void res.status(429).json({ error: "Slow down a moment and try again." });
-      const body = z.object({ artifactId: z.number().int(), mode: z.enum(["game", "story", "prompt", "music", "quest", "video", "robot"]) }).safeParse(req.body);
+      const body = z.object({ artifactId: z.number().int(), mode: z.enum(["game", "story", "language", "prompt", "music", "quest", "video", "robot"]) }).safeParse(req.body);
       if (!body.success) return void res.status(400).json({ error: "Pick a piece and a tool." });
       const src = await hubVisible(req, body.data.artifactId);
       if (!src || !src.approved) return void res.status(404).json({ error: "That piece isn't available to remix." });

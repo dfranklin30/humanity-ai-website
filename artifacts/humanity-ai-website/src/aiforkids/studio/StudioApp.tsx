@@ -35,6 +35,7 @@ import {
   type VoiceOption,
 } from "./api";
 import { ArtifactLoader, BigButton, Card, ChangeBox, ChatPanel, ModeForm, Notice, RequestStatus, Spinner, kindEmoji, type ChatMsg } from "./components";
+import { KidsRemixTab, type KidStart } from "./KidsRemix";
 import { RoomIcon, ROOM_THEME, roomIdFor } from "./icons";
 import { Lounge } from "./Lounge";
 import { childLounge, DESK_TOOLS, DESK_SUBJECTS, type DeskTool, type DeskSubject, type LoungeItem } from "./api";
@@ -234,7 +235,7 @@ function SignIn({ config, stage, setStage }: { config: StudioConfig; stage: Stag
  * Workspace
  * ------------------------------------------------------------------ */
 
-type Tab = "make" | "portfolio" | "arcade" | "lounge";
+type Tab = "make" | "remix" | "portfolio" | "arcade" | "lounge";
 
 function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut: () => void }) {
   const [me, setMe] = useState<ChildMe | null>(null);
@@ -243,6 +244,7 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
   const [modeId, setModeId] = useState<ModeId | null>(null); // null = Studio hall
   const [active, setActive] = useState<StudioRequest | null>(null); // the order being watched
   const [project, setProject] = useState<ArtifactMeta | null>(null); // the artifact being worked on
+  const [start, setStart] = useState<KidStart | null>(null); // Remix: what this room starts from
   const [busy, setBusy] = useState(false);
   const [chat, setChat] = useState<{ convoId: number | null; messages: ChatMsg[]; busy: boolean }>({ convoId: null, messages: [], busy: false });
   const [showChat, setShowChat] = useState(false);
@@ -275,10 +277,11 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me?.class.modes.join(",")]);
 
-  function openModule(id: ModeId | null) {
+  function openModule(id: ModeId | null, from?: KidStart) {
     setModeId(id);
     setProject(null);
     setActive(null);
+    setStart(from ?? null);
     setChat({ convoId: null, messages: [], busy: false });
     const m = config.modes.find((x) => x.id === id);
     setShowChat(m?.interaction === "chat");
@@ -301,7 +304,7 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
     setBusy(true);
     setError(null);
     try {
-      const { request } = await childSubmit({ mode: mode.id, kind, projectArtifactId, input });
+      const { request } = await childSubmit({ mode: mode.id, kind, projectArtifactId, input, ...(kind === "create" && start ? { remixFrom: start.remixFrom } : {}) });
       setActive(request);
       const settled = await waitForRequest(request.id, childRequest, setActive, 300_000);
       setActive(settled);
@@ -365,9 +368,9 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
           </span>
         </div>
         <nav className="flex flex-wrap gap-2">
-          {(["make", "portfolio", "arcade", "lounge"] as Tab[]).map((t) => {
-            const room = t === "make" ? "video" : t === "portfolio" ? "portfolio" : t === "arcade" ? "arcade" : "lounge";
-            const label = t === "make" ? "Rooms" : t === "portfolio" ? "My stuff" : t === "arcade" ? "Arcade" : "Lounge";
+          {(["make", "remix", "portfolio", "arcade", "lounge"] as Tab[]).map((t) => {
+            const room = t === "make" ? "video" : t === "remix" ? "story" : t === "portfolio" ? "portfolio" : t === "arcade" ? "arcade" : "lounge";
+            const label = t === "make" ? "Rooms" : t === "remix" ? "Remix" : t === "portfolio" ? "My stuff" : t === "arcade" ? "Arcade" : "Lounge";
             return (
               <button
                 key={t}
@@ -469,7 +472,15 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
                         </BigButton>
                       </div>
                     ) : (
-                      <ModeForm mode={mode} maxChars={config.maxFieldChars} busy={busy} onSubmit={(values) => submit("create", values)} />
+                      <div className="space-y-3">
+                        {start && (
+                          <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-900 ring-1 ring-emerald-200">
+                            <span>🔁 Remixing {kindEmoji(start.sourceKind as ArtifactMeta["kind"])} “{start.sourceTitle}” — the form is filled in for you. Change anything you like!</span>
+                            <button type="button" onClick={() => setStart(null)} className="text-xs font-bold text-emerald-700 underline">Start blank instead</button>
+                          </div>
+                        )}
+                        <ModeForm key={start ? `remix-${start.remixFrom}` : "blank"} mode={mode} maxChars={config.maxFieldChars} busy={busy} initialValues={start?.values} onSubmit={(values) => submit("create", values)} submitLabel={start ? "Remix it! 🔁" : undefined} />
+                      </div>
                     )}
                   </div>
                   {ticketsLeft === 0 && <div className="mt-3"><Notice>You've used all your Director's Orders for today. Time to play and test!</Notice></div>}
@@ -499,6 +510,11 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
                       </h3>
                       <div className="flex gap-2">
                         {config.ttsReady && ["story", "quest", "robot"].includes(project.kind) && <SpeakButton artifactId={project.id} />}
+                        {!me.class.locked && (
+                          <BigButton variant="secondary" onClick={() => setTab("remix")}>
+                            🔁 Remix it
+                          </BigButton>
+                        )}
                         {!me.class.locked && (
                           <BigButton
                             variant="secondary"
@@ -532,10 +548,27 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
         </div>
       )}
 
+      {tab === "remix" && (
+        <KidsRemixTab
+          me={me}
+          config={config}
+          ticketsLeft={ticketsLeft}
+          onRefresh={refresh}
+          onOpenRoom={(id, from) => {
+            openModule(id, from);
+            setTab("make");
+          }}
+        />
+      )}
+
       {tab === "portfolio" && (
         <Portfolio
           items={me.portfolio.filter((a) => a.kind !== "chat")}
           onOpen={(a) => {
+            if (a.kind === "hero") {
+              setTab("remix");
+              return;
+            }
             const m = config.modes.find((x) => x.artifactKind === a.kind);
             if (m && me.class.modes.includes(m.id)) {
               openModule(m.id);

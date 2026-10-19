@@ -228,8 +228,13 @@ export const aikConfig = {
   facilitatorSessionMinutes: 8 * 60,
   /** Wrong-PIN attempts before a child account locks. */
   maxPinAttempts: 5,
-  /** Default Director's Orders (create/change) per child per session. */
-  defaultTicketLimit: 2,
+  /** Default Director's Orders (create/change) per child per session. Enough to
+   *  walk the whole Remix cycle: a hero, a few pieces, a few remixes and changes. */
+  defaultTicketLimit: 12,
+  /** Pictures, clips and songs a child makes are theirs straight away (Content
+   *  Safety has already screened them); set AIK_CLASS_AUTO_APPROVE=false to hold
+   *  every one for a facilitator click in the Review queue again. */
+  classAutoApprove: env.AIK_CLASS_AUTO_APPROVE !== "false",
   /** Default guided-chat turns per child per session (Homework Help, Robotics Lab, "Ask the helper"). */
   defaultChatTurnLimit: 15,
   /** Turns of conversation history sent back to the model on each chat turn. */

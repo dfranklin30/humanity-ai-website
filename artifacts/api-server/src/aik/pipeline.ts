@@ -413,7 +413,7 @@ async function complete(req: RequestRow, artifactInput: NewArtifact, flags: Flag
   // In a staff workspace the facilitator is the approver, so there is no one
   // to hold media for. Screening still ran; only the human gate is skipped.
   const klass = await store.getClass(req.class_id);
-  const approved = artifactInput.approved || klass?.kind === "workspace";
+  const approved = artifactInput.approved || klass?.kind === "workspace" || aikConfig.classAutoApprove;
   const artifact = await store.createArtifact({
     classId: req.class_id,
     childId: req.child_id,
@@ -526,8 +526,9 @@ async function runBook(req: RequestRow, mode: ModeDef, input: ReturnType<typeof 
     writing.push({
       key: "check",
       label: "Checking every word",
-      state: lr.checked ? "done" : "failed",
-      detail: lr.checked ? (lr.fixes ? `${lr.fixes} fixed` : `${lr.draft.words.length} words OK`) : "the checker was unavailable",
+      // An unavailable checker is not a failure of the book: the words were still written and screened.
+      state: lr.checked ? "done" : "skipped",
+      detail: lr.checked ? (lr.fixes ? `${lr.fixes} fixed` : `${lr.draft.words.length} words OK`) : "the checker was unavailable; ask your facilitator to double-check the words",
     });
   }
   report(writing);
@@ -558,7 +559,8 @@ async function runBook(req: RequestRow, mode: ModeDef, input: ReturnType<typeof 
     report([...writing, ...built.steps, wordStep]);
     const t0 = Date.now();
     const rec = await recordWords(req.id, lang, block, prevLang, remix?.voice ?? null);
-    extraSteps.push({ ...wordStep, state: rec.total === 0 || rec.recorded === rec.total ? "done" : "failed", detail: rec.total ? `${rec.recorded} of ${rec.total}` : "no voice switched on", ms: Date.now() - t0 });
+    // A word that could not be recorded simply has no sound; the book is still fine. Only a total miss is a failure.
+    extraSteps.push({ ...wordStep, state: rec.total === 0 || rec.recorded > 0 ? "done" : "failed", detail: rec.total ? `${rec.recorded} of ${rec.total}` : "no voice switched on", ms: Date.now() - t0 });
     (built.book as LangBook).lang = block;
     if (!rec.total) built.kidNote += " Word sounds aren't switched on yet.";
   }

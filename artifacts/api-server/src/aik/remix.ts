@@ -97,6 +97,8 @@ function sampleLine(h: { name: string; personality: string }): string {
 export async function runHeroJob(opts: {
   requestId: number;
   classId: number;
+  /** The child who made the hero, or null for a staff workspace. */
+  childId?: number | null;
   projectId: number | null;
   input: HeroInput;
   voice: VoiceChoice | null;
@@ -164,14 +166,15 @@ export async function runHeroJob(opts: {
     const klass = await store.getClass(opts.classId);
     const artifact = await store.createArtifact({
       classId: opts.classId,
-      childId: null,
+      childId: opts.childId ?? null,
       kind: "hero",
       title: hero.name,
       content: JSON.stringify(hero),
       mime: "application/json",
       summary: `${hero.name}: ${hero.look}`.slice(0, 500),
-      // Hub work is approved by the adult who made it; a class hero with a picture waits.
-      approved: klass?.kind === "workspace" || !hero.portrait,
+      // Hub work is approved by the adult who made it; a class hero with a picture waits
+      // unless the class auto-approves (the portrait was screened when it was drawn).
+      approved: klass?.kind === "workspace" || !hero.portrait || aikConfig.classAutoApprove,
       parentArtifactId: opts.previous?.id ?? null,
       projectId: opts.projectId,
     });

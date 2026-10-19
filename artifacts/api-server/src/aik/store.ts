@@ -194,6 +194,15 @@ export function ensureTables(): Promise<void> {
         )`);
       await db.execute(sql`
         ALTER TABLE aik_classes ADD COLUMN IF NOT EXISTS chat_turn_limit integer NOT NULL DEFAULT 15`);
+      // Orders per session went from 2 to 12 so a class can walk the whole Remix
+      // cycle. Classes still on the old default move up once; a limit a
+      // facilitator set by hand afterwards is left alone.
+      await db.execute(sql`
+        ALTER TABLE aik_classes ADD COLUMN IF NOT EXISTS limits_v integer NOT NULL DEFAULT 0`);
+      await db.execute(sql`
+        UPDATE aik_classes SET ticket_limit = 12, limits_v = 1 WHERE limits_v = 0 AND ticket_limit < 12`);
+      await db.execute(sql`
+        UPDATE aik_classes SET limits_v = 1 WHERE limits_v = 0`);
       await db.execute(sql`
         CREATE TABLE IF NOT EXISTS aik_children (
           id serial PRIMARY KEY,
