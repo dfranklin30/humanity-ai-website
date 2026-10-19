@@ -34,6 +34,7 @@ export const KID_MESSAGES = {
   injection: "The Studio only takes Director's Orders about your project. Let's try again!",
   unavailable: "The Studio helper is taking a break. Please tell your facilitator.",
   paused: "Your facilitator paused the Studio. Look up front!",
+  closed: "The Studio is closed right now. Your facilitator will open it when it's time.",
   tickets: "You've used all your Director's Orders for today. Time to play and test what you made!",
   failed: "That one didn't work. Let's try the order a different way.",
 } as const;

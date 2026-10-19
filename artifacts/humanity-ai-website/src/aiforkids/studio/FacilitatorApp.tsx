@@ -1,8 +1,8 @@
 /**
  * Kids AI Studio — facilitator dashboard. /aiforkids/facilitator
  *
- * Sign in → pick a class → live view: roster and consent, mode unlocks,
- * ticket limit, pause-all, per-child mute, approval queue, live feed of
+ * Sign in → pick a class → live view: roster, open/close the Studio,
+ * ticket limit, per-child mute, approval queue, live feed of
  * every Director's Order with its flags, Projector mode, export and delete.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -166,7 +166,7 @@ function Classes({ me, onOpen }: { me: Facilitator; onOpen: (id: number) => void
               <p className="text-lg font-extrabold">{c.name}</p>
               <p className="font-mono text-2xl font-bold tracking-widest text-violet-700">{c.code}</p>
               <p className="mt-1 text-xs text-slate-500">
-                Modes: {c.modes.length ? c.modes.join(", ") : "none"} · {c.paused ? "Paused" : "Live"} · {c.locked ? "Locked" : "Open"}
+                {c.paused ? "Closed" : "Open"} · {c.locked ? "Portfolios locked" : "Portfolios open"}
               </p>
             </button>
           ))}
@@ -372,27 +372,20 @@ function ClassDashboard({ config, me, classId, onGone }: { config: StudioConfig;
             <div className="flex flex-col items-end gap-2">
               <span className={cx("rounded-full px-3 py-1 text-xs font-bold", live ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600")}>{live ? "● Live feed connected" : "○ Reconnecting…"}</span>
               <BigButton variant={k.paused ? "primary" : "danger"} onClick={() => patch({ paused: !k.paused })}>
-                {k.paused ? "▶ Resume Studio" : "⏸ Pause all"}
+                {k.paused ? "▶ Open the Studio" : "⏹ Close the Studio"}
               </BigButton>
+              <span className="text-xs font-semibold text-slate-500">{k.paused ? "Closed — children can't get in" : "Open — anyone with the class code can get in"}</span>
             </div>
           </div>
         </Card>
 
         <Card className="min-w-[280px]">
-          <p className="text-sm font-bold text-slate-700">Unlocked modes</p>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            {(Object.keys(MODE_LABELS) as ModeId[]).map((m) => {
-              const on = k.modes.includes(m);
-              return (
-                <button
-                  key={m}
-                  onClick={() => patch({ modes: on ? k.modes.filter((x) => x !== m) : [...k.modes, m] })}
-                  className={cx("rounded-xl px-3 py-2 text-left text-sm font-bold ring-2 transition", on ? "bg-violet-600 text-white ring-violet-600" : "bg-white text-slate-600 ring-slate-200 hover:ring-violet-300")}
-                >
-                  {MODE_LABELS[m]}
-                </button>
-              );
-            })}
+          <p className="text-sm font-bold text-slate-700">Studios — all open</p>
+          <p className="mt-1 text-xs text-slate-500">Every class gets all eight studios; there is nothing to unlock. Use <b>Close the Studio</b> above to shut the whole class down, or mute one child on the roster.</p>
+          <div className="mt-2 flex flex-wrap gap-1">
+            {(Object.keys(MODE_LABELS) as ModeId[]).map((m) => (
+              <span key={m} className="rounded-lg bg-violet-50 px-2 py-1 text-xs font-bold text-violet-800">{MODE_LABELS[m]}</span>
+            ))}
           </div>
           <div className="mt-3 flex items-center justify-between text-sm">
             <span className="font-bold text-slate-700">Orders per child per session</span>
@@ -532,7 +525,7 @@ function ApprovalCard({ artifact, who, onDone }: { artifact: ArtifactMeta; who: 
  * ------------------------------------------------------------------ */
 
 function Roster({ detail, config, onChange }: { detail: ClassDetail; config: StudioConfig; onChange: () => void }) {
-  const [form, setForm] = useState({ nickname: "", avatar: config.avatars[0] ?? "🦊", pin: "", consentRecorded: false });
+  const [form, setForm] = useState({ nickname: "", avatar: config.avatars[0] ?? "🦊", consentRecorded: false });
   const [error, setError] = useState<string | null>(null);
   const classId = detail.class.id;
   const used = useMemo(() => new Set(detail.children.map((c) => c.avatar)), [detail.children]);
@@ -550,7 +543,7 @@ function Roster({ detail, config, onChange }: { detail: ClassDetail; config: Stu
   return (
     <Card>
       <h2 className="text-lg font-extrabold">Roster ({detail.children.length})</h2>
-      <p className="text-xs text-slate-500">Nicknames only, never real names. A child can sign in only after you record their consent form.</p>
+      <p className="text-xs text-slate-500">Nicknames only, never real names. Children join themselves with the class code — this list fills in as they do. Add someone here if you want their name waiting for them.</p>
       {error && <div className="mt-2"><Notice>{error}</Notice></div>}
       <ul className="mt-3 divide-y divide-slate-100">
         {detail.children.map((c) => (
@@ -563,7 +556,7 @@ function Roster({ detail, config, onChange }: { detail: ClassDetail; config: Stu
           e.preventDefault();
           void act(async () => {
             await fAddChild(classId, form);
-            setForm({ nickname: "", avatar: config.avatars.find((a) => !used.has(a) && a !== form.avatar) ?? config.avatars[0], pin: "", consentRecorded: false });
+            setForm({ nickname: "", avatar: config.avatars.find((a) => !used.has(a) && a !== form.avatar) ?? config.avatars[0], consentRecorded: false });
           });
         }}
       >
@@ -577,13 +570,12 @@ function Roster({ detail, config, onChange }: { detail: ClassDetail; config: Stu
         </div>
         <div className="flex gap-2">
           <input value={form.nickname} onChange={(e) => setForm({ ...form, nickname: e.target.value })} placeholder="Nickname (e.g. RocketFox)" className={inputCls} maxLength={20} />
-          <input value={form.pin} onChange={(e) => setForm({ ...form, pin: e.target.value.replace(/\D/g, "").slice(0, 4) })} placeholder="PIN" inputMode="numeric" className={cx(inputCls, "w-24 text-center font-mono")} />
         </div>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={form.consentRecorded} onChange={(e) => setForm({ ...form, consentRecorded: e.target.checked })} />
           I have the signed parent/guardian consent form for this child
         </label>
-        <BigButton type="submit" variant="secondary" className="!px-4 !py-2 !text-base" disabled={form.nickname.trim().length < 2 || form.pin.length !== 4}>
+        <BigButton type="submit" variant="secondary" className="!px-4 !py-2 !text-base" disabled={form.nickname.trim().length < 2}>
           Add to class
         </BigButton>
       </form>
@@ -592,7 +584,6 @@ function Roster({ detail, config, onChange }: { detail: ClassDetail; config: Stu
 }
 
 function RosterRow({ c, limit, classId, onAct }: { c: ChildSummary; limit: number; classId: number; onAct: (fn: () => Promise<unknown>) => Promise<void> }) {
-  const [pin, setPin] = useState("");
   return (
     <li className="flex flex-wrap items-center gap-2 py-2">
       <span className="text-2xl">{c.avatar}</span>
@@ -600,24 +591,11 @@ function RosterRow({ c, limit, classId, onAct }: { c: ChildSummary; limit: numbe
       <span className="text-xs text-slate-500">
         {c.ticketsUsed}/{limit} orders · {c.chatTurnsUsed} chats
       </span>
-      <span className={cx("rounded-full px-2 py-0.5 text-xs font-bold", c.consentRecorded ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800")}>{c.consentRecorded ? "Consent ✓" : "No consent — locked"}</span>
-      {c.pinLocked && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">PIN locked</span>}
+      <span className={cx("rounded-full px-2 py-0.5 text-xs font-bold", c.consentRecorded ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800")}>{c.consentRecorded ? "Consent ✓" : "No consent form yet"}</span>
       {c.muted && <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-bold text-slate-700">Muted</span>}
       <span className="ml-auto flex flex-wrap items-center gap-1">
         <SmallBtn onClick={() => onAct(() => fPatchChild(classId, c.id, { consentRecorded: !c.consentRecorded }))}>{c.consentRecorded ? "Remove consent" : "Record consent"}</SmallBtn>
         <SmallBtn onClick={() => onAct(() => fPatchChild(classId, c.id, { muted: !c.muted }))}>{c.muted ? "Unmute" : "Mute"}</SmallBtn>
-        {c.pinLocked && <SmallBtn onClick={() => onAct(() => fPatchChild(classId, c.id, { unlock: true }))}>Unlock</SmallBtn>}
-        <input value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="New PIN" inputMode="numeric" className="w-20 rounded-lg border border-slate-200 px-2 py-1 text-center font-mono text-sm" />
-        <SmallBtn
-          onClick={() =>
-            onAct(async () => {
-              if (pin.length === 4) await fPatchChild(classId, c.id, { pin });
-              setPin("");
-            })
-          }
-        >
-          Set
-        </SmallBtn>
         <button
           type="button"
           onClick={() => {
