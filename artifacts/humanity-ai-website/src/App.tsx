@@ -22,7 +22,8 @@ import Programs from "@/pages/programs";
 import Blog from "@/pages/blog";
 import BlogPostPage from "@/pages/blog-post";
 import Events from "@/pages/events";
-import AiForKidsEvent from "@/pages/ai-for-kids-event";
+// Be Ready for AI page hidden until the event is funded (2026-10-21).
+// Restore this import, its Route, the Shell exclusion and the sitemap entry in api-server routes.ts to bring it back.
 import AiHub from "@/pages/ai-hub";
 import Contact from "@/pages/contact";
 import Donate from "@/pages/donate";
@@ -50,7 +51,6 @@ function Router() {
       <Route path="/blog" component={Blog} />
       <Route path="/blog/:slug" component={BlogPostPage} />
       <Route path="/events" component={Events} />
-      <Route path="/aiforkids/bereadyforai" component={AiForKidsEvent} />
       <Route path="/ai-hub" component={AiHub} />
       <Route path="/contact" component={Contact} />
       <Route path="/donate" component={Donate} />
@@ -84,10 +84,7 @@ function Shell() {
     trackPageView(location);
   }, [location]);
 
-  if (
-    location.startsWith("/aiforkids") &&
-    !location.startsWith("/aiforkids/bereadyforai")
-  ) {
+  if (location.startsWith("/aiforkids")) {
     return <AiForKidsApp />;
   }
 
