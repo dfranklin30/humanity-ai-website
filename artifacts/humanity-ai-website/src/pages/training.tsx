@@ -23,6 +23,7 @@ import { CampaignMeter, type CampaignProgress } from "@/components/campaign-mete
 import jofiaPhoto from "@assets/image_1775903668936.png";
 import { VideoClipCard } from "@/components/video-clip";
 import { claudeHacksClips, type VideoClip } from "@/data/claude-hacks";
+import { podcastClips } from "@/data/podcast-clips";
 
 const fadeIn = {
   initial: { opacity: 0, y: 20 },
@@ -694,6 +695,27 @@ const learningModules: LearningModule[] = [
     ],
     requirements: "A Claude account (free tier works). No coding.",
     videos: claudeHacksClips,
+    icon: Video,
+  },
+  {
+    slug: "podcast-highlights",
+    title: "Humanity + AI Podcast Highlights",
+    subtitle: "One-minute moments from our conversations on human-centered AI",
+    provider: "Video series · Humanity + AI Podcasts, hosted by Danielle A. Franklin",
+    description:
+      "Short highlights from Humanity + AI Podcasts: our founder and guests on AI leadership, alignment, agents, ethics and keeping people at the center. Full episodes are on our Events page and YouTube channel.",
+    format: "Video series",
+    duration: `${podcastClips.length} clips · ~${podcastClips.reduce((n, c) => n + parseInt(c.duration, 10), 0)} min`,
+    level: "Beginner",
+    price: "Free",
+    tags: ["Podcast", "Human-Centered AI", "AI Leadership", "AI Ethics"],
+    outcomes: [
+      "Hear how leaders and practitioners think about human-centered AI",
+      "Pick up one idea per minute you can bring to your own team",
+      "Find the full episode behind any clip that sparks your interest",
+    ],
+    requirements: "Nothing but a few minutes.",
+    videos: podcastClips,
     icon: Video,
   },
   {
