@@ -14,6 +14,19 @@ import {
   passwordResetTokens, type PasswordResetToken,
 } from "@workspace/db";
 
+// Cancelled events, matched on their natural key (title prefix + date). They
+// are hidden from every listing and refuse new sign-ups, but the row is NOT
+// deleted: event_signups cascades on delete, and the registrations for a
+// cancelled event are kept so they can still be followed up.
+const CANCELLED_EVENTS: { titlePrefix: string; date: string }[] = [
+  // 2026-10-23 podcast with Doug Loyo: cancelled, guest never confirmed.
+  { titlePrefix: "Humanity + AI Podcasts: Running an AI Startup from Orlando", date: "2026-10-23" },
+];
+
+function isCancelledEvent(e: Pick<Event, "title" | "date">): boolean {
+  return CANCELLED_EVENTS.some((c) => e.date === c.date && e.title.startsWith(c.titlePrefix));
+}
+
 export type CreateUserDb = Omit<InsertUser, "password"> & { password: string };
 export type ProfileUpdate = Partial<Pick<User, "displayName" | "fullName" | "bio" | "title" | "organization" | "avatarUrl">>;
 export type PostUpdate = Partial<Omit<InsertBlogPost, "authorId">>;
@@ -249,12 +262,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getEvents(): Promise<Event[]> {
-    return db.select().from(events).orderBy(desc(events.createdAt));
+    const rows = await db.select().from(events).orderBy(desc(events.createdAt));
+    return rows.filter((e) => !isCancelledEvent(e));
   }
 
   async getEventById(id: number): Promise<Event | undefined> {
     const [e] = await db.select().from(events).where(eq(events.id, id));
-    return e;
+    return e && !isCancelledEvent(e) ? e : undefined;
   }
 
   /** Look an event up by its natural key, for clients holding a stale id. */
@@ -264,7 +278,7 @@ export class DatabaseStorage implements IStorage {
       .from(events)
       .where(and(eq(events.title, title), eq(events.date, date)))
       .limit(1);
-    return e;
+    return e && !isCancelledEvent(e) ? e : undefined;
   }
 
   async createEvent(event: InsertEvent): Promise<Event> {
