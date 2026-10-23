@@ -630,20 +630,6 @@ Read the full piece on JourneyBytes.`,
       speakerProfileUrl: "/about/board/william-zhu",
     },
     {
-      title: "Humanity + AI Podcasts: Running an AI Startup from Orlando \u2014 feat. Doug Loyo",
-      description: "Danielle Franklin sits down with Doug Loyo, CEO and co-founder of Developers.Net, for a conversation about building an AI company from Orlando, Florida. Doug is an entrepreneur who still ships code: he co-founded Developers.Net in 2017 after failing to hire the engineers he needed locally, and built it into a nearshore software development firm that places vetted engineering talent across Latin America. He is also co-founder of Patients Eye and spent three years as a senior solutions architect with the Michael & Susan Dell Foundation. Expect a practical conversation about what it actually takes to start and run a successful AI startup outside the usual tech hubs, how AI is changing the way small teams build software, and why working in the same timezone still beats working around the clock.",
-      date: "2026-10-23",
-      time: "5:00 PM Eastern",
-      location: "Online \u2014 Join Virtually",
-      type: "Podcast",
-      imageUrl: "/uploads/doug-loyo-tlcast.png",
-      secondaryImageUrl: null,
-      link: null,
-      recordingUrl: null,
-      speakerName: "Doug Loyo",
-      speakerProfileUrl: "https://www.linkedin.com/in/douglasloyo",
-    },
-    {
       title: "AI Build Club: How We AI - Demo Night!",
       description: "An in-person AI demo night hosted and sponsored by Prefect at their Downtown DC headquarters. Three hand-selected builders from the DMV take the floor to show what they've built with AI - an agent, a shipped product, or a workflow that saves hours every week. Grab food, meet fellow creators, and leave with ideas you can actually explore. Whether you're AI-curious or already building, you'll fit right in.",
       date: "2026-07-30",
@@ -872,7 +858,6 @@ Read the full piece on JourneyBytes.`,
     // The live, multi-person follow-on to Claude Hacks (which ended at Ep. 05
     // as solo recordings), so the numbering continues rather than restarting.
     // Fridays 5pm ET, Sept 18 - Dec 18. Nov 27 is skipped (Thanksgiving).
-    // Ep. 11 is the Doug (developers.net) guest episode and runs 15 min longer.
     {
       title: "Humanity + AI Quick Hacks Ep. 07 — Prompting That Survives Contact With Reality",
       description: "The gap between a prompt that works once and instructions that work every time. We take a request someone on the team actually sends every week and turn it into something repeatable — with examples, constraints, and a way to tell when it has gone wrong. Bring a task you have explained to an AI more than twice.",
