@@ -279,6 +279,17 @@ export const aikConfig = {
   videoShots: Math.min(Math.max(Number(env.AIK_VIDEO_SHOTS) || 3, 1), 4),
   videoShotSeconds: 4,
   videoSize: env.AIK_VIDEO_SIZE || "1280x720",
+  /**
+   * Hero fidelity. Each shot starts from a screened still drawn from the hero's
+   * portrait (or from shot 1's still when there is no hero), so the video model
+   * animates one character instead of re-imagining it per shot. Turn off with
+   * AIK_VIDEO_REFERENCE=false if a provider rejects reference images.
+   */
+  videoReference: env.AIK_VIDEO_REFERENCE !== "false",
+  /** After filming, a vision model compares each shot's character with the reference. */
+  fidelityCheck: env.AIK_FIDELITY_CHECK !== "false",
+  /** 0-10. A shot scoring below this gets one retake. */
+  fidelityMin: Math.min(Math.max(Number(env.AIK_FIDELITY_MIN) || 6, 0), 10),
   ffmpeg: env.AIK_FFMPEG || "ffmpeg",
   kidsVerifyGames: env.AIK_KIDS_VERIFY_GAMES !== "false",
   /** Characters per narrated page; keeps a six-page book readable aloud in about two minutes. */

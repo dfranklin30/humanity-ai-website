@@ -362,7 +362,16 @@ async function imageFromResponse(data: any, model: string): Promise<MediaResult>
   throw new Error("OSS image: no image returned");
 }
 
-export type VideoOptions = { seconds?: number; size?: string };
+export type VideoOptions = {
+  seconds?: number;
+  size?: string;
+  /**
+   * A screened still (base64 PNG) the shot starts from, so the character on
+   * screen is the one already drawn rather than a fresh guess from words.
+   * Providers that refuse a reference fall back to the text prompt.
+   */
+  reference?: string;
+};
 
 export async function generateVideo(prompt: string, options: VideoOptions = {}): Promise<MediaResult> {
   if (aikConfig.mockAI) return { base64: MOCK_MP4, mime: "video/mp4", provider: "mock", model: "mock" };
@@ -398,21 +407,54 @@ async function generateVideoJobApi(prompt: string, options: VideoOptions): Promi
     "api-key": videoApiKey,
   };
 
-  const start = await fetchMediaWithRetry(
-    withApiVersion(`${videoBaseUrl}/videos`),
-    {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        model: videoModel,
-        prompt,
-        seconds,
-        size,
-      }),
-    },
-    120_000,
-    "video",
-  );
+  const submitJson = () =>
+    fetchMediaWithRetry(
+      withApiVersion(`${videoBaseUrl}/videos`),
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          model: videoModel,
+          prompt,
+          seconds,
+          size,
+        }),
+      },
+      120_000,
+      "video",
+    );
+
+  let start: Response;
+  if (options.reference) {
+    // Image-to-video: the reference goes up as `input_reference`, multipart,
+    // sized exactly to the frame (Sora rejects a mismatched reference).
+    const [w, h] = size.split("x").map(Number);
+    const { default: sharp } = await import("sharp");
+    const png = await sharp(Buffer.from(options.reference, "base64"))
+      .resize(w || 1280, h || 720, { fit: "cover" })
+      .png()
+      .toBuffer();
+    const form = new FormData();
+    form.append("model", videoModel);
+    form.append("prompt", prompt);
+    form.append("seconds", seconds);
+    form.append("size", size);
+    form.append("input_reference", new Blob([new Uint8Array(png)], { type: "image/png" }), "reference.png");
+    start = await fetchMediaWithRetry(
+      withApiVersion(`${videoBaseUrl}/videos`),
+      { method: "POST", headers: { authorization: headers.authorization, "api-key": headers["api-key"] }, body: form },
+      120_000,
+      "video",
+    );
+    if (!start.ok && start.status >= 400 && start.status < 500 && start.status !== 429) {
+      const why = (await start.text().catch(() => "")).slice(0, 300);
+      if (/content|policy|safety|moderat/i.test(why)) throw new ContentFilteredError(why);
+      logger.warn({ status: start.status, why }, "[aik] video reference refused; filming from the text prompt");
+      start = await submitJson();
+    }
+  } else {
+    start = await submitJson();
+  }
   if (!start.ok) throw new Error(`Video submit ${start.status}: ${(await start.text().catch(() => "")).slice(0, 300)}`);
   const job: any = await start.json();
   const jobId = job?.id;
@@ -706,6 +748,8 @@ function mockText(opts: TextCallOptions): string {
       return mockLanguageBook();
     case "langcheck":
       return mockLanguageCheck(opts.user ?? "");
+    case "fidelity":
+      return JSON.stringify({ same: true, score: 8, differences: "" });
     // Remix workflow: a filled form for whatever tool was asked, and a few ideas.
     case "remix": {
       const keys = [...(opts.user ?? "").matchAll(/"key":"([a-z_]+)"/g)].map((m) => m[1]);

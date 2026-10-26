@@ -111,7 +111,7 @@ export function GameFrame({ html, title, tall }: { html: string; title: string; 
  * Artifact viewers
  * ------------------------------------------------------------------ */
 
-export function ArtifactView({ artifact, compact }: { artifact: Artifact; compact?: boolean }) {
+export function ArtifactView({ artifact, compact, showFidelity }: { artifact: Artifact; compact?: boolean; /** Staff only: the hero-consistency check for movies. */ showFidelity?: boolean }) {
   if (artifact.kind === "hero") {
     let hero: Hero | null = null;
     try {
@@ -211,6 +211,7 @@ export function ArtifactView({ artifact, compact }: { artifact: Artifact; compac
             {movie.style && <span className="text-xs text-slate-500">Look: {movie.style}</span>}
           </div>
         )}
+        {showFidelity && movie.fidelity && <FidelityPanel report={movie.fidelity} />}
       </div>
     );
   }
@@ -1026,6 +1027,34 @@ export function FilesList({ files, title = "Files", dense }: { files: FileLink[]
           <div className="mt-1.5 flex flex-wrap gap-1.5">{parts.map(link)}</div>
         </details>
       )}
+    </div>
+  );
+}
+
+/** Staff view of the hero-consistency check: one line per shot, with what drifted. */
+function FidelityPanel({ report }: { report: NonNullable<Movie["fidelity"]> }) {
+  if (!report.checked) {
+    return <p className="text-xs text-slate-500">Hero consistency: the check could not run for this movie.</p>;
+  }
+  const tone = (n: number | null) => (n === null ? "text-slate-500" : n >= report.threshold ? "text-emerald-700" : "text-amber-700");
+  return (
+    <div className="rounded-2xl bg-slate-50 p-3 text-sm ring-1 ring-slate-200">
+      <p className="font-bold">
+        Hero consistency: <span className={tone(report.average)}>{report.average ?? "–"}/10</span>
+        <span className="ml-2 text-xs font-normal text-slate-500">
+          compared with the {report.reference}
+          {report.retakes ? ` · ${report.retakes} shot${report.retakes === 1 ? "" : "s"} re-filmed` : ""}
+        </span>
+      </p>
+      <ul className="mt-1 space-y-0.5">
+        {report.shots.map((sh) => (
+          <li key={sh.shot} className="text-xs">
+            Shot {sh.shot}: <span className={`font-semibold ${tone(sh.score)}`}>{sh.score ?? "not checked"}{sh.score !== null ? "/10" : ""}</span>
+            {sh.differences ? <span className="text-slate-600"> · {sh.differences}</span> : null}
+            {sh.take > 1 ? <span className="text-slate-500"> (retake)</span> : null}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

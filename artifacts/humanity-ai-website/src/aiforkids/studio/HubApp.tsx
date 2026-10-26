@@ -67,6 +67,7 @@ import ClaudeConsole from "../ClaudeConsole";
 import { LibraryTab, RemixInto, RemixTab, type OpenTool, type ToolStart } from "./RemixWorkflow";
 import { FilesList } from "./components";
 import { HubMap, LoungeFinder, MenuAssist } from "./HubExtras";
+import { ToolDrawer, ToolDrawerButtons, autoSaveName, readAutosave, writeAutosave, type DrawerTab } from "./ToolSidePanels";
 
 const STAFF_FIELD_CHARS = 1200;
 const STAFF_CHAT_CHARS = 4000;
@@ -399,9 +400,38 @@ function HubShell() {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>(saved.tab ?? "remix");
   const [tool, setToolState] = useState<{ id: ModeId; start?: ToolStart } | null>(saved.tool ?? null);
-  const setTool = (id: ModeId | null) => setToolState(id ? { id } : null);
-  const openTool: OpenTool = (id, start) => setToolState({ id, start });
-  const [projectId, setProjectId] = useState<number | null>(saved.projectId ?? null);
+  const [projectId, setProjectIdState] = useState<number | null>(saved.projectId ?? null);
+
+  /*
+   * The browser's Back button. A tool or a project is drawn inside the Hub
+   * page, so without a history entry of its own, Back left the Hub entirely
+   * and landed on the sign-in screen, which looked like being logged out.
+   * Opening a tool or project now pushes an entry; Back pops it and returns to
+   * the dashboard. A view restored after a reload gets its entry too.
+   */
+  const pushInner = () => {
+    try {
+      if (window.history.state?.aikHub !== "inner") window.history.pushState({ ...(window.history.state ?? {}), aikHub: "inner" }, "");
+    } catch {
+      /* history unavailable: the on-screen back button still works */
+    }
+  };
+  const setTool = (id: ModeId | null) => {
+    if (id) pushInner();
+    setToolState(id ? { id } : null);
+  };
+  const openTool: OpenTool = (id, start) => {
+    pushInner();
+    setToolState({ id, start });
+  };
+  const setProjectId = (id: number | null) => {
+    if (id !== null) pushInner();
+    setProjectIdState(id);
+  };
+  useEffect(() => {
+    if (saved.tool || saved.projectId != null) pushInner();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // Remember where you are, so a reload or a fresh sign-in lands back here.
   useEffect(() => {
     writeView({ tab, tool, projectId });
@@ -420,6 +450,27 @@ function HubShell() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    const onPop = () => {
+      setToolState(null);
+      setProjectIdState(null);
+      void load();
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [load]);
+
+  /** On-screen "back to dashboard": the same as the browser's Back, so the two never disagree. */
+  const backToDashboard = () => {
+    if (window.history.state?.aikHub === "inner") {
+      window.history.back();
+      return;
+    }
+    setToolState(null);
+    setProjectIdState(null);
+    void load();
+  };
+
   if (error) return <Notice>{error}</Notice>;
   if (!state) return <Spinner label="Opening your workspace…" />;
 
@@ -432,13 +483,10 @@ function HubShell() {
         mode={activeTool}
         start={tool!.start}
         onOpenTool={openTool}
-        onBack={() => {
-          setToolState(null);
-          void load();
-        }}
+        onBack={backToDashboard}
       />
     );
-  if (projectId !== null) return <ProjectView id={projectId} projects={state.projects} onBack={() => { setProjectId(null); void load(); }} />;
+  if (projectId !== null) return <ProjectView id={projectId} projects={state.projects} onBack={backToDashboard} />;
 
   return (
     <div className="space-y-6">
@@ -688,17 +736,62 @@ function FileItBar({
   projects,
   onRefresh,
   onFiled,
+  autoSave,
+  onAutoSaveChange,
+  autoName,
+  skipAuto,
 }: {
   artifact: Artifact;
   projects: Project[];
   onRefresh: () => Promise<Project[]>;
   onFiled: (projectName: string) => void;
+  /** On by default: a new piece files itself under `autoName` the moment it exists. */
+  autoSave: boolean;
+  onAutoSaveChange: (on: boolean) => void;
+  autoName: string;
+  /** The piece was already filed (e.g. a remix started inside a project). */
+  skipAuto: boolean;
 }) {
   const [target, setTarget] = useState<FileTarget>(projects[0]?.id ?? "__unfiled__");
   const [newName, setNewName] = useState("");
   const [busy, setBusy] = useState(false);
   const [filedTo, setFiledTo] = useState<string | null>(null);
+  const [autoFiled, setAutoFiled] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const autoDone = useRef<number | null>(null);
+
+  // Auto-save: find or make the project named `autoName`, then file the piece there.
+  useEffect(() => {
+    if (!autoSave || skipAuto || autoDone.current === artifact.id) return;
+    autoDone.current = artifact.id;
+    let gone = false;
+    void (async () => {
+      setBusy(true);
+      setError(null);
+      try {
+        const fresh = (await onRefresh().catch(() => null)) ?? projects;
+        const existing = fresh.find((p) => p.name === autoName);
+        const projectId = existing ? existing.id : (await hubCreateProject({ name: autoName, summary: "Saved automatically from the Hub tools." })).project.id;
+        await hubFileArtifact(artifact.id, projectId);
+        if (gone) return;
+        clearDraft();
+        setFiledTo(autoName);
+        setAutoFiled(true);
+        onFiled(autoName);
+        await onRefresh().catch(() => null);
+      } catch (err) {
+        if (!gone) setError(err instanceof ApiError ? `Auto-save didn't work: ${err.message}` : "Auto-save didn't work. Choose where to file it below.");
+      } finally {
+        if (!gone) setBusy(false);
+      }
+    })();
+    return () => {
+      gone = true;
+    };
+    // Runs once per new piece. Filing flips `skipAuto` in the parent; that must
+    // not cancel the save in flight, so only a new piece re-runs this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [artifact.id]);
 
   // A project made in another tab, or on the Projects screen, has to show up
   // here without a reload — otherwise the dropdown quietly lies.
@@ -762,14 +855,22 @@ function FileItBar({
     }
   }
 
+  const autoToggle = (
+    <label className="flex items-center gap-2 text-sm text-slate-700">
+      <input type="checkbox" checked={autoSave} onChange={(e) => onAutoSaveChange(e.target.checked)} className="h-4 w-4 accent-violet-700" />
+      Auto-save new work
+    </label>
+  );
+
   if (filedTo) {
     return (
       <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4 text-sm">
-        <span className="font-semibold text-emerald-700">Filed ✓</span>
-        <span className="text-slate-600">in {filedTo}</span>
+        <span className="font-semibold text-emerald-700">{autoFiled ? "Auto-saved ✓" : "Filed ✓"}</span>
+        <span className="text-slate-600">in “{filedTo}”</span>
         <button onClick={() => setFiledTo(null)} className="font-semibold text-violet-700 underline underline-offset-2">
           File somewhere else
         </button>
+        <span className="ml-auto">{autoToggle}</span>
       </div>
     );
   }
@@ -816,6 +917,7 @@ function FileItBar({
         <BigButton className="!px-3 !py-1.5 !text-sm" disabled={disabled} onClick={() => void file()}>
           {busy ? "Filing…" : target === "__new__" ? "Create & file" : "File it"}
         </BigButton>
+        <span className="ml-auto">{autoToggle}</span>
       </div>
 
       {why && <p className="mt-2 text-sm text-slate-600">{why}</p>}
@@ -840,6 +942,15 @@ function ToolRunner({ state, mode, onBack, start, onOpenTool }: { state: HubStat
   const [projects, setProjects] = useState<Project[]>(state.projects);
   const [filed, setFiled] = useState(false);
   const [restored, setRestored] = useState(false);
+  const [drawer, setDrawer] = useState<DrawerTab | null>(null);
+  const [saveName, setSaveName] = useState("");
+  const [autoSave, setAutoSaveState] = useState<boolean>(readAutosave);
+  const setAutoSave = (on: boolean) => {
+    setAutoSaveState(on);
+    writeAutosave(on);
+  };
+  const heroTitle = remix?.sourceKind === "hero" ? remix.sourceTitle : null;
+  const defaultSaveName = autoSaveName({ typed: "", heroTitle, pieceTitle: "", toolName: mode.name });
 
   /** The dropdown must never be stale: a project made elsewhere has to appear here. */
   const refreshProjects = useCallback(async () => {
@@ -931,14 +1042,16 @@ function ToolRunner({ state, mode, onBack, start, onOpenTool }: { state: HubStat
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <BigButton variant="ghost" onClick={onBack} className="!px-3 !py-1.5 !text-sm">
-            ← All tools
+            ← Back to dashboard
           </BigButton>
           <h1 className="mt-2 text-2xl font-extrabold">
             {TOOL_ICON[mode.id]} {mode.name}
           </h1>
           <p className="max-w-2xl text-sm text-slate-600">{STAFF_BLURB[mode.id] ?? mode.blurb}</p>
         </div>
+        <ToolDrawerButtons busy={busy} onOpen={setDrawer} />
       </div>
+      {drawer && <ToolDrawer tab={drawer} onTab={setDrawer} onClose={() => setDrawer(null)} busy={busy} />}
 
       {error && <Notice>{error}</Notice>}
 
@@ -966,6 +1079,23 @@ function ToolRunner({ state, mode, onBack, start, onOpenTool }: { state: HubStat
                   </button>
                 </div>
               )}
+              <div className="mb-4 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200">
+                <label htmlFor="save-as" className="block text-sm font-semibold text-slate-700">
+                  Name this work <span className="font-normal text-slate-500">(optional)</span>
+                </label>
+                <input
+                  id="save-as"
+                  value={saveName}
+                  maxLength={80}
+                  onChange={(e) => setSaveName(e.target.value)}
+                  placeholder={heroTitle ? `Leave blank to save as “${defaultSaveName}”` : "Leave blank to save it under the piece's own title"}
+                  className="mt-1 w-full rounded-xl border-2 border-slate-200 px-3 py-2 text-sm focus:border-violet-500 focus:outline-none"
+                />
+                <label className="mt-2 flex items-center gap-2 text-xs text-slate-600">
+                  <input type="checkbox" checked={autoSave} onChange={(e) => setAutoSave(e.target.checked)} className="h-4 w-4 accent-violet-700" />
+                  Auto-save into a project with this name (on by default)
+                </label>
+              </div>
               <ModeForm key={remix ? `remix-${remix.remixFrom}` : "blank"} mode={mode} maxChars={STAFF_FIELD_CHARS} busy={busy} initialValues={remix?.values} onSubmit={(v) => void run("create", v)} submitLabel={remix ? "Remix it" : "Run it"} />
             </Card>
           )}
@@ -1110,7 +1240,7 @@ function ToolRunner({ state, mode, onBack, start, onOpenTool }: { state: HubStat
                 </h2>
                 <span className="text-xs font-semibold text-slate-500">v{artifact.version}</span>
               </div>
-              <ArtifactView artifact={artifact} />
+              <ArtifactView artifact={artifact} showFidelity />
               {files.length > 0 && (
                 <div className="mt-4 border-t border-slate-100 pt-4">
                   <FilesList files={files} title="Saved files: open or download" />
@@ -1126,6 +1256,10 @@ function ToolRunner({ state, mode, onBack, start, onOpenTool }: { state: HubStat
                 projects={projects}
                 onRefresh={refreshProjects}
                 onFiled={() => setFiled(true)}
+                autoSave={autoSave}
+                onAutoSaveChange={setAutoSave}
+                autoName={autoSaveName({ typed: saveName, heroTitle, pieceTitle: artifact.title, toolName: mode.name })}
+                skipAuto={filed || Boolean(remix?.projectId)}
               />
             </Card>
           )}
