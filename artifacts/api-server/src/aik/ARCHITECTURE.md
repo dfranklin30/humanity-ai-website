@@ -68,7 +68,7 @@ What changed is what the studios deliver at the end of it:
 | Studio | Before | Now |
 |---|---|---|
 | Story Maker | a six-panel comic script to draw yourself | a picture book: cover + 6 illustrated pages, same hero throughout, narrated, flip-book viewer, PDF (`book.ts`, `bookpdf.ts`) |
-| Video Maker | a storyboard and, sometimes, one portrait clip | three Sora shots cut behind a title card with narration into one landscape MP4; every frame screened (`movie.ts`, `ffmpeg.ts`) |
+| Video Maker | a storyboard and, sometimes, one portrait clip | three Sora shots (8 s each by default, `AIK_VIDEO_SHOT_SECONDS`) cut behind a title card with narration into one landscape MP4; every frame screened (`movie.ts`, `ffmpeg.ts`) |
 | Music Maker | a tune that ignored the words | a song that sings the child's own lyrics, with a download |
 | Game Maker (children) | one model call, shipped unverified | plan → build → run → repair, same checker the Hub uses (`forge.ts` light mode) |
 

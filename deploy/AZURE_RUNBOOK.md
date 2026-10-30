@@ -67,6 +67,7 @@ az containerapp update -g $RG -n $APP --set-env-vars \
   AIK_TTS_PROVIDER=azure AIK_AZURE_SPEECH_KEY=secretref:aik-safety-key AIK_AZURE_SPEECH_REGION=eastus2 \
   AIK_IMAGE_PROVIDER=oss AIK_OSS_IMAGE_BASE_URL=https://danielle-4273-resource.openai.azure.com/openai/v1 AIK_OSS_IMAGE_MODEL=flux2-flex AIK_OSS_IMAGE_API_KEY=secretref:foundry-api-key \
   AIK_VIDEO_PROVIDER=oss AIK_OSS_VIDEO_BASE_URL=https://danielle-4273-resource.openai.azure.com/openai/v1 AIK_OSS_VIDEO_MODEL=sora-2 AIK_OSS_VIDEO_API_KEY=secretref:foundry-api-key \
+  AIK_VIDEO_SHOTS=3 AIK_VIDEO_SHOT_SECONDS=8 AIK_VIDEO_SIZE=1280x720 \
   AIK_MUSIC_PROVIDER=elevenlabs AIK_ELEVENLABS_API_KEY=secretref:elevenlabs-api-key \
   AIK_MEDIA_ACCOUNT=sthumanityplusai AIK_MEDIA_CONTAINER=aik-media \
   AIK_CEILING_USER_DAILY=5 AIK_CEILING_ORG_MONTHLY=150

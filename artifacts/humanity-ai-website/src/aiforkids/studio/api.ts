@@ -130,7 +130,10 @@ export type LangBlock = {
 };
 /** A finished movie, as Video Maker stores it. */
 export type MovieShot = { shot: number; description: string; seconds: number; videoPrompt: string; clip?: string };
-export type Movie = { format: "movie"; title: string; style: string; shots: MovieShot[]; movie?: string; narration?: string; madeWith: { shots: boolean; narration: boolean; cut: boolean } };
+export type ShotFidelity = { shot: number; score: number | null; same: boolean | null; differences: string; take: number };
+/** How faithfully each shot kept the main character (server: aik/fidelity.ts). */
+export type FidelityReport = { checked: boolean; reference: "hero portrait" | "first shot" | "none"; threshold: number; shots: ShotFidelity[]; average: number | null; retakes: number };
+export type Movie = { format: "movie"; title: string; style: string; shots: MovieShot[]; movie?: string; narration?: string; madeWith: { shots: boolean; narration: boolean; cut: boolean }; fidelity?: FidelityReport };
 
 export type PublicClass = {
   id: number;

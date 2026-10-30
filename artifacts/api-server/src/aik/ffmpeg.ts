@@ -66,9 +66,12 @@ export async function withWorkDir<T>(fn: (dir: string) => Promise<T>): Promise<T
  * unchecked just because it moves.
  */
 export async function extractFrames(dir: string, clipFile: string, fps = 1): Promise<Buffer[]> {
-  const pattern = path.join(dir, `${path.basename(clipFile, path.extname(clipFile))}-frame-%03d.jpg`);
+  const stem = path.basename(clipFile, path.extname(clipFile));
+  const pattern = path.join(dir, `${stem}-frame-%03d.jpg`);
   await run(["-i", clipFile, "-vf", `fps=${fps},scale=512:-2`, "-q:v", "4", pattern], 60_000, dir);
-  const files = (await readdir(dir)).filter((f) => f.includes("-frame-") && f.endsWith(".jpg")).sort();
+  // Only this clip's frames: the work dir holds every shot's frames, and the
+  // hero-fidelity check needs the middle frame of THIS shot, not of all of them.
+  const files = (await readdir(dir)).filter((f) => f.startsWith(`${stem}-frame-`) && f.endsWith(".jpg")).sort();
   return Promise.all(files.map((f) => readFile(path.join(dir, f))));
 }
 

@@ -34,9 +34,10 @@ import { putMedia, type MediaRef } from "./media";
 import { contentSafetyImage, type Flag } from "./safety";
 import { drawScreened } from "./book";
 import { ffmpegAvailable, withWorkDir, extractFrames, cutMovie, ensureAudioTrack } from "./ffmpeg";
+import { scoreFrame, summarise, middleFrame, type FidelityReport, type ShotFidelity } from "./fidelity";
 import { logger } from "../lib/logger";
 
-export type Shot = { shot: number; description: string; seconds: number; videoPrompt: string; clip?: MediaRef };
+export type Shot = { shot: number; description: string; seconds: number; videoPrompt: string; clip?: MediaRef; keyframe?: MediaRef };
 
 export type Movie = {
   format: "movie";
@@ -49,6 +50,8 @@ export type Movie = {
   /** The painted title-card picture (also the movie's poster). */
   poster?: MediaRef;
   madeWith: { shots: boolean; narration: boolean; cut: boolean };
+  /** How faithfully each shot kept the main character (see fidelity.ts). */
+  fidelity?: FidelityReport;
 };
 
 const NO_TEXT = "No text, no words, no letters, no real people, no logos, no scary moments. Bright, kid-friendly.";
@@ -61,6 +64,12 @@ export function shotPrompt(style: string, shot: { videoPrompt: string }, heroLoo
   // A hero from the Remix workflow is described in every shot, so all three shots film the same character.
   const hero = heroLook ? ` The main character, exactly the same in every shot: ${heroLook}.` : "";
   return `${shot.videoPrompt}${hero} ${style} style, ${FILM_QUALITY}. Smooth gentle camera motion, one continuous shot. ${NO_TEXT}`;
+}
+
+/** The still a shot starts from: drawn in the book's words, from the hero's portrait when there is one. */
+function keyframePrompt(style: string, scene: string, heroLook?: string | null): string {
+  const hero = heroLook ? ` The main character: ${heroLook}. Exactly the same character as the reference picture.` : " Keep the main character exactly the same as the reference picture, if one is given.";
+  return `${style} children's picture-book illustration, the opening frame of one shot of a short animated film.${hero} Scene: ${scene}. Wide 16:9 composition, ${FILM_QUALITY}. ${NO_TEXT}`;
 }
 
 function posterPrompt(style: string, title: string, firstShot: string, heroLook?: string | null): string {
@@ -115,25 +124,53 @@ export async function buildMovie(opts: {
           .catch(() => null)
       : Promise.resolve(null);
 
+    /* 0. Keyframes: one screened still per shot, drawn from the hero, so every
+          shot animates the same character instead of re-imagining it. ----- */
+    const keyframes: (string | null)[] = movie.shots.map(() => null);
+    if (aikConfig.videoReference && isImageConfigured()) {
+      steps.begin("keyframes", opts.heroPortraitPng ? "Drawing the hero into each shot" : "Drawing the opening frame of each shot");
+      const draw = (i: number, ref: string | undefined) => drawScreened(keyframePrompt(style, movie.shots[i].description, opts.heroLook), ref, flags);
+      const results: Awaited<ReturnType<typeof draw>>[] = [];
+      if (opts.heroPortraitPng) {
+        results.push(...(await Promise.all(movie.shots.map((_, i) => draw(i, opts.heroPortraitPng!)))));
+      } else {
+        // No hero: shot 1's still becomes the character reference for the rest.
+        results.push(await draw(0, undefined));
+        const first = results[0].png ?? undefined;
+        results.push(...(await Promise.all(movie.shots.slice(1).map((_, i) => draw(i + 1, first)))));
+      }
+      if (results.some((r) => r.blocked)) {
+        steps.end("keyframes", "failed", "a picture was refused");
+        return { ok: false, blocked: true, message: "One of the shots wasn't right for the club. Try a different idea!", flags, steps: steps.all() };
+      }
+      results.forEach((r, i) => (keyframes[i] = r.png));
+      const drawn = keyframes.filter(Boolean).length;
+      for (let i = 0; i < keyframes.length; i++) {
+        const k = keyframes[i];
+        if (k) movie.shots[i].keyframe = await putMedia(requestId, `keyframe${i + 1}.png`, Buffer.from(k, "base64"), "image/png");
+      }
+      steps.end("keyframes", drawn ? "done" : "skipped", `${drawn} of ${movie.shots.length}`);
+    }
+
+    const film = async (s: Shot, i: number): Promise<Buffer | null> => {
+      // A shot that times out or hits a transient provider error gets one more take;
+      // a shot the provider refuses on content grounds does not.
+      for (let take = 1; take <= 2; take++) {
+        try {
+          const m = await generateVideo(shotPrompt(movie.style, s, opts.heroLook), { seconds: s.seconds, size: aikConfig.videoSize, reference: keyframes[i] ?? undefined });
+          return Buffer.from(m.base64, "base64");
+        } catch (err) {
+          if (err instanceof ContentFilteredError) throw err;
+          logger.warn({ requestId, shot: s.shot, take, err: String((err as Error)?.message ?? err).slice(0, 200) }, "[aik] shot failed");
+        }
+      }
+      return null;
+    };
+
     steps.begin("shots", `Filming ${movie.shots.length} shot${movie.shots.length === 1 ? "" : "s"}`);
     let clips: (Buffer | null)[];
     try {
-      clips = await Promise.all(
-        movie.shots.map(async (s) => {
-          // A shot that times out or hits a transient provider error gets one more take;
-          // a shot the provider refuses on content grounds does not.
-          for (let take = 1; take <= 2; take++) {
-            try {
-              const m = await generateVideo(shotPrompt(movie.style, s, opts.heroLook), { seconds: s.seconds, size: aikConfig.videoSize });
-              return Buffer.from(m.base64, "base64");
-            } catch (err) {
-              if (err instanceof ContentFilteredError) throw err;
-              logger.warn({ requestId, shot: s.shot, take, err: String((err as Error)?.message ?? err).slice(0, 200) }, "[aik] shot failed");
-            }
-          }
-          return null;
-        }),
-      );
+      clips = await Promise.all(movie.shots.map((s, i) => film(s, i)));
     } catch (err) {
       if (!(err instanceof ContentFilteredError)) throw err;
       flags.push({ layer: "content_safety", category: "provider_filter" });
@@ -146,6 +183,66 @@ export async function buildMovie(opts: {
       return { ok: true, movie, steps: steps.all(), flags, kidNote: "Here's your storyboard! The clips didn't come out this time; try once more later." };
     }
 
+    /* 1b. Hero fidelity: same character in every shot? ---------------- */
+    const framesOf = new Map<number, Buffer[]>();
+    const pullFrames = async (i: number, clip: Buffer, tag: string): Promise<Buffer[]> => {
+      if (!canCut) return [];
+      const { writeFile } = await import("node:fs/promises");
+      const path = await import("node:path");
+      const f = path.join(dir, `${tag}-${i + 1}.mp4`);
+      await writeFile(f, clip);
+      return extractFrames(dir, f, 1).catch(() => []);
+    };
+    const refPng = opts.heroPortraitPng ?? keyframes[0] ?? null;
+    if (aikConfig.fidelityCheck && canCut && refPng) {
+      steps.begin("fidelity", "Checking the hero looks the same in every shot");
+      const ref = Buffer.from(refPng, "base64");
+      const results: ShotFidelity[] = [];
+      let retakes = 0;
+      for (let i = 0; i < clips.length; i++) {
+        const clip = clips[i];
+        if (!clip) continue;
+        const frames = await pullFrames(i, clip, "raw");
+        framesOf.set(i, frames);
+        const mid = middleFrame(frames);
+        if (!mid) continue;
+        let best = await scoreFrame({ referencePng: ref, frameJpg: mid, look: opts.heroLook, shot: i + 1, take: 1, requestId });
+        if (best.score !== null && best.score < aikConfig.fidelityMin) {
+          // One retake for a shot that drifted; keep whichever take is closer.
+          retakes++;
+          // A refused or failed retake just means the first take stands.
+          const again = await film(movie.shots[i], i).catch(() => null);
+          if (again) {
+            const frames2 = await pullFrames(i, again, "retake");
+            const mid2 = middleFrame(frames2);
+            if (mid2) {
+              const second = await scoreFrame({ referencePng: ref, frameJpg: mid2, look: opts.heroLook, shot: i + 1, take: 2, requestId });
+              if ((second.score ?? -1) > (best.score ?? -1)) {
+                best = second;
+                clips[i] = again;
+                framesOf.set(i, frames2);
+              }
+            }
+          }
+        }
+        results.push(best);
+      }
+      movie.fidelity = summarise({
+        checked: results.some((r) => r.score !== null),
+        reference: opts.heroPortraitPng ? "hero portrait" : "first shot",
+        threshold: aikConfig.fidelityMin,
+        shots: results,
+        retakes,
+      });
+      logger.info({ requestId, fidelity: movie.fidelity }, "[aik] hero fidelity");
+      const f = movie.fidelity;
+      steps.end(
+        "fidelity",
+        f.checked ? "done" : "skipped",
+        f.average !== null ? `average ${f.average}/10${retakes ? ` · ${retakes} retake${retakes === 1 ? "" : "s"}` : ""}` : "the check could not run",
+      );
+    }
+
     /* 2. Screen every frame ----------------------------------------- */
     if (isContentSafetyConfigured()) {
       steps.begin("screen", "Checking every frame");
@@ -153,14 +250,8 @@ export async function buildMovie(opts: {
       for (let i = 0; i < clips.length; i++) {
         const clip = clips[i];
         if (!clip) continue;
-        let jpgs: Buffer[] = [];
-        if (canCut) {
-          const { writeFile } = await import("node:fs/promises");
-          const path = await import("node:path");
-          const f = path.join(dir, `raw-${i + 1}.mp4`);
-          await writeFile(f, clip);
-          jpgs = await extractFrames(dir, f, 1).catch(() => []);
-        }
+        let jpgs: Buffer[] = framesOf.get(i) ?? [];
+        if (!jpgs.length) jpgs = await pullFrames(i, clip, "raw");
         if (!jpgs.length) {
           // Cannot pull frames apart: fail closed on this shot rather than ship unseen.
           logger.warn({ requestId, shot: i + 1 }, "[aik] could not extract frames; dropping the shot");
