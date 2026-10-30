@@ -89,7 +89,7 @@ key per provider; children never hold licenses.
 | **Finished products** | |
 | `AIK_BOOK_PAGES` | pages per picture book (default 6) |
 | `AIK_IMAGE_REFERENCE` | `true` (default): the cover is passed as a reference image so the hero stays consistent |
-| `AIK_VIDEO_SHOTS`, `AIK_VIDEO_SIZE`, `AIK_FFMPEG` | shots per movie (default 3 × 4 s), output size (default 1280x720), ffmpeg path |
+| `AIK_VIDEO_SHOTS`, `AIK_VIDEO_SHOT_SECONDS`, `AIK_VIDEO_SIZE`, `AIK_FFMPEG` | shots per movie (default 3, max 4); seconds per shot, `4`, `8` or `12` (default 8; with the 3 s title card, 3 × 8 s is a 27 s movie); output size (default `1280x720`; Sora 2 also takes `720x1280`); ffmpeg path. Each shot is billed by the second and every second is screened as a frame, so longer shots cost more and take longer. |
 | `AIK_KIDS_VERIFY_GAMES` | `true` (default): children's games are run, checked and repaired before delivery |
 | `AIK_BOOTSTRAP_FACILITATOR` | `email:password` — creates the first (admin) facilitator if none exist. Remove after first sign-in and change the password from the dashboard. |
 | **Text (Claude)** | |
@@ -105,7 +105,8 @@ key per provider; children never hold licenses.
 | `AIK_AZURE_OPENAI_ENDPOINT`, `AIK_AZURE_OPENAI_API_KEY`, `AIK_AZURE_OPENAI_IMAGE_DEPLOYMENT`, (`AIK_AZURE_OPENAI_TEXT_DEPLOYMENT`, `AIK_AZURE_OPENAI_API_VERSION`) | Azure OpenAI |
 | `AIK_FAL_KEY`, `AIK_FAL_IMAGE_MODEL` (default `fal-ai/flux/schnell`) | fal.ai |
 | **Video** | |
-| `AIK_VIDEO_PROVIDER` | `fal` or `none` |
+| `AIK_VIDEO_PROVIDER` | `oss` (Sora 2 on Azure AI Foundry, the production setting), `fal` or `none` |
+| `AIK_OSS_VIDEO_BASE_URL`, `AIK_OSS_VIDEO_API_KEY`, `AIK_OSS_VIDEO_MODEL` | Foundry `…/openai/v1` endpoint, key, and the Sora deployment name (`sora-2`). One job per shot; the wait budget is `videoTimeoutMs`, 4–8 minutes depending on shot length |
 | `AIK_FAL_VIDEO_MODEL` | default `fal-ai/ltx-video` (open-source text-to-video). Verify the model id on fal.ai before enabling. |
 | **Music / voice** | |
 | `AIK_MUSIC_PROVIDER` | `elevenlabs`, `fal` (`AIK_FAL_MUSIC_MODEL`, default `fal-ai/stable-audio`) or `none` |

@@ -460,7 +460,7 @@ async function generateVideoJobApi(prompt: string, options: VideoOptions): Promi
   const jobId = job?.id;
   if (!jobId) throw new Error("Video job: no id returned");
 
-  const deadline = Date.now() + aikConfig.mediaTimeoutMs;
+  const deadline = Date.now() + aikConfig.videoTimeoutMs;
   let attempts = 0;
   let status = String(job?.status ?? "queued");
   while (Date.now() < deadline && attempts < 120) {

@@ -73,8 +73,11 @@
  *   AIK_BOOK_PAGES                    illustrated pages per storybook (default 6)
  *   AIK_IMAGE_REFERENCE               "true" (default): reuse the cover as a reference
  *                                     image so the hero looks the same on every page
- *   AIK_VIDEO_SHOTS                   Sora shots per movie (default 3, 4 s each)
- *   AIK_VIDEO_SIZE                    default 1280x720
+ *   AIK_VIDEO_SHOTS                   Sora shots per movie (default 3, max 4)
+ *   AIK_VIDEO_SHOT_SECONDS            length of each shot: 4, 8 or 12 (default 8). Sora 2 accepts only
+ *                                     these three; anything else snaps to the nearest. Longer shots
+ *                                     cost more per movie and take longer to film.
+ *   AIK_VIDEO_SIZE                    default 1280x720 (Sora 2 also takes 720x1280 portrait)
  *   AIK_FFMPEG                        path to ffmpeg (default "ffmpeg" on PATH)
  *   AIK_KIDS_VERIFY_GAMES             "true" (default): children's games are run, checked
  *                                     and repaired before they are handed over
@@ -102,6 +105,12 @@ const bflConfigured = Boolean(env.AIK_BFL_IMAGE_URL && (env.AIK_BFL_API_KEY || e
 const azureSpeechConfigured = Boolean(env.AIK_AZURE_SPEECH_KEY && env.AIK_AZURE_SPEECH_REGION);
 const elevenConfigured = Boolean(env.AIK_ELEVENLABS_API_KEY);
 const ossVideoConfigured = Boolean(env.AIK_OSS_VIDEO_BASE_URL && env.AIK_OSS_VIDEO_API_KEY && env.AIK_OSS_VIDEO_MODEL);
+
+/** 4, 8 or 12: the only shot lengths Sora 2 films. Default 8; anything else snaps to the nearest. */
+function snapShotSeconds(value: string | undefined): 4 | 8 | 12 {
+  const wanted = Number(value) || 8;
+  return ([4, 8, 12] as const).reduce((best, n) => (Math.abs(n - wanted) < Math.abs(best - wanted) ? n : best), 4 as 4 | 8 | 12);
+}
 
 function pick<T extends string>(value: string | undefined, allowed: T[], fallback: T): T {
   return allowed.includes(value as T) ? (value as T) : fallback;
@@ -259,8 +268,16 @@ export const aikConfig = {
   childRequestsPerMinute: 8,
   /** Requests per minute per IP on the sign-in endpoints. */
   loginAttemptsPerMinute: 20,
-  /** Media generation timeout (video can take a couple of minutes). */
+  /** Media generation timeout for pictures, music and voice. */
   mediaTimeoutMs: 240_000,
+  /**
+   * How long one video job may take, submit to finished file. Sora 2 is
+   * typically one to five minutes and longer shots sit at the top of that
+   * range, so the budget grows with the shot: 4 min for 4 s, 6 min for 8 s,
+   * 8 min for 12 s. Movies are filmed in the background, so this bounds the
+   * wait a child sees on the progress bar, not an HTTP request.
+   */
+  videoTimeoutMs: 240_000 + (snapShotSeconds(env.AIK_VIDEO_SHOT_SECONDS) - 4) * 30_000,
 
   /* --- Media store ------------------------------------------------- */
   media: {
@@ -277,7 +294,8 @@ export const aikConfig = {
   bookPages: Math.min(Math.max(Number(env.AIK_BOOK_PAGES) || 6, 3), 8),
   imageReference: env.AIK_IMAGE_REFERENCE !== "false",
   videoShots: Math.min(Math.max(Number(env.AIK_VIDEO_SHOTS) || 3, 1), 4),
-  videoShotSeconds: 4,
+  /** Sora 2 films shots of exactly 4, 8 or 12 seconds; the setting snaps to the nearest. */
+  videoShotSeconds: snapShotSeconds(env.AIK_VIDEO_SHOT_SECONDS),
   videoSize: env.AIK_VIDEO_SIZE || "1280x720",
   /**
    * Hero fidelity. Each shot starts from a screened still drawn from the hero's
