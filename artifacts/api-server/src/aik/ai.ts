@@ -373,10 +373,38 @@ export type VideoOptions = {
   reference?: string;
 };
 
+/**
+ * One lane per allowed Sora job. Every shot of every movie on this server goes
+ * through here, so a class full of directors queues politely instead of
+ * tripping the deployment's "Too many running tasks" limit and losing shots.
+ */
+export class Gate {
+  private running = 0;
+  private waiters: (() => void)[] = [];
+  constructor(private readonly limit: number) {}
+  get queued(): number {
+    return this.waiters.length;
+  }
+  async run<T>(fn: () => Promise<T>): Promise<T> {
+    if (this.running >= this.limit) await new Promise<void>((resolve) => this.waiters.push(resolve));
+    this.running++;
+    try {
+      return await fn();
+    } finally {
+      this.running--;
+      this.waiters.shift()?.();
+    }
+  }
+}
+const videoGate = new Gate(aikConfig.videoConcurrency);
+
 export async function generateVideo(prompt: string, options: VideoOptions = {}): Promise<MediaResult> {
   if (aikConfig.mockAI) return { base64: MOCK_MP4, mime: "video/mp4", provider: "mock", model: "mock" };
   if (!isVideoConfigured()) throw new Error("Video provider not configured");
-  if (aikConfig.providers.video === "oss") return generateVideoJobApi(prompt, options);
+  if (aikConfig.providers.video === "oss") {
+    if (videoGate.queued) logger.info({ queued: videoGate.queued + 1, limit: aikConfig.videoConcurrency }, "[aik] video shot waiting for a free lane");
+    return videoGate.run(() => generateVideoJobApi(prompt, options));
+  }
   const data = await falRun(aikConfig.fal.videoModel, { prompt, negative_prompt: "scary, violent, blood, weapons, text, watermark, realistic people", aspect_ratio: "16:9" });
   const url = data?.video?.url ?? data?.videos?.[0]?.url;
   if (!url) throw new Error("fal: no video returned");
@@ -424,36 +452,52 @@ async function generateVideoJobApi(prompt: string, options: VideoOptions): Promi
       "video",
     );
 
-  let start: Response;
+  // Image-to-video: the reference goes up as `input_reference`, multipart,
+  // sized exactly to the frame (Sora rejects a mismatched reference).
+  let referencePng: Buffer | null = null;
   if (options.reference) {
-    // Image-to-video: the reference goes up as `input_reference`, multipart,
-    // sized exactly to the frame (Sora rejects a mismatched reference).
     const [w, h] = size.split("x").map(Number);
     const { default: sharp } = await import("sharp");
-    const png = await sharp(Buffer.from(options.reference, "base64"))
+    referencePng = await sharp(Buffer.from(options.reference, "base64"))
       .resize(w || 1280, h || 720, { fit: "cover" })
       .png()
       .toBuffer();
+  }
+  const submitForm = () => {
     const form = new FormData();
     form.append("model", videoModel);
     form.append("prompt", prompt);
     form.append("seconds", seconds);
     form.append("size", size);
-    form.append("input_reference", new Blob([new Uint8Array(png)], { type: "image/png" }), "reference.png");
-    start = await fetchMediaWithRetry(
+    form.append("input_reference", new Blob([new Uint8Array(referencePng!)], { type: "image/png" }), "reference.png");
+    return fetchMediaWithRetry(
       withApiVersion(`${videoBaseUrl}/videos`),
       { method: "POST", headers: { authorization: headers.authorization, "api-key": headers["api-key"] }, body: form },
       120_000,
       "video",
     );
-    if (!start.ok && start.status >= 400 && start.status < 500 && start.status !== 429) {
-      const why = (await start.text().catch(() => "")).slice(0, 300);
-      if (/content|policy|safety|moderat/i.test(why)) throw new ContentFilteredError(why);
-      logger.warn({ status: start.status, why }, "[aik] video reference refused; filming from the text prompt");
-      start = await submitJson();
-    }
-  } else {
-    start = await submitJson();
+  };
+  // The same submission, retried the same way: a busy 429 must not quietly drop the reference picture.
+  let submit = referencePng ? submitForm : submitJson;
+
+  let start = await submit();
+  if (referencePng && !start.ok && start.status >= 400 && start.status < 500 && start.status !== 429) {
+    const why = (await start.text().catch(() => "")).slice(0, 300);
+    if (/content|policy|safety|moderat/i.test(why)) throw new ContentFilteredError(why);
+    logger.warn({ status: start.status, why }, "[aik] video reference refused; filming from the text prompt");
+    submit = submitJson;
+    start = await submit();
+  }
+  // "429 Too many running tasks" is the deployment's concurrency limit, and it
+  // lasts as long as someone else's shot (a minute or more), far longer than
+  // the generic retry's few seconds. Wait it out in widening steps, for up to
+  // about four minutes, before calling the shot a failure.
+  for (let attempt = 1; attempt <= 8 && start.status === 429; attempt++) {
+    const why = (await start.text().catch(() => "")).slice(0, 200);
+    const waitMs = Math.min(60_000, 15_000 * attempt) + Math.random() * 2000;
+    logger.info({ attempt, waitMs: Math.round(waitMs), why }, "[aik] video provider busy; waiting for a slot");
+    await new Promise((r) => setTimeout(r, waitMs));
+    start = await submit();
   }
   if (!start.ok) throw new Error(`Video submit ${start.status}: ${(await start.text().catch(() => "")).slice(0, 300)}`);
   const job: any = await start.json();

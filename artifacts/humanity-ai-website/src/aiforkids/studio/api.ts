@@ -362,6 +362,15 @@ export const hubSpeak = (artifactId: number, voice?: VoiceChoice | null) =>
   call<{ audio: string; mime: string }>("POST", `/hub/artifacts/${artifactId}/speak`, voice ? { voice } : undefined);
 
 /** Poll a child request until it settles (done/blocked/failed). */
+/**
+ * How long the screen keeps waiting for a movie, whatever the caller asked
+ * for. Three Sora shots take two to five minutes when the lane is free, and
+ * longer when another class is filming: the server queues shots and keeps
+ * going, so giving up at three or five minutes told people the movie had
+ * failed while it was still being made.
+ */
+const MOVIE_WAIT_MS = 20 * 60_000;
+
 export async function waitForRequest(id: number, getter: (id: number) => Promise<{ request: StudioRequest }>, onTick?: (r: StudioRequest) => void, timeoutMs = 120_000): Promise<StudioRequest> {
   const start = Date.now();
   let delay = 900;
@@ -369,7 +378,8 @@ export async function waitForRequest(id: number, getter: (id: number) => Promise
     const { request } = await getter(id);
     onTick?.(request);
     if (request.status === "done" || request.status === "blocked" || request.status === "failed" || request.status === "held") return request;
-    if (Date.now() - start > timeoutMs) return { ...request, status: "failed", message: "That took too long. Try again!" };
+    const budget = request.mode === "video" ? Math.max(timeoutMs, MOVIE_WAIT_MS) : timeoutMs;
+    if (Date.now() - start > budget) return { ...request, status: "failed", message: "That took too long. Try again!" };
     await new Promise((r) => setTimeout(r, delay));
     delay = Math.min(delay * 1.3, 3000);
   }

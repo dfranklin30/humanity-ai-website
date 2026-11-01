@@ -1215,7 +1215,7 @@ function ToolRunner({ state, mode, onBack, start, onOpenTool }: { state: HubStat
         </div>
 
         <div className="space-y-4">
-          {request && <RequestStatus request={request} showReason />}
+          {request && <RequestStatus request={request} showReason steps={false} />}
           {request?.progress && request.progress.length > 0 && (
             <Card>
               <h2 className="mb-1 text-lg font-extrabold">

@@ -915,13 +915,13 @@ export function ForgeSteps({ steps }: { steps: NonNullable<StudioRequest["progre
  * from one that fires on something genuinely wrong, so the person responsible
  * for judging it cannot judge it.
  */
-export function RequestStatus({ request, showReason }: { request: StudioRequest; showReason?: boolean }) {
+export function RequestStatus({ request, showReason, steps = true }: { request: StudioRequest; showReason?: boolean; /** Hub screens draw the steps in their own card. */ steps?: boolean }) {
   if (request.status === "queued" || request.status === "working")
     return (
       <div className="space-y-3">
-        <Spinner label={request.status === "queued" ? "In line…" : "The helper is working on it…"} />
+        <Spinner label={request.status === "queued" ? "In line…" : request.mode === "video" ? "Filming your movie… this takes a few minutes" : "The helper is working on it…"} />
         {/* A movie takes a few minutes. The server reports each step; a child watching a lone spinner thinks it broke. */}
-        {request.progress && request.progress.length > 0 && <ForgeSteps steps={request.progress} />}
+        {steps && request.progress && request.progress.length > 0 && <ForgeSteps steps={request.progress} />}
       </div>
     );
 
