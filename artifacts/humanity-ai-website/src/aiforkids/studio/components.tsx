@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "wouter";
 import { cx } from "../components/ui";
 import { WovenText, LanguageExtras } from "./LanguagePassport";
+import { RobotStage } from "./RobotStage";
 import { getArtifact, mediaSrc, downloadUrl, bookPdfUrl, type Artifact, type ArtifactMeta, type Book, type Movie, type FieldDef, type ModeDef, type StudioRequest, type FileLink, type Hero } from "./api";
 
 /* ------------------------------------------------------------------ *
@@ -226,6 +227,7 @@ export function ArtifactView({ artifact, compact, showFidelity }: { artifact: Ar
     return (
       <div className="space-y-3">
         <p className="text-lg font-semibold text-slate-800">🤖 {r.job}</p>
+        <RobotStage artifactId={artifact.id} name={r.name || artifact.title} compact={compact} />
         <Notice tone="warn">🦺 {r.safetyNote}</Notice>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-2xl bg-white p-4 ring-2 ring-slate-200">
