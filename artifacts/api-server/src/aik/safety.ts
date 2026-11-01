@@ -188,6 +188,10 @@ async function csPost(path: string, body: any, timeoutMs = 8000): Promise<any> {
  * service is unreachable so the caller can decide to fail closed.
  */
 export async function contentSafetyText(text: string): Promise<Flag[]> {
+  // Local testing (AIK_MOCK_AI, never in production): the token [[unsafe]]
+  // stands in for a Content Safety hit, so the hold-for-facilitator path can
+  // be exercised end to end without the service.
+  if (aikConfig.mockAI) return /\[\[unsafe\]\]/i.test(text) ? [{ layer: "content_safety", category: "Violence", severity: 4 }] : [];
   const data = await csPost("text:analyze", {
     text: text.slice(0, 10_000),
     categories: ["Hate", "SelfHarm", "Sexual", "Violence"],
@@ -204,12 +208,14 @@ export async function contentSafetyText(text: string): Promise<Flag[]> {
 
 /** Prompt Shields: detects jailbreak / instruction-override attempts in user text. */
 export async function promptShield(text: string): Promise<Flag[]> {
+  if (aikConfig.mockAI) return /\[\[jailbreak\]\]/i.test(text) ? [{ layer: "prompt_shield", category: "jailbreak" }] : [];
   const data = await csPost("text:shieldPrompt", { userPrompt: text.slice(0, 10_000), documents: [] });
   return data?.userPromptAnalysis?.attackDetected ? [{ layer: "prompt_shield", category: "jailbreak" }] : [];
 }
 
 /** Image analysis for generated pictures (Phase 2). `base64` is PNG/JPEG content. */
 export async function contentSafetyImage(base64: string): Promise<Flag[]> {
+  if (aikConfig.mockAI) return [];
   const data = await csPost("image:analyze", { image: { content: base64 }, outputType: "FourSeverityLevels" }, 15_000);
   const flags: Flag[] = [];
   for (const c of data?.categoriesAnalysis ?? []) {

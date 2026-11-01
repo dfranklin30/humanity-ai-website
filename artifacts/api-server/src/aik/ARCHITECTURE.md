@@ -75,6 +75,13 @@ or `/keep-blocked` settles it. An unblocked run carries a `facilitator:
 unblocked` flag, skips only Content Safety's text verdict, and is audited.
 Hub work is the adult's own and is never held.
 
+Testing this path: `pnpm --filter @workspace/api-server test` runs the
+hold/unblock decision tests (`hold.test.ts`). `hold.e2e.ts` drives a running
+mock-mode server (`AIK_MOCK_AI=true`, where `[[unsafe]]` in an order stands in
+for a Content Safety hit and `[[jailbreak]]` for Prompt Shields) through every
+branch over HTTP: held → unblocked with edits → done, unblocked as written,
+kept blocked, PII and prompt attacks still blocked, authorization, bad input.
+
 What changed is what the studios deliver at the end of it:
 
 | Studio | Before | Now |

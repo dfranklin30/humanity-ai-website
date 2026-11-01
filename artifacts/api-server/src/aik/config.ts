@@ -369,6 +369,8 @@ export function isGoogleConfigured(): boolean {
 }
 
 export function isContentSafetyConfigured(): boolean {
+  // Mock mode screens with canned verdicts (safety.ts), so the pipeline runs its full screening path locally.
+  if (aikConfig.mockAI) return true;
   const c = aikConfig.contentSafety;
   return Boolean(c.endpoint && c.key);
 }

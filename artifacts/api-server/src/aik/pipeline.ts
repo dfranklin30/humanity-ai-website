@@ -161,6 +161,12 @@ const HOLD_LAYERS = new Set<string>(["content_safety", "output"]);
 const HARD_LAYERS = new Set<string>(["pii", "blocklist", "prompt_shield", "system"]);
 const HARD_CATEGORIES = new Set<string>(["redirect", "care_alert"]);
 
+/** Would this set of flags hold the order for the facilitator rather than block it? Pure, so it can be tested. */
+export function shouldHold(flags: unknown[]): boolean {
+  const fs = (flags ?? []) as { layer?: string; category?: string }[];
+  return fs.some((f) => HOLD_LAYERS.has(String(f?.layer))) && !fs.some((f) => HARD_LAYERS.has(String(f?.layer)) || HARD_CATEGORIES.has(String(f?.category)));
+}
+
 /** The flag a facilitator's "unblock" leaves on the request; the next run reads it. */
 export const UNBLOCKED_FLAG: Flag = { layer: "facilitator", category: "unblocked" };
 export function wasUnblocked(r: Pick<RequestRow, "flags">): boolean {
@@ -172,8 +178,7 @@ async function finish(req: RequestRow, patch: Parameters<typeof store.finishRequ
   let next = patch;
   if (patch.status === "blocked") {
     const flags: any[] = patch.flags ?? [];
-    const holdable = flags.some((f) => HOLD_LAYERS.has(f?.layer)) && !flags.some((f) => HARD_LAYERS.has(f?.layer) || HARD_CATEGORIES.has(f?.category));
-    if (holdable) {
+    if (shouldHold(flags)) {
       // Hub work is the adult's own; only a class order waits for a facilitator.
       const klass = await store.getClass(req.class_id);
       if (klass && klass.kind !== "workspace") {
