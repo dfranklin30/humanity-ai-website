@@ -778,6 +778,61 @@ export function registerAikRoutes(app: Express): void {
     }),
   );
 
+  /* ---------------- Held orders: the facilitator decides ----------------
+   * A judgment-call screening result holds an order instead of blocking it
+   * (see HOLD_LAYERS in pipeline.ts). The facilitator reads it with the
+   * child and either lets it run — as written, or with words they edited —
+   * or keeps it blocked. Both decisions are audited. A blocked order can be
+   * unblocked too, so an earlier hard "no" is never final without an adult.
+   */
+  async function ownRequest(req: Request, res: Response): Promise<{ r: store.RequestRow; f: FReq["facilitator"] } | null> {
+    const r = await store.getRequest(Number(req.params.rid));
+    const klass = r ? await store.getClass(r.class_id) : null;
+    const f = (req as FReq).facilitator;
+    if (!r || !klass || (klass.facilitator_id !== f.id && !f.is_admin)) {
+      res.status(404).json({ error: "Not found." });
+      return null;
+    }
+    return { r, f };
+  }
+
+  app.post(
+    `${base}/facilitator/requests/:rid/unblock`,
+    requireRunClasses,
+    wrap(async (req, res) => {
+      const own = await ownRequest(req, res);
+      if (!own) return;
+      const { r, f } = own;
+      if (r.status !== "held" && r.status !== "blocked") return void res.status(409).json({ error: "Only a held or blocked order can be unblocked." });
+      const body = z.object({ input: z.record(z.string().max(40), z.string().max(2000)).optional() }).safeParse(req.body ?? {});
+      if (!body.success) return void res.status(400).json({ error: "Edited words must be short text." });
+      const edited = Boolean(body.data.input && Object.keys(body.data.input).length);
+      const input = edited ? { ...r.input, ...body.data.input } : r.input;
+      const updated = await store.requeueRequest(r.id, input, [
+        { layer: "facilitator", category: "unblocked", detail: edited ? "words edited by the facilitator" : "run as the child wrote it" },
+      ]);
+      await store.audit(r.class_id, "facilitator", f.id, "request_unblocked", { requestId: r.id, edited, previousStatus: r.status, previousFlags: r.flags });
+      if (updated) publish(r.class_id, { type: "request", request: toPublicRequest(updated) });
+      void runRequest(r.id);
+      res.json({ ok: true });
+    }),
+  );
+
+  app.post(
+    `${base}/facilitator/requests/:rid/keep-blocked`,
+    requireRunClasses,
+    wrap(async (req, res) => {
+      const own = await ownRequest(req, res);
+      if (!own) return;
+      const { r, f } = own;
+      if (r.status !== "held") return void res.status(409).json({ error: "Only a held order can be kept blocked." });
+      const updated = await store.finishRequest(r.id, { status: "blocked", message: KID_MESSAGES.unsafe, flags: Array.isArray(r.flags) ? r.flags : [] });
+      await store.audit(r.class_id, "facilitator", f.id, "request_kept_blocked", { requestId: r.id });
+      if (updated) publish(r.class_id, { type: "request", request: toPublicRequest(updated) });
+      res.json({ ok: true });
+    }),
+  );
+
   /* ---------------- Review queue and audit trail ----------------
    * The approve endpoint above has existed since the beginning. Nothing ever
    * listed what was waiting for it, so a child's song held "for your

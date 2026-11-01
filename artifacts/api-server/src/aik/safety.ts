@@ -16,7 +16,7 @@ import { aikConfig, isContentSafetyConfigured } from "./config";
 import { logger } from "../lib/logger";
 
 export type Flag = {
-  layer: "pii" | "blocklist" | "content_safety" | "prompt_shield" | "code_scan" | "output" | "system";
+  layer: "pii" | "blocklist" | "content_safety" | "prompt_shield" | "code_scan" | "output" | "system" | "facilitator";
   category: string;
   detail?: string;
   severity?: number;
@@ -31,6 +31,7 @@ export const KID_MESSAGES = {
   pii: "Let's keep names, phone numbers and places out of the Studio. Try describing your idea without them!",
   blocklist: "That's not something we make in the Studio. Try a different idea — maybe something silly or brave?",
   unsafe: "Hmm, let's try that a different way. Your facilitator can help you think of another idea.",
+  held: "The helper wants a grown-up to check this one. Your facilitator is coming over to take a look. Hang tight!",
   injection: "The Studio only takes Director's Orders about your project. Let's try again!",
   unavailable: "The Studio helper is taking a break. Please tell your facilitator.",
   paused: "Your facilitator paused the Studio. Look up front!",
@@ -187,6 +188,10 @@ async function csPost(path: string, body: any, timeoutMs = 8000): Promise<any> {
  * service is unreachable so the caller can decide to fail closed.
  */
 export async function contentSafetyText(text: string): Promise<Flag[]> {
+  // Local testing (AIK_MOCK_AI, never in production): the token [[unsafe]]
+  // stands in for a Content Safety hit, so the hold-for-facilitator path can
+  // be exercised end to end without the service.
+  if (aikConfig.mockAI) return /\[\[unsafe\]\]/i.test(text) ? [{ layer: "content_safety", category: "Violence", severity: 4 }] : [];
   const data = await csPost("text:analyze", {
     text: text.slice(0, 10_000),
     categories: ["Hate", "SelfHarm", "Sexual", "Violence"],
@@ -203,12 +208,14 @@ export async function contentSafetyText(text: string): Promise<Flag[]> {
 
 /** Prompt Shields: detects jailbreak / instruction-override attempts in user text. */
 export async function promptShield(text: string): Promise<Flag[]> {
+  if (aikConfig.mockAI) return /\[\[jailbreak\]\]/i.test(text) ? [{ layer: "prompt_shield", category: "jailbreak" }] : [];
   const data = await csPost("text:shieldPrompt", { userPrompt: text.slice(0, 10_000), documents: [] });
   return data?.userPromptAnalysis?.attackDetected ? [{ layer: "prompt_shield", category: "jailbreak" }] : [];
 }
 
 /** Image analysis for generated pictures (Phase 2). `base64` is PNG/JPEG content. */
 export async function contentSafetyImage(base64: string): Promise<Flag[]> {
+  if (aikConfig.mockAI) return [];
   const data = await csPost("image:analyze", { image: { content: base64 }, outputType: "FourSeverityLevels" }, 15_000);
   const flags: Flag[] = [];
   for (const c of data?.categoriesAnalysis ?? []) {

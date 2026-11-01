@@ -299,23 +299,57 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
     }
   }
 
+  /** A finished order becomes the project on screen (or a "waiting for your facilitator" card when the media still needs approval). */
+  async function showResult(settled: StudioRequest, artifactKind: ArtifactMeta["kind"]) {
+    setActive(settled);
+    await refresh();
+    if (settled.status === "done" && settled.resultArtifactId) {
+      const m = await childMe();
+      setMe(m);
+      const found = m.portfolio.find((a) => a.id === settled.resultArtifactId);
+      if (found) setProject(found);
+      else setProject({ id: settled.resultArtifactId, kind: artifactKind, title: "Waiting for your facilitator", approved: false } as ArtifactMeta);
+    }
+  }
+
+  /* A held order isn't over: the facilitator may unblock it from their
+     dashboard a minute later. Keep a patient eye on it (every 5 s, for up to
+     half an hour) so the result appears on the child's screen without them
+     ordering again. The form stays usable meanwhile; a new order cancels the
+     watch. */
+  const heldWatch = useRef(0);
+  async function watchHeld(id: number, artifactKind: ArtifactMeta["kind"]) {
+    const token = ++heldWatch.current;
+    const until = Date.now() + 30 * 60_000;
+    while (Date.now() < until && heldWatch.current === token) {
+      await new Promise((r) => setTimeout(r, 5000));
+      let r: StudioRequest;
+      try {
+        ({ request: r } = await childRequest(id));
+      } catch {
+        continue;
+      }
+      if (heldWatch.current !== token) return;
+      if (r.status === "held") continue;
+      if (r.status === "queued" || r.status === "working") r = await waitForRequest(id, childRequest, setActive, 600_000);
+      if (heldWatch.current !== token) return;
+      await showResult(r, artifactKind).catch(() => {});
+      return;
+    }
+  }
+
   async function submit(kind: "create" | "change", input: Record<string, string>, projectArtifactId?: number) {
     if (!mode) return;
+    heldWatch.current++; // a new order ends any watch on an older held one
     setBusy(true);
     setError(null);
     try {
       const { request } = await childSubmit({ mode: mode.id, kind, projectArtifactId, input, ...(kind === "create" && start ? { remixFrom: start.remixFrom } : {}) });
       setActive(request);
-      const settled = await waitForRequest(request.id, childRequest, setActive, 300_000);
-      setActive(settled);
-      await refresh();
-      if (settled.status === "done" && settled.resultArtifactId) {
-        const m = await childMe();
-        setMe(m);
-        const found = m.portfolio.find((a) => a.id === settled.resultArtifactId);
-        if (found) setProject(found);
-        else setProject({ id: settled.resultArtifactId, kind: mode.artifactKind, title: "Waiting for your facilitator", approved: false } as ArtifactMeta);
-      }
+      // A three-shot movie is two to five minutes of filming; give it the room the server does.
+      const settled = await waitForRequest(request.id, childRequest, setActive, mode.id === "video" ? 600_000 : 300_000);
+      await showResult(settled, mode.artifactKind);
+      if (settled.status === "held") void watchHeld(request.id, mode.artifactKind);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "That didn't work. Try again!");
     } finally {

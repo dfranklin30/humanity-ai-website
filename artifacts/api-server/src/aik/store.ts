@@ -112,7 +112,12 @@ export type ChildRow = {
   created_at: string;
 };
 
-export type RequestStatus = "queued" | "working" | "done" | "blocked" | "failed";
+/**
+ * `held` is a screening result that is a judgment call (Content Safety, the
+ * video model's own filter, output screening): the request waits for the
+ * facilitator to walk over and decide, instead of telling the child no.
+ */
+export type RequestStatus = "queued" | "working" | "done" | "blocked" | "failed" | "held";
 
 /**
  * "fast" is one model call — right for a child with two tickets and a
@@ -688,6 +693,28 @@ export async function finishRequest(
         flags = ${JSON.stringify(patch.flags ?? [])}::jsonb,
         result_artifact_id = ${patch.resultArtifactId ?? null},
         completed_at = CASE WHEN ${patch.status} IN ('done','blocked','failed') THEN now() ELSE completed_at END
+      WHERE id = ${id}
+      RETURNING *`),
+  );
+}
+
+/**
+ * A facilitator lets a held (or blocked) order run again, with the child's
+ * words or with words they edited. The request keeps its id and ticket; the
+ * flags are replaced by the facilitator's decision so the run reads them.
+ */
+export async function requeueRequest(id: number, input: any, flags: any[]): Promise<RequestRow | null> {
+  await ensureTables();
+  return one<RequestRow>(
+    await db.execute(sql`
+      UPDATE aik_requests SET
+        status = 'queued',
+        input = ${JSON.stringify(input)}::jsonb,
+        flags = ${JSON.stringify(flags)}::jsonb,
+        message = NULL,
+        result_artifact_id = NULL,
+        progress = '[]'::jsonb,
+        completed_at = NULL
       WHERE id = ${id}
       RETURNING *`),
   );

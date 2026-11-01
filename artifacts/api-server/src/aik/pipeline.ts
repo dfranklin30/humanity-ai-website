@@ -148,9 +148,46 @@ function hiddenNumber(req: RequestRow, key: string): number | null {
   return Number.isInteger(n) && n > 0 ? n : null;
 }
 
+/**
+ * Which screening verdicts are a judgment call. Content Safety's category
+ * scores, the video or image model's own filter, and output screening all
+ * misfire on perfectly good club work ("Supergirl saves the day" was refused
+ * by the video model twice). Those hold the order for the facilitator, who
+ * walks over, reads it with the child and decides. Private data, the
+ * blocklist, prompt attacks and system faults stay a hard stop, and so does a
+ * "grown-up question" redirect, which already sends the child to an adult.
+ */
+const HOLD_LAYERS = new Set<string>(["content_safety", "output"]);
+const HARD_LAYERS = new Set<string>(["pii", "blocklist", "prompt_shield", "system"]);
+const HARD_CATEGORIES = new Set<string>(["redirect", "care_alert"]);
+
+/** Would this set of flags hold the order for the facilitator rather than block it? Pure, so it can be tested. */
+export function shouldHold(flags: unknown[]): boolean {
+  const fs = (flags ?? []) as { layer?: string; category?: string }[];
+  return fs.some((f) => HOLD_LAYERS.has(String(f?.layer))) && !fs.some((f) => HARD_LAYERS.has(String(f?.layer)) || HARD_CATEGORIES.has(String(f?.category)));
+}
+
+/** The flag a facilitator's "unblock" leaves on the request; the next run reads it. */
+export const UNBLOCKED_FLAG: Flag = { layer: "facilitator", category: "unblocked" };
+export function wasUnblocked(r: Pick<RequestRow, "flags">): boolean {
+  return Array.isArray(r.flags) && r.flags.some((f: any) => f?.layer === "facilitator" && f?.category === "unblocked");
+}
+
 async function finish(req: RequestRow, patch: Parameters<typeof store.finishRequest>[1]): Promise<RequestRow> {
   remixContexts.delete(req.id);
-  const updated = (await store.finishRequest(req.id, patch)) ?? req;
+  let next = patch;
+  if (patch.status === "blocked") {
+    const flags: any[] = patch.flags ?? [];
+    if (shouldHold(flags)) {
+      // Hub work is the adult's own; only a class order waits for a facilitator.
+      const klass = await store.getClass(req.class_id);
+      if (klass && klass.kind !== "workspace") {
+        next = { ...patch, status: "held", message: KID_MESSAGES.held };
+        await store.audit(req.class_id, "system", null, "request_held", { requestId: req.id, flags, screeningMessage: patch.message }).catch(() => {});
+      }
+    }
+  }
+  const updated = (await store.finishRequest(req.id, next)) ?? req;
   publish(req.class_id, { type: "request", request: toPublicRequest(updated) });
   return updated;
 }
@@ -165,7 +202,12 @@ export async function runRequest(requestId: number): Promise<void> {
     return;
   }
 
-  const flags: Flag[] = [];
+  // A facilitator who unblocked this order has already read it: their decision
+  // stays on the record, and Content Safety's text verdict no longer stops it.
+  // Everything else (private data, blocklist, prompt attacks, image and frame
+  // screening, the provider's own filter) still runs exactly as before.
+  const unblocked = wasUnblocked(req);
+  const flags: Flag[] = unblocked ? [{ ...UNBLOCKED_FLAG, detail: (req.flags as any[]).find((f) => f?.layer === "facilitator")?.detail }] : [];
   try {
     await store.markWorking(req.id);
     publish(req.class_id, { type: "request", request: toPublicRequest({ ...req, status: "working" }) });
@@ -190,9 +232,14 @@ export async function runRequest(requestId: number): Promise<void> {
     const screen = await screenInput(input.text);
     flags.push(...screen.flags);
     if (!screen.ok) {
-      await finish(req, { status: "blocked", message: screen.kidMessage, flags });
-      await store.audit(req.class_id, "system", null, "request_blocked", { requestId: req.id, flags: screen.flags });
-      return;
+      const onlyJudgmentCall = screen.flags.length > 0 && screen.flags.every((f) => f.layer === "content_safety");
+      if (unblocked && onlyJudgmentCall) {
+        logger.info({ requestId: req.id, flags: screen.flags }, "[aik] facilitator unblocked; running past Content Safety's text verdict");
+      } else {
+        await finish(req, { status: "blocked", message: screen.kidMessage, flags });
+        await store.audit(req.class_id, "system", null, "request_blocked", { requestId: req.id, flags: screen.flags });
+        return;
+      }
     }
 
     // Guided chat turns have their own, shorter path.

@@ -63,12 +63,31 @@ order → validate → PII catcher → blocklist → Content Safety + Prompt Shi
       → artifact → facilitator approval for anything with generated media
 ```
 
+A screening "no" is not always final. Private data, the blocklist and Prompt
+Shields block outright. Content Safety's category scores, the video or image
+model's own filter and output screening are judgment calls that misfire on
+good club work ("Supergirl saves the day" was refused by Sora twice), so those
+**hold** the order instead (`status: held`, `HOLD_LAYERS` in `pipeline.ts`):
+the child is told the facilitator is coming over, the facilitator's live feed
+shows the order with the words editable and the provider's reason, and
+`POST /facilitator/requests/:rid/unblock` (as written, or with edited words)
+or `/keep-blocked` settles it. An unblocked run carries a `facilitator:
+unblocked` flag, skips only Content Safety's text verdict, and is audited.
+Hub work is the adult's own and is never held.
+
+Testing this path: `pnpm --filter @workspace/api-server test` runs the
+hold/unblock decision tests (`hold.test.ts`). `hold.e2e.ts` drives a running
+mock-mode server (`AIK_MOCK_AI=true`, where `[[unsafe]]` in an order stands in
+for a Content Safety hit and `[[jailbreak]]` for Prompt Shields) through every
+branch over HTTP: held → unblocked with edits → done, unblocked as written,
+kept blocked, PII and prompt attacks still blocked, authorization, bad input.
+
 What changed is what the studios deliver at the end of it:
 
 | Studio | Before | Now |
 |---|---|---|
 | Story Maker | a six-panel comic script to draw yourself | a picture book: cover + 6 illustrated pages, same hero throughout, narrated, flip-book viewer, PDF (`book.ts`, `bookpdf.ts`) |
-| Video Maker | a storyboard and, sometimes, one portrait clip | three Sora shots (8 s each by default, `AIK_VIDEO_SHOT_SECONDS`) cut behind a title card with narration into one landscape MP4; every frame screened (`movie.ts`, `ffmpeg.ts`) |
+| Video Maker | a storyboard and, sometimes, one portrait clip | three Sora shots (8 s each by default, `AIK_VIDEO_SHOT_SECONDS`) cut behind a title card with narration into one landscape MP4; every frame screened (`movie.ts`, `ffmpeg.ts`). Sora jobs pass through one app-wide gate (`AIK_VIDEO_CONCURRENCY`, default 2) and a busy "429 Too many running tasks" is waited out for up to ~4 min, so shots queue instead of dropping; screens wait up to 20 min for a movie |
 | Music Maker | a tune that ignored the words | a song that sings the child's own lyrics, with a download |
 | Game Maker (children) | one model call, shipped unverified | plan → build → run → repair, same checker the Hub uses (`forge.ts` light mode) |
 

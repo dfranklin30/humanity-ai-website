@@ -78,6 +78,9 @@
  *                                     these three; anything else snaps to the nearest. Longer shots
  *                                     cost more per movie and take longer to film.
  *   AIK_VIDEO_SIZE                    default 1280x720 (Sora 2 also takes 720x1280 portrait)
+ *   AIK_VIDEO_CONCURRENCY             Sora jobs in flight at once across the whole app (default 2).
+ *                                     The deployment answers "429 Too many running tasks" past its
+ *                                     own limit; extra shots wait their turn here instead of failing.
  *   AIK_FFMPEG                        path to ffmpeg (default "ffmpeg" on PATH)
  *   AIK_KIDS_VERIFY_GAMES             "true" (default): children's games are run, checked
  *                                     and repaired before they are handed over
@@ -278,6 +281,13 @@ export const aikConfig = {
    * wait a child sees on the progress bar, not an HTTP request.
    */
   videoTimeoutMs: 240_000 + (snapShotSeconds(env.AIK_VIDEO_SHOT_SECONDS) - 4) * 30_000,
+  /**
+   * Sora jobs in flight at once, app-wide. A three-shot movie films its shots
+   * in parallel; the deployment refused the third ("429 Too many running
+   * tasks") even with one movie running, and two classes filming at once would
+   * lose shots constantly. Shots past this limit queue locally and wait.
+   */
+  videoConcurrency: Math.min(Math.max(Number(env.AIK_VIDEO_CONCURRENCY) || 2, 1), 8),
 
   /* --- Media store ------------------------------------------------- */
   media: {
@@ -369,6 +379,8 @@ export function isGoogleConfigured(): boolean {
 }
 
 export function isContentSafetyConfigured(): boolean {
+  // Mock mode screens with canned verdicts (safety.ts), so the pipeline runs its full screening path locally.
+  if (aikConfig.mockAI) return true;
   const c = aikConfig.contentSafety;
   return Boolean(c.endpoint && c.key);
 }
