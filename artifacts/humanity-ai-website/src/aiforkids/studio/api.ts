@@ -57,7 +57,8 @@ export type StudioRequest = {
   mode: ModeId;
   kind: "create" | "change" | "chat";
   input: Record<string, string>;
-  status: "queued" | "working" | "done" | "blocked" | "failed";
+  /** `held`: screening said no, but it is the facilitator's call; the order waits for them. */
+  status: "queued" | "working" | "done" | "blocked" | "failed" | "held";
   message: string | null;
   flags?: Flag[];
   flagged?: boolean;
@@ -300,6 +301,10 @@ export const fPatchChild = (classId: number, childId: number, patch: Partial<{ n
   call<{ child: ChildSummary }>("PATCH", `/facilitator/classes/${classId}/children/${childId}`, patch);
 export const fDeleteChild = (classId: number, childId: number) => call<{ ok: true }>("DELETE", `/facilitator/classes/${classId}/children/${childId}`);
 export const fApprove = (artifactId: number, approve: boolean) => call<{ ok: true }>("POST", `/facilitator/artifacts/${artifactId}/approve`, { approve });
+/** Let a held order run: as the child wrote it, or with the facilitator's edited words. */
+export const fUnblock = (requestId: number, input?: Record<string, string>) => call<{ ok: true }>("POST", `/facilitator/requests/${requestId}/unblock`, input ? { input } : {});
+/** The facilitator agrees with the screening: the held order becomes a block. */
+export const fKeepBlocked = (requestId: number) => call<{ ok: true }>("POST", `/facilitator/requests/${requestId}/keep-blocked`, {});
 export const fProjector = (classId: number, body: { mode: ModeId; kind: "create" | "change" | "chat"; projectArtifactId?: number; input: Record<string, string> }) =>
   call<{ request: StudioRequest }>("POST", `/facilitator/classes/${classId}/projector`, body);
 export const fRequest = (id: number) => call<{ request: StudioRequest }>("GET", `/facilitator/requests/${id}`);
@@ -363,7 +368,7 @@ export async function waitForRequest(id: number, getter: (id: number) => Promise
   for (;;) {
     const { request } = await getter(id);
     onTick?.(request);
-    if (request.status === "done" || request.status === "blocked" || request.status === "failed") return request;
+    if (request.status === "done" || request.status === "blocked" || request.status === "failed" || request.status === "held") return request;
     if (Date.now() - start > timeoutMs) return { ...request, status: "failed", message: "That took too long. Try again!" };
     await new Promise((r) => setTimeout(r, delay));
     delay = Math.min(delay * 1.3, 3000);

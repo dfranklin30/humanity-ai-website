@@ -63,6 +63,18 @@ order → validate → PII catcher → blocklist → Content Safety + Prompt Shi
       → artifact → facilitator approval for anything with generated media
 ```
 
+A screening "no" is not always final. Private data, the blocklist and Prompt
+Shields block outright. Content Safety's category scores, the video or image
+model's own filter and output screening are judgment calls that misfire on
+good club work ("Supergirl saves the day" was refused by Sora twice), so those
+**hold** the order instead (`status: held`, `HOLD_LAYERS` in `pipeline.ts`):
+the child is told the facilitator is coming over, the facilitator's live feed
+shows the order with the words editable and the provider's reason, and
+`POST /facilitator/requests/:rid/unblock` (as written, or with edited words)
+or `/keep-blocked` settles it. An unblocked run carries a `facilitator:
+unblocked` flag, skips only Content Safety's text verdict, and is audited.
+Hub work is the adult's own and is never held.
+
 What changed is what the studios deliver at the end of it:
 
 | Studio | Before | Now |

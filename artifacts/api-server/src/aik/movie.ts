@@ -160,7 +160,11 @@ export async function buildMovie(opts: {
           const m = await generateVideo(shotPrompt(movie.style, s, opts.heroLook), { seconds: s.seconds, size: aikConfig.videoSize, reference: keyframes[i] ?? undefined });
           return Buffer.from(m.base64, "base64");
         } catch (err) {
-          if (err instanceof ContentFilteredError) throw err;
+          if (err instanceof ContentFilteredError) {
+            // The provider's own reason is the only clue a facilitator has about what to change.
+            logger.warn({ requestId, shot: s.shot, why: String(err.message).slice(0, 300) }, "[aik] shot refused by the video provider");
+            throw err;
+          }
           logger.warn({ requestId, shot: s.shot, take, err: String((err as Error)?.message ?? err).slice(0, 200) }, "[aik] shot failed");
         }
       }
@@ -173,7 +177,7 @@ export async function buildMovie(opts: {
       clips = await Promise.all(movie.shots.map((s, i) => film(s, i)));
     } catch (err) {
       if (!(err instanceof ContentFilteredError)) throw err;
-      flags.push({ layer: "content_safety", category: "provider_filter" });
+      flags.push({ layer: "content_safety", category: "provider_filter", detail: `The video model refused a shot: ${String(err.message).slice(0, 200)}` });
       steps.end("shots", "failed", "a shot was refused");
       return { ok: false, blocked: true, message: "One of the shots wasn't right for the club. Try a different idea!", flags, steps: steps.all() };
     }

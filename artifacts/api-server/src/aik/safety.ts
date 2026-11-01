@@ -16,7 +16,7 @@ import { aikConfig, isContentSafetyConfigured } from "./config";
 import { logger } from "../lib/logger";
 
 export type Flag = {
-  layer: "pii" | "blocklist" | "content_safety" | "prompt_shield" | "code_scan" | "output" | "system";
+  layer: "pii" | "blocklist" | "content_safety" | "prompt_shield" | "code_scan" | "output" | "system" | "facilitator";
   category: string;
   detail?: string;
   severity?: number;
@@ -31,6 +31,7 @@ export const KID_MESSAGES = {
   pii: "Let's keep names, phone numbers and places out of the Studio. Try describing your idea without them!",
   blocklist: "That's not something we make in the Studio. Try a different idea — maybe something silly or brave?",
   unsafe: "Hmm, let's try that a different way. Your facilitator can help you think of another idea.",
+  held: "The helper wants a grown-up to check this one. Your facilitator is coming over to take a look. Hang tight!",
   injection: "The Studio only takes Director's Orders about your project. Let's try again!",
   unavailable: "The Studio helper is taking a break. Please tell your facilitator.",
   paused: "Your facilitator paused the Studio. Look up front!",

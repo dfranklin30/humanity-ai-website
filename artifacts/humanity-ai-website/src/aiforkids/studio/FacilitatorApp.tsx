@@ -20,6 +20,7 @@ import {
   fDeleteClass,
   fExportUrl,
   fFeedUrl,
+  fKeepBlocked,
   fLogin,
   fLogout,
   fMe,
@@ -29,6 +30,7 @@ import {
   fProjector,
   fRequest,
   fRotateCode,
+  fUnblock,
   getConfig,
   waitForRequest,
   type ArtifactMeta,
@@ -313,7 +315,7 @@ function ClassDashboard({ config, me, classId, onGone }: { config: StudioConfig;
             const requests = idx >= 0 ? d.requests.map((x) => (x.id === r.id ? r : x)) : [...d.requests, r];
             return { ...d, requests };
           });
-          if (data.request.status === "done" || data.request.status === "blocked") void load(); // refresh ticket counts/approvals
+          if (data.request.status === "done" || data.request.status === "blocked" || data.request.status === "held") void load(); // refresh ticket counts/approvals
         } else if (data.type === "class") {
           setDetail((d) => (d ? { ...d, class: data.klass } : d));
         } else if (data.type === "approval") {
@@ -467,8 +469,84 @@ function SmallBtn({ children, onClick, title }: { children: React.ReactNode; onC
   );
 }
 
+/**
+ * A held order: the screening said no, but it is the facilitator's call. The
+ * child's words are shown editable so a refused name ("Supergirl") can become
+ * a description ("a tall strong hero in a red cape") before the order runs
+ * again. Unblocking keeps the request and its ticket; the run is audited.
+ */
+function HeldReview({ r, modes }: { r: StudioRequest; modes: StudioConfig["modes"] }) {
+  const mode = modes.find((m) => m.id === r.mode);
+  const fields: { key: string; label: string }[] =
+    r.kind === "create" ? (mode?.createFields ?? []).map((f) => ({ key: f.key, label: f.label })) : r.kind === "change" ? [{ key: "change", label: "Change" }] : [{ key: "message", label: "Message" }];
+  const [draft, setDraft] = useState<Record<string, string>>(() => ({ ...r.input }));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const edited = fields.some((f) => (draft[f.key] ?? "") !== (r.input[f.key] ?? ""));
+  const why = (r.flags ?? []).map((f) => f.detail).filter(Boolean);
+
+  async function act(fn: () => Promise<unknown>) {
+    setBusy(true);
+    setError(null);
+    try {
+      await fn();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "That didn't work.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-3 rounded-xl bg-white p-3 ring-1 ring-rose-200">
+      <p className="text-sm font-extrabold text-rose-800">🙋 Waiting for you</p>
+      <p className="mt-1 text-xs text-slate-600">
+        The screening said no, but it's your call. Walk over and read the order with the child, then let it run as written, fix the words first, or keep it blocked. The child has been told you're coming.
+      </p>
+      {why.length > 0 && (
+        <ul className="mt-2 list-disc pl-5 text-xs text-slate-600">
+          {why.map((w, i) => (
+            <li key={i}>{w}</li>
+          ))}
+        </ul>
+      )}
+      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+        {fields.map((f) => (
+          <label key={f.key} className="block text-xs font-semibold text-slate-600">
+            {f.label}
+            <input
+              value={draft[f.key] ?? ""}
+              onChange={(e) => setDraft((d) => ({ ...d, [f.key]: e.target.value }))}
+              className="mt-0.5 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm font-normal text-slate-900"
+            />
+          </label>
+        ))}
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <BigButton className="!px-4 !py-2 !text-base" disabled={busy} onClick={() => act(() => fUnblock(r.id, edited ? draft : undefined))}>
+          {edited ? "✓ Make it with my edits" : "✓ Unblock & make it"}
+        </BigButton>
+        <BigButton variant="danger" className="!px-4 !py-2 !text-base" disabled={busy} onClick={() => act(() => fKeepBlocked(r.id))}>
+          ✕ Keep blocked
+        </BigButton>
+        {busy && <Spinner />}
+      </div>
+      {error && <p className="mt-2 text-xs font-semibold text-rose-700">{error}</p>}
+    </div>
+  );
+}
+
 function FeedItem({ r, who, modes, onPreview, previewing }: { r: StudioRequest; who: string; modes: StudioConfig["modes"]; onPreview: (id: number | null) => void; previewing: boolean }) {
-  const tone = r.status === "blocked" ? "border-rose-300 bg-rose-50" : r.status === "failed" ? "border-amber-300 bg-amber-50" : r.status === "done" ? "border-emerald-200 bg-white" : "border-violet-200 bg-violet-50";
+  const tone =
+    r.status === "held"
+      ? "border-rose-400 bg-rose-50 ring-2 ring-rose-200"
+      : r.status === "blocked"
+        ? "border-rose-300 bg-rose-50"
+        : r.status === "failed"
+          ? "border-amber-300 bg-amber-50"
+          : r.status === "done"
+            ? "border-emerald-200 bg-white"
+            : "border-violet-200 bg-violet-50";
   return (
     <li className={cx("rounded-xl border p-3", tone)}>
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -480,9 +558,11 @@ function FeedItem({ r, who, modes, onPreview, previewing }: { r: StudioRequest; 
       <p className="mt-1 text-sm text-slate-800">{summarizeInput(r, modes)}</p>
       {r.kind === "chat" && r.status === "done" && r.message && <p className="mt-1 rounded-xl bg-violet-50 px-3 py-2 text-sm text-violet-900">🤖 {r.message}</p>}
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <span className={cx("rounded-full px-2 py-0.5 text-xs font-bold", r.status === "done" ? "bg-emerald-100 text-emerald-800" : r.status === "blocked" ? "bg-rose-100 text-rose-800" : r.status === "failed" ? "bg-amber-100 text-amber-800" : "bg-violet-100 text-violet-800")}>{r.status}</span>
+        <span className={cx("rounded-full px-2 py-0.5 text-xs font-bold", r.status === "done" ? "bg-emerald-100 text-emerald-800" : r.status === "blocked" || r.status === "held" ? "bg-rose-100 text-rose-800" : r.status === "failed" ? "bg-amber-100 text-amber-800" : "bg-violet-100 text-violet-800")}>
+          {r.status === "held" ? "waiting for you" : r.status}
+        </span>
         {(r.flags ?? []).map((f, i) => (
-          <span key={i} className={cx("rounded-full px-2 py-0.5 text-xs font-bold text-white", f.layer === "system" ? "bg-amber-500" : "bg-rose-600")} title={f.detail ?? ""}>
+          <span key={i} className={cx("rounded-full px-2 py-0.5 text-xs font-bold text-white", f.layer === "system" ? "bg-amber-500" : f.layer === "facilitator" ? "bg-emerald-600" : "bg-rose-600")} title={f.detail ?? ""}>
             {f.layer}: {f.category}
             {f.severity !== undefined ? ` (${f.severity})` : ""}
           </span>
@@ -494,6 +574,7 @@ function FeedItem({ r, who, modes, onPreview, previewing }: { r: StudioRequest; 
           </button>
         )}
       </div>
+      {r.status === "held" && <HeldReview r={r} modes={modes} />}
     </li>
   );
 }
