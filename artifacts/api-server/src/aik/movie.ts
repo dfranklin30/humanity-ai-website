@@ -32,6 +32,7 @@ import { generateVideo, speak, ContentFilteredError, usableVoice, type VoiceChoi
 import { Steps, type ForgeStep } from "./forge";
 import { putMedia, type MediaRef } from "./media";
 import { contentSafetyImage, type Flag } from "./safety";
+import { autofixFlag, autofixOn, GENTLE } from "./autofix";
 import { drawScreened } from "./book";
 import { ffmpegAvailable, withWorkDir, extractFrames, cutMovie, ensureAudioTrack } from "./ffmpeg";
 import { scoreFrame, summarise, middleFrame, type FidelityReport, type ShotFidelity } from "./fidelity";
@@ -153,16 +154,28 @@ export async function buildMovie(opts: {
     }
 
     const film = async (s: Shot, i: number): Promise<Buffer | null> => {
-      // A shot that times out or hits a transient provider error gets one more take;
-      // a shot the provider refuses on content grounds does not.
-      for (let take = 1; take <= 2; take++) {
+      // A shot that times out or hits a transient provider error gets one more take.
+      // A shot the provider refuses on content grounds is refilmed once with a
+      // gentler prompt (autofix), then dropped so the rest of the movie still cuts.
+      let gentle = false;
+      for (let take = 1; take <= (autofixOn() ? 3 : 2); take++) {
         try {
-          const m = await generateVideo(shotPrompt(movie.style, s, opts.heroLook), { seconds: s.seconds, size: aikConfig.videoSize, reference: keyframes[i] ?? undefined });
+          const prompt = shotPrompt(movie.style, s, opts.heroLook) + (gentle ? GENTLE : "");
+          const m = await generateVideo(prompt, { seconds: s.seconds, size: aikConfig.videoSize, reference: keyframes[i] ?? undefined });
           return Buffer.from(m.base64, "base64");
         } catch (err) {
           if (err instanceof ContentFilteredError) {
             // The provider's own reason is the only clue a facilitator has about what to change.
             logger.warn({ requestId, shot: s.shot, why: String(err.message).slice(0, 300) }, "[aik] shot refused by the video provider");
+            if (autofixOn() && !gentle) {
+              gentle = true;
+              flags.push(autofixFlag("shot_refilmed", `shot ${s.shot}: ${String(err.message).slice(0, 120)}`));
+              continue;
+            }
+            if (autofixOn()) {
+              flags.push(autofixFlag("shot_skipped", `shot ${s.shot} refused twice by the video model`));
+              return null;
+            }
             throw err;
           }
           logger.warn({ requestId, shot: s.shot, take, err: String((err as Error)?.message ?? err).slice(0, 200) }, "[aik] shot failed");
@@ -267,12 +280,21 @@ export async function buildMovie(opts: {
           const hits = await contentSafetyImage(jpg.toString("base64"));
           if (hits.length) {
             flags.push(...hits);
+            if (autofixOn()) {
+              // One flagged frame drops that shot, not the whole movie; the cut uses what is left.
+              flags.push(autofixFlag("shot_skipped", `shot ${i + 1} failed frame screening`));
+              clips[i] = null;
+              break;
+            }
             steps.end("screen", "failed", `shot ${i + 1}`);
             return { ok: false, blocked: true, message: "One of the shots wasn't right for the club. Try a different idea!", flags, steps: steps.all() };
           }
         }
       }
       steps.end("screen", "done", `${frames} frames`);
+    }
+    if (!clips.some(Boolean)) {
+      return { ok: true, movie, steps: steps.all(), flags, kidNote: "Here's your storyboard! The clips weren't right for the club this time. Try once more with a different idea." };
     }
 
     /* 3. Store the shots ---------------------------------------------- */

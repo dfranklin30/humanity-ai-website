@@ -25,6 +25,34 @@ layout, the media store and the finished-product pipelines. Media (images, video
 facilitator approval before a child sees it. Chats are turn-limited per session
 and every turn is screened both ways and shown on the facilitator dashboard.
 
+## Finish every order (autofix)
+
+A screening hit used to end an order: the child saw "try a different idea" and
+nothing was made. Now the pipeline repairs and keeps going (`autofix.ts`):
+
+| Where it stopped | What happens now |
+|---|---|
+| Private details in the order | They are taken out; the order runs |
+| Blocklist or Content Safety hit on the order | The order is rewritten kid-safe by the fast model (keeping the idea), screened again, and runs |
+| The model's own filter, a redirect, output screening | Generated again with a gentler instruction, up to `AIK_AUTOFIX_TRIES` (default 2) |
+| A refused book page or movie keyframe | Redrawn gentler once, then that one picture is skipped; the words stay |
+| A refused or flagged movie shot | Refilmed gentler once, then that shot is dropped; the rest is cut |
+| A game that fails its checks, a text provider hiccup | Plain build as a second chance; two quiet retries before the fallback provider |
+
+What still stops an order, always: a prompt attack (Prompt Shields), a child who
+is hurting (care alert), and screening itself being unavailable. When the
+repairs run out, a class order is **held** for the facilitator, never silently
+blocked, so the child's idea is not lost. Every repair is a flag
+(`layer: "autofix"`, blue on the dashboard) and an audit event
+(`request_autofixed`), and the child's result note says what changed. The
+facilitator approval gate for generated media is unchanged. `AIK_AUTOFIX=false`
+turns all of it off.
+
+Tests: `autofix.test.ts` (unit), `autofix.e2e.ts` (mock, end to end: repaired →
+done; PII → done; attack → blocked; repairs used up → held; every studio twice
+from the Hub), and `soak.e2e.ts` (a real deployment: every studio, N rounds,
+from a facilitator's Hub, reports what came back).
+
 ## The Hub (`/aiforkids/hub`)
 
 The staff side. One signed-in place where Humanity + AI does its own AI work:

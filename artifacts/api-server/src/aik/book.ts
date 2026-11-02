@@ -28,6 +28,7 @@ import { COMMON_RULES, extractJson, type ModeDef } from "./modes";
 import { Steps, type ForgeStep } from "./forge";
 import { putMedia, getMedia, type MediaRef } from "./media";
 import { screenOutputText, contentSafetyImage, stripLinks, type Flag } from "./safety";
+import { autofixFlag, autofixOn, GENTLE } from "./autofix";
 import { logger } from "../lib/logger";
 
 export type BookPage = {
@@ -270,8 +271,31 @@ export async function buildBook(opts: {
 
 type Drawn = { png: string | null; blocked: boolean; message: string };
 
-/** One picture, generated and screened. A screening hit blocks the whole book; a generation failure just loses that picture. */
+/**
+ * One picture, generated and screened.
+ *
+ * With autofix on (the default): a screening hit redraws the picture once with
+ * a gentler prompt, and if that is refused too the picture is skipped and the
+ * words stay, so no single picture can stop a book or a movie. A plain
+ * generation failure gets one more try. With autofix off, a screening hit
+ * still blocks the whole piece, as before.
+ */
 export async function drawScreened(prompt: string, referencePng: string | undefined, flags: Flag[]): Promise<Drawn> {
+  let made = await drawOnce(prompt, referencePng, flags);
+  if (!autofixOn()) return made;
+  if (!made.png && !made.blocked) made = await drawOnce(prompt, referencePng, flags);
+  if (made.blocked) {
+    flags.push(autofixFlag("picture_redrawn"));
+    made = await drawOnce(prompt + GENTLE, referencePng, flags);
+    if (made.blocked) {
+      flags.push(autofixFlag("picture_skipped", "refused twice by screening; the words stay"));
+      return { png: null, blocked: false, message: "picture skipped after screening" };
+    }
+  }
+  return made;
+}
+
+async function drawOnce(prompt: string, referencePng: string | undefined, flags: Flag[]): Promise<Drawn> {
   try {
     const img = await generateImage(prompt, { reference: referencePng });
     if (isContentSafetyConfigured()) {

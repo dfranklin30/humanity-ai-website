@@ -562,7 +562,7 @@ function FeedItem({ r, who, modes, onPreview, previewing }: { r: StudioRequest; 
           {r.status === "held" ? "waiting for you" : r.status}
         </span>
         {(r.flags ?? []).map((f, i) => (
-          <span key={i} className={cx("rounded-full px-2 py-0.5 text-xs font-bold text-white", f.layer === "system" ? "bg-amber-500" : f.layer === "facilitator" ? "bg-emerald-600" : "bg-rose-600")} title={f.detail ?? ""}>
+          <span key={i} className={cx("rounded-full px-2 py-0.5 text-xs font-bold text-white", f.layer === "system" ? "bg-amber-500" : f.layer === "facilitator" ? "bg-emerald-600" : f.layer === "autofix" ? "bg-sky-600" : "bg-rose-600")} title={f.detail ?? ""}>
             {f.layer}: {f.category}
             {f.severity !== undefined ? ` (${f.severity})` : ""}
           </span>

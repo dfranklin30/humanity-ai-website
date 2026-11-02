@@ -5,7 +5,8 @@
  *   BASE_URL=http://localhost:5055 DATABASE_URL=postgres://aik@127.0.0.1:55432/aik \
  *     pnpm --filter @workspace/api-server exec tsx src/aik/hold.e2e.ts
  *
- * In mock mode the token [[unsafe]] stands in for a Content Safety hit and
+ * In mock mode the token [[stuck]] stands in for a Content Safety hit that the
+ * autofix rewrite cannot repair (see autofix.e2e.ts for the repaired path) and
  * [[jailbreak]] for Prompt Shields (safety.ts). The script signs up a
  * facilitator (verifying the address directly in the database, since no mail
  * is configured locally), opens a class, joins it as a child, and walks every
@@ -91,7 +92,7 @@ async function main() {
   const settled = (r: any) => ["done", "blocked", "failed", "held"].includes(r.status);
 
   /* ---- 1. a judgment-call hit is HELD, not blocked ---- */
-  let r = (await kid.call("POST", "/child/requests", { mode: "video", kind: "create", input: { ...ORDER, what: "a tall strong hero [[unsafe]]" } }, 200)).json.request;
+  let r = (await kid.call("POST", "/child/requests", { mode: "video", kind: "create", input: { ...ORDER, what: "a tall strong hero [[stuck]]" } }, 200)).json.request;
   let s = await waitFor(() => kidReq(r.id), settled, "order 1 settles");
   assert.equal(s.status, "held", `expected held, got ${s.status}: ${s.message}`);
   assert.match(s.message, /facilitator is coming/i);
@@ -115,7 +116,7 @@ async function main() {
   ok("unblock with edited words → done, edits used, decision on the record");
 
   /* ---- 3. unblock AS WRITTEN → runs past Content Safety's verdict → done ---- */
-  r = (await kid.call("POST", "/child/requests", { mode: "video", kind: "create", input: { ...ORDER, what: "a tall strong hero [[unsafe]]" } }, 200)).json.request;
+  r = (await kid.call("POST", "/child/requests", { mode: "video", kind: "create", input: { ...ORDER, what: "a tall strong hero [[stuck]]" } }, 200)).json.request;
   s = await waitFor(() => kidReq(r.id), settled, "order 2 settles");
   assert.equal(s.status, "held");
   await fac.call("POST", `/facilitator/requests/${r.id}/unblock`, {}, 200);
@@ -126,7 +127,7 @@ async function main() {
   ok("unblock as written → done (Content Safety's text verdict skipped, everything else ran)");
 
   /* ---- 4. keep blocked ---- */
-  r = (await kid.call("POST", "/child/requests", { mode: "video", kind: "create", input: { ...ORDER, what: "a tall strong hero [[unsafe]]" } }, 200)).json.request;
+  r = (await kid.call("POST", "/child/requests", { mode: "video", kind: "create", input: { ...ORDER, what: "a tall strong hero [[stuck]]" } }, 200)).json.request;
   s = await waitFor(() => kidReq(r.id), settled, "order 3 settles");
   assert.equal(s.status, "held");
   await fac.call("POST", `/facilitator/requests/${r.id}/keep-blocked`, {}, 200);
@@ -152,12 +153,14 @@ async function main() {
   /* ---- 7. hard stops stay hard: PII and prompt attacks block outright ---- */
   r = (await kid.call("POST", "/child/requests", { mode: "video", kind: "create", input: { ...ORDER, what: "my friend, call 404-555-0123" } }, 200)).json.request;
   s = await waitFor(() => kidReq(r.id), settled, "PII order settles");
-  assert.equal(s.status, "blocked", `PII should block, got ${s.status}`);
-  assert.match(s.message, /names, phone numbers/i);
+  // Private details no longer stop the order: they are taken out and the order runs (autofix).
+  assert.equal(s.status, "done", `PII should be removed and the order finished, got ${s.status}: ${s.message}`);
+  assert.match(s.message ?? "", /personal details/i);
+  assert.ok(!/404-555/.test(JSON.stringify((await facReq(r.id)).flags)), "the phone number is not echoed in the flags");
   r = (await kid.call("POST", "/child/requests", { mode: "video", kind: "create", input: { ...ORDER, what: "a hero [[jailbreak]]" } }, 200)).json.request;
   s = await waitFor(() => kidReq(r.id), settled, "jailbreak order settles");
   assert.equal(s.status, "blocked", `Prompt Shields should block, got ${s.status}`);
-  ok("PII and Prompt Shields still block immediately (never held)");
+  ok("PII is removed and the order finishes; Prompt Shields still block immediately (never held)");
 
   /* ---- 8. a clean order is untouched by all this ---- */
   r = (await kid.call("POST", "/child/requests", { mode: "video", kind: "create", input: ORDER }, 200)).json.request;
@@ -166,7 +169,7 @@ async function main() {
   ok("a clean order still goes straight through");
 
   /* ---- 9. authorization: children and strangers cannot decide ---- */
-  const heldAgain = (await kid.call("POST", "/child/requests", { mode: "video", kind: "create", input: { ...ORDER, what: "a hero [[unsafe]]" } }, 200)).json.request;
+  const heldAgain = (await kid.call("POST", "/child/requests", { mode: "video", kind: "create", input: { ...ORDER, what: "a hero [[stuck]]" } }, 200)).json.request;
   await waitFor(() => kidReq(heldAgain.id), settled, "order 4 settles");
   const anon = new Jar();
   const a1 = await anon.call("POST", `/facilitator/requests/${heldAgain.id}/unblock`, {});
