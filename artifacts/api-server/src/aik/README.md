@@ -65,8 +65,12 @@ keyframes, a poster or nine failed submits. `/api/aik/config` shows
 still makes a movie when pictures and ffmpeg are available: each shot's
 screened keyframe is brought to life with a slow push-in, narrated and cut
 behind the title card (`animateStill` in `ffmpeg.ts`; `madeWith.stills`).
-The replacement camera is a new video provider (Runway, see
-`AIK_VIDEO_PROVIDER=runway` once that lands; `fal` is also wired).
+The replacement camera is **Runway** (`AIK_VIDEO_PROVIDER=runway`,
+`AIK_RUNWAY_API_KEY` from Key Vault): image-to-video with `gen4_turbo` from
+each shot's keyframe, so the hero stays the same across shots, and `gen4.5`
+text-to-video for a shot with no keyframe. Runway's own moderation refusals
+(`SAFETY.*`) count as screening hits; a bad key or empty credits pause movies
+the same way a dead deployment does. `fal` is also wired.
 
 ## The Hub (`/aiforkids/hub`)
 
