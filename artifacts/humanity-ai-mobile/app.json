@@ -2,7 +2,7 @@
   "expo": {
     "name": "Humanity + AI",
     "slug": "humanity-ai-mobile",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "humanity-ai-mobile",
@@ -24,7 +24,7 @@
     },
     "android": {
       "package": "org.humanityplusai.app",
-      "versionCode": 10,
+      "versionCode": 13,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#0a2117"
