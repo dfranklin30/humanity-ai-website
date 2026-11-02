@@ -147,6 +147,35 @@ export async function cutMovie(dir: string, opts: CutOptions): Promise<Buffer> {
  * has the same streams. Sora clips usually carry sound; a silent one gets a
  * silent track rather than breaking the cut.
  */
+/**
+ * Picture-motion: a screened still becomes a clip of `seconds`, with a slow
+ * push-in so the frame breathes. Used when no video model is available, so
+ * Video Maker still delivers a movie made from the pictures it painted.
+ */
+export async function animateStill(dir: string, png: Buffer, seconds: number, size: string, name: string): Promise<Buffer> {
+  const [w, h] = size.split("x").map(Number);
+  const W = w || 1280;
+  const H = h || 720;
+  const input = path.join(dir, `${name}-still.png`);
+  const output = path.join(dir, `${name}-motion.mp4`);
+  await writeFile(input, png);
+  const fps = 24;
+  const frames = Math.max(fps, Math.round(Math.max(1, seconds) * fps));
+  // Work at 2x so the zoom does not shimmer, push in to ~10% over the clip, then size down.
+  const vf = [
+    `scale=${W * 2}:${H * 2}:force_original_aspect_ratio=increase`,
+    `crop=${W * 2}:${H * 2}`,
+    `zoompan=z='min(1+0.10*on/${frames},1.10)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${W}x${H}:fps=${fps}`,
+    "format=yuv420p",
+  ].join(",");
+  await run(
+    ["-loop", "1", "-framerate", String(fps), "-i", input, "-vf", vf, "-t", String(seconds), "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-profile:v", "main", "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-an", output],
+    120_000,
+    dir,
+  );
+  return readFile(output);
+}
+
 export async function ensureAudioTrack(dir: string, clip: Buffer, name: string): Promise<Buffer> {
   const input = path.join(dir, `${name}-in.mp4`);
   const output = path.join(dir, `${name}-norm.mp4`);
