@@ -28,8 +28,14 @@ test("the blocklist and Prompt Shields are hard stops", () => {
   assert.equal(shouldHold([{ layer: "prompt_shield", category: "jailbreak" }]), false);
 });
 
-test("system faults and grown-up redirects are not held", () => {
-  assert.equal(shouldHold([{ layer: "system", category: "content_safety_unavailable" }]), false);
+test("screening being unreachable holds the order for a grown-up; other system faults do not", () => {
+  assert.equal(shouldHold([{ layer: "system", category: "content_safety_unavailable" }]), true);
+  assert.equal(shouldHold([{ layer: "system", category: "content_safety_not_configured" }]), true);
+  assert.equal(shouldHold([{ layer: "system", category: "bad_request" }]), false);
+  assert.equal(shouldHold([{ layer: "system", category: "content_safety_unavailable" }, { layer: "pii", category: "phone" }]), false);
+});
+
+test("grown-up redirects and care alerts are not held", () => {
   assert.equal(shouldHold([{ layer: "output", category: "redirect" }]), false);
   assert.equal(shouldHold([{ layer: "output", category: "care_alert" }]), false);
 });

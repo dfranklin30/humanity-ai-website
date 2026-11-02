@@ -39,8 +39,10 @@ nothing was made. Now the pipeline repairs and keeps going (`autofix.ts`):
 | A refused or flagged movie shot | Refilmed gentler once, then that shot is dropped; the rest is cut |
 | A game that fails its checks, a text provider hiccup | Plain build as a second chance; two quiet retries before the fallback provider |
 
-What still stops an order, always: a prompt attack (Prompt Shields), a child who
-is hurting (care alert), and screening itself being unavailable. When the
+What still stops an order, always: a prompt attack (Prompt Shields) and a child
+who is hurting (care alert). Screening itself being unreachable no longer ends
+an order: it is **held** for the facilitator (Hub orders too), who re-runs it
+once screening is back; nothing is ever made unscreened. When the
 repairs run out, a class order is **held** for the facilitator, never silently
 blocked, so the child's idea is not lost. Every repair is a flag
 (`layer: "autofix"`, blue on the dashboard) and an audit event

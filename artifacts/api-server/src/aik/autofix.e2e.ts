@@ -131,6 +131,21 @@ async function main() {
   assert.ok(await audited(r.id, "request_held"), "request_held audited");
   ok("repairs used up → held for the facilitator (not blocked), audited");
 
+  /* ---- 4b. screening unreachable → held for the facilitator, never "taking a break" ---- */
+  if (config.capabilities?.screening?.required) {
+    r = (await kid.call("POST", "/child/requests", { mode: "video", kind: "create", input: { ...ORDER, what: "a hero [[screening-down]]" } }, 200)).json.request;
+    s = await waitFor(() => kidReq(r.id), settled, "screening-down order settles");
+    assert.equal(s.status, "held", `expected held, got ${s.status}: ${s.message}`);
+    assert.doesNotMatch(s.message ?? "", /taking a break/i);
+    f = await facReq(r.id);
+    assert.ok(f.flags.some((x: any) => x.layer === "system" && x.category === "content_safety_unavailable"), "facilitator sees why");
+    const hub = (await fac.call("POST", "/hub/requests", { mode: "video", kind: "create", input: { ...ORDER, what: "a hero [[screening-down]]" } }, 200)).json;
+    const hubId = hub.request?.id ?? hub.id;
+    const hs = await waitFor(() => fac.call("GET", `/hub/requests/${hubId}`, undefined, 200).then((x) => x.json.request ?? x.json), settled, "hub screening-down settles");
+    assert.equal(hs.status, "held", `hub order should wait too, got ${hs.status}`);
+    ok("screening unreachable → held (class and Hub), with the reason on the record");
+  }
+
   /* ---- 5. a clean order is untouched ---- */
   r = (await kid.call("POST", "/child/requests", { mode: "video", kind: "create", input: ORDER }, 200)).json.request;
   s = await waitFor(() => kidReq(r.id), settled, "clean order settles");
