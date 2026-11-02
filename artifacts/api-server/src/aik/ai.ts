@@ -78,15 +78,26 @@ export async function completeText(opts: TextCallOptions): Promise<string> {
   if (aikConfig.mockAI) return mockText(opts);
   const provider: TextProviderId = opts.provider ?? (opts.tier === "oss" ? aikConfig.providers.ossText : aikConfig.providers.text);
   if (!textProviderConfigured(provider)) throw new Error(`Text provider "${provider}" not configured`);
-  try {
-    return await completeWith(provider, opts);
-  } catch (err) {
-    if (err instanceof ContentFilteredError) throw err;
-    const fallback = textFallbackProvider(provider);
-    if (!fallback) throw err;
-    logger.warn({ err: String((err as Error)?.message ?? err).slice(0, 200), provider, fallback }, "[aik] text provider failed; trying fallback");
-    return completeWith(fallback, opts);
+  // Transient trouble (a 429, a timeout, a dropped connection) gets two more
+  // tries with a short pause before the fallback provider is asked, so one
+  // hiccup never costs a child their order. A content refusal is never retried here.
+  let lastErr: unknown = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      return await completeWith(provider, opts);
+    } catch (err) {
+      if (err instanceof ContentFilteredError) throw err;
+      lastErr = err;
+      if (attempt < 3) {
+        logger.warn({ err: String((err as Error)?.message ?? err).slice(0, 200), provider, attempt }, "[aik] text provider failed; trying again");
+        await new Promise((r) => setTimeout(r, 400 * attempt));
+      }
+    }
   }
+  const fallback = textFallbackProvider(provider);
+  if (!fallback) throw lastErr;
+  logger.warn({ err: String((lastErr as Error)?.message ?? lastErr).slice(0, 200), provider, fallback }, "[aik] text provider failed; trying fallback");
+  return completeWith(fallback, opts);
 }
 
 async function completeWith(provider: TextProviderId, opts: TextCallOptions): Promise<string> {
@@ -788,6 +799,37 @@ function realRobotMock(): string {
 
 function mockText(opts: TextCallOptions): string {
   switch (opts.mockKind) {
+    // The kid-safe rewrite (autofix.ts): [[unsafe]] comes out and any word the
+    // blocklist named becomes a foam noodle. [[stuck]] is left in on purpose.
+    case "rewrite": {
+      const m = /FIELDS \(JSON\): (\{.*\})\nFLAGGED FOR: (\[.*\])/s.exec(opts.user ?? "");
+      let values: Record<string, string> = {};
+      let flagged: string[] = [];
+      try {
+        values = m ? JSON.parse(m[1]) : {};
+        flagged = m ? JSON.parse(m[2]) : [];
+      } catch {
+        /* an unreadable prompt just means nothing changes */
+      }
+      const words = flagged.map((f) => String(f).split(": ")[1]).filter(Boolean);
+      const changes: string[] = [];
+      for (const k of Object.keys(values)) {
+        let v = String(values[k]);
+        if (/\[\[unsafe\]\]/i.test(v)) {
+          v = v.replace(/\s*\[\[unsafe\]\]\s*/gi, " ").trim();
+          changes.push("I took out the part that wasn't right for the club.");
+        }
+        for (const w of words) {
+          const re = new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "gi");
+          if (re.test(v)) {
+            v = v.replace(re, "foam noodle");
+            changes.push(`I swapped "${w}" for a foam noodle.`);
+          }
+        }
+        values[k] = v;
+      }
+      return JSON.stringify({ values, changes });
+    }
     case "language":
       return mockLanguageBook();
     case "langcheck":

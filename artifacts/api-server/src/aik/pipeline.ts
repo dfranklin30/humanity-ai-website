@@ -19,6 +19,7 @@ import { stripArt, carryArt, type GameHero } from "./gameart";
 import { writeBookDraft, buildBook, bookTextOnly, type Book, type BookDraft } from "./book";
 import { findLanguage, writeLanguageDraft, languageUserPrompt, languageTextOnly, langBlock, recordWords, spokenText, type LangBook, type LangDef, type LangDraft } from "./language";
 import { buildMovie, type Movie } from "./movie";
+import { autofixFlag, fixable, fixNote, rewriteOrder, softenRule, stripPIIFromValues, type Fix } from "./autofix";
 import { putMedia, discardMedia } from "./media";
 import { verifyMicrobitCode } from "./verify";
 import { loadRemixContext, remixBlock, type RemixContext } from "./remix";
@@ -133,6 +134,18 @@ export function toPublicClass(c: ClassRow): PublicClass {
  */
 const remixContexts = new Map<number, RemixContext>();
 
+/** Repairs made while an order ran, in the child's words; complete() reads them back into the result note. */
+const fixNotes = new Map<number, Fix[]>();
+function rememberFixes(requestId: number, fixes: Fix[]): void {
+  if (!fixes.length) return;
+  fixNotes.set(requestId, [...(fixNotes.get(requestId) ?? []), ...fixes]);
+}
+function takeFixes(requestId: number): Fix[] {
+  const f = fixNotes.get(requestId) ?? [];
+  fixNotes.delete(requestId);
+  return f;
+}
+
 /** Hidden request inputs written only by the routes, never by a form. */
 export const REMIX_FROM_KEY = "__remixFrom";
 export const PROJECT_KEY = "__projectId";
@@ -171,6 +184,67 @@ export function shouldHold(flags: unknown[]): boolean {
 export const UNBLOCKED_FLAG: Flag = { layer: "facilitator", category: "unblocked" };
 export function wasUnblocked(r: Pick<RequestRow, "flags">): boolean {
   return Array.isArray(r.flags) && r.flags.some((f: any) => f?.layer === "facilitator" && f?.category === "unblocked");
+}
+
+/**
+ * Where an order goes when the repairs run out. A class order waits for the
+ * facilitator (held) so the child's idea is not lost; staff work in the Hub,
+ * a prompt attack or a screening outage is simply blocked, as before.
+ */
+async function holdOrBlock(req: RequestRow, message: string, flags: Flag[]): Promise<void> {
+  fixNotes.delete(req.id);
+  const klass = await store.getClass(req.class_id);
+  const hard = flags.some((f) => f.layer === "prompt_shield" || f.layer === "system" || f.category === "care_alert");
+  if (!aikConfig.autofix || hard || !klass || klass.kind === "workspace") {
+    await finish(req, { status: "blocked", message, flags });
+    await store.audit(req.class_id, "system", null, "request_blocked", { requestId: req.id, flags }).catch(() => {});
+    return;
+  }
+  const held = [...flags, autofixFlag("exhausted", "repairs used up; waiting for the facilitator")];
+  await finish(req, { status: "held", message: KID_MESSAGES.held, flags: held });
+  await store.audit(req.class_id, "system", null, "request_held", { requestId: req.id, flags: held, screeningMessage: message }).catch(() => {});
+}
+
+/**
+ * Repair an order the screen stopped: private details out, then a kid-safe
+ * rewrite that keeps the idea, each followed by a fresh screen. Null when the
+ * repairs run out or the rewrite is unusable (the order is then held).
+ */
+async function repairOrder(
+  mode: ModeDef,
+  input: ReturnType<typeof validateInput> & { ok: true },
+  hit: Flag[],
+  staff: boolean,
+): Promise<{ input: ReturnType<typeof validateInput> & { ok: true }; fixes: Fix[]; flags: Flag[] } | null> {
+  if (input.kind === "chat") return null;
+  const max = staff ? aikConfig.staffFieldChars : aikConfig.maxFieldChars;
+  const fields: Pick<ModeDef, "name" | "createFields"> =
+    input.kind === "create" ? mode : { name: mode.name, createFields: [{ key: "change", label: "Change", hint: "", required: true, maxChars: max }] };
+  let values: Record<string, string> = input.kind === "create" ? { ...input.values } : { change: input.change };
+  const fixes: Fix[] = [];
+  const added: Flag[] = [];
+  let flagsNow = hit;
+  for (let attempt = 0; attempt < aikConfig.autofixTries; attempt++) {
+    if (flagsNow.some((f) => f.layer === "pii")) {
+      const stripped = stripPIIFromValues(fields, values);
+      values = stripped.values;
+      fixes.push("I left out some personal details");
+      added.push(autofixFlag("pii_removed", stripped.removed.join(", ")));
+    } else {
+      const rewritten = await rewriteOrder(fields, values, flagsNow);
+      if (!rewritten) return null;
+      values = rewritten.values;
+      fixes.push(...rewritten.changes);
+      added.push(autofixFlag("order_rewritten", rewritten.changes.join("; ")));
+    }
+    const next = validateInput(mode, input.kind, values, { staff });
+    if (!next.ok) return null;
+    const again = await screenInput(next.text);
+    if (again.ok) return { input: next, fixes, flags: [...added, ...again.flags] };
+    if (!fixable(again.flags)) return null;
+    flagsNow = again.flags;
+  }
+  return null;
 }
 
 async function finish(req: RequestRow, patch: Parameters<typeof store.finishRequest>[1]): Promise<RequestRow> {
@@ -214,11 +288,13 @@ export async function runRequest(requestId: number): Promise<void> {
 
     // 1. Validate shape
     const isStaff = klass.kind === "workspace";
-    const input = validateInput(mode, req.kind, req.input, { staff: isStaff });
-    if (!input.ok) {
-      await finish(req, { status: "blocked", message: input.error, flags: [{ layer: "system", category: "invalid_input" }] });
+    const validated = validateInput(mode, req.kind, req.input, { staff: isStaff });
+    if (!validated.ok) {
+      await finish(req, { status: "blocked", message: validated.error, flags: [{ layer: "system", category: "invalid_input" }] });
       return;
     }
+    // A repaired order (autofix) replaces this before the model sees it.
+    let input: ReturnType<typeof validateInput> & { ok: true } = validated;
 
     // 2a. A child who is hurting gets care, not a block. Checked before any
     // screening so the words "hurt myself" never produce a scolding message.
@@ -228,13 +304,27 @@ export async function runRequest(requestId: number): Promise<void> {
       return;
     }
 
-    // 2. Screen the child's words
+    // 2. Screen the child's words. A hit no longer ends the order: private
+    // details come out, unsafe words are rewritten kid-safe, and the result
+    // is screened again (autofix.ts). Only a prompt attack, a child who is
+    // hurting, or a screening outage still stops here.
     const screen = await screenInput(input.text);
     flags.push(...screen.flags);
     if (!screen.ok) {
       const onlyJudgmentCall = screen.flags.length > 0 && screen.flags.every((f) => f.layer === "content_safety");
       if (unblocked && onlyJudgmentCall) {
         logger.info({ requestId: req.id, flags: screen.flags }, "[aik] facilitator unblocked; running past Content Safety's text verdict");
+      } else if (input.kind !== "chat" && fixable(screen.flags)) {
+        const fixed = await repairOrder(mode, input, screen.flags, isStaff);
+        if (!fixed) {
+          await holdOrBlock(req, screen.kidMessage, flags);
+          return;
+        }
+        input = fixed.input;
+        flags.push(...fixed.flags);
+        rememberFixes(req.id, fixed.fixes);
+        await store.audit(req.class_id, "system", null, "request_autofixed", { requestId: req.id, fixes: fixed.fixes, flags: screen.flags }).catch(() => {});
+        logger.info({ requestId: req.id, fixes: fixed.fixes }, "[aik] order repaired and screened again");
       } else {
         await finish(req, { status: "blocked", message: screen.kidMessage, flags });
         await store.audit(req.class_id, "system", null, "request_blocked", { requestId: req.id, flags: screen.flags });
@@ -304,7 +394,9 @@ export async function runRequest(requestId: number): Promise<void> {
       // round-trips, and unordered writes would leave the last-written row
       // showing an early step forever.
       let writeChain: Promise<unknown> = Promise.resolve();
-      const forged = await forgeGame({
+      let forged: Awaited<ReturnType<typeof forgeGame>> | null = null;
+      try {
+        forged = await forgeGame({
         brief: input.text,
         soundEnabled: klass.sound_enabled,
         charBudget: studio ? aikConfig.studioGameChars : aikConfig.kidsGameChars,
@@ -318,61 +410,91 @@ export async function runRequest(requestId: number): Promise<void> {
           publish(req.class_id, { type: "request", request: toPublicRequest({ ...req, status: "working", progress: steps }) });
         },
       });
+      } catch (err) {
+        logger.warn({ requestId: req.id, err: String((err as Error)?.message ?? err).slice(0, 200) }, "[aik] game forge failed; building the plain way instead");
+      }
       await writeChain.catch(() => {});
-      // The authoritative final state, whatever the streaming writes did.
-      await store.setProgress(req.id, forged.steps).catch(() => {});
-      const built = await buildArtifact(mode.id, forged.html, input, current, klass, flags, req.id);
-      if (!built.ok) {
-        await finish(req, { status: built.blocked ? "blocked" : "failed", message: built.message, flags: [...flags, ...built.flags] });
-        return;
-      }
-      // Keep the planned title and pitch: they are better than anything
-      // scraped back out of the markup.
-      await complete(
-        req,
-        { ...built.artifact, title: forged.title || built.artifact.title, summary: forged.summary || built.artifact.summary },
-        flags,
-      );
-      return;
-    }
-
-    let raw: string;
-    try {
-      raw = await completeText({ system: sys, user: usr, maxTokens: mode.maxTokens, temperature: mode.temperature, tier: mode.tier, mockKind: mode.id });
-    } catch (err) {
-      if (err instanceof ContentFilteredError) {
-        await finish(req, { status: "blocked", message: KID_MESSAGES.unsafe, flags: [...flags, { layer: "content_safety", category: "provider_filter" }] });
-        return;
-      }
-      throw err;
-    }
-    if (isRedirect(raw)) {
-      await finish(req, { status: "blocked", message: "That's a grown-up question. Let's ask your facilitator!", flags: [...flags, { layer: "output", category: "redirect" }] });
-      return;
-    }
-
-    // 5. Turn the reply into an artifact, screening on the way
-    const built = await buildArtifact(mode.id, raw, input, current, klass, flags, req.id);
-    if (!built.ok) {
-      // one retry for shape problems only
-      if (built.retryable) {
-        const raw2 = await completeText({
-          system: sys + "\n\nIMPORTANT: your previous reply had the wrong format. Follow OUTPUT FORMAT exactly.",
-          user: usr,
-          maxTokens: mode.maxTokens,
-          temperature: Math.max(0, mode.temperature - 0.2),
-          tier: mode.tier,
-          mockKind: mode.id,
-        });
-        const built2 = await buildArtifact(mode.id, raw2, input, current, klass, flags, req.id);
-        if (built2.ok) {
-          await finalize(req, mode, built2.artifact, flags);
+      if (forged) {
+        // The authoritative final state, whatever the streaming writes did.
+        await store.setProgress(req.id, forged.steps).catch(() => {});
+        const built = await buildArtifact(mode.id, forged.html, input, current, klass, flags, req.id);
+        if (built.ok) {
+          // Keep the planned title and pitch: they are better than anything
+          // scraped back out of the markup.
+          await complete(
+            req,
+            { ...built.artifact, title: forged.title || built.artifact.title, summary: forged.summary || built.artifact.summary },
+            flags,
+          );
           return;
         }
-        await finish(req, { status: built2.blocked ? "blocked" : "failed", message: built2.message, flags: [...flags, ...built2.flags] });
+        if (built.blocked && !fixable(built.flags)) {
+          await holdOrBlock(req, built.message, [...flags, ...built.flags]);
+          return;
+        }
+        logger.warn({ requestId: req.id, flags: built.flags }, "[aik] forged game did not pass; building the plain way instead");
+      }
+      // A forge that threw, or a game that did not pass, is not the end: the
+      // plain build below is a second chance, with the gentler retries it has.
+      flags.push(autofixFlag("plain_build", "the checked game build did not finish; built the simple way"));
+    }
+
+    /* ---- 4 + 5. Model call, then an artifact, with repairs ------------
+     * A wrong-shape reply gets one tighter retry. A screening hit (the
+     * provider's own filter, a redirect, output screening, a refused picture)
+     * gets `autofixTries` gentler retries. Only then is the order held for
+     * the facilitator; it is never silently blocked.                      */
+    let built: Extract<BuildResult, { ok: true }> | null = null;
+    let sysNow = sys;
+    let shapeRetried = false;
+    let fixesLeft = aikConfig.autofix ? aikConfig.autofixTries : 0;
+    const gentler = (why: Flag[]) => {
+      flags.push(autofixFlag("regenerated", why.map((f) => f.category).join(", ")));
+      rememberFixes(req.id, ["I made it a bit gentler"]);
+      sysNow = sys + softenRule(why);
+    };
+    while (!built) {
+      let raw: string;
+      try {
+        raw = await completeText({ system: sysNow, user: usr, maxTokens: mode.maxTokens, temperature: mode.temperature, tier: mode.tier, mockKind: mode.id });
+      } catch (err) {
+        if (!(err instanceof ContentFilteredError)) throw err;
+        const hit: Flag[] = [{ layer: "content_safety", category: "provider_filter" }];
+        if (fixesLeft-- > 0) {
+          gentler(hit);
+          continue;
+        }
+        await holdOrBlock(req, KID_MESSAGES.unsafe, [...flags, ...hit]);
         return;
       }
-      await finish(req, { status: built.blocked ? "blocked" : "failed", message: built.message, flags: [...flags, ...built.flags] });
+      if (isRedirect(raw)) {
+        const hit: Flag[] = [{ layer: "output", category: "redirect" }];
+        if (fixesLeft-- > 0) {
+          gentler(hit);
+          continue;
+        }
+        await holdOrBlock(req, "That's a grown-up question. Let's ask your facilitator!", [...flags, ...hit]);
+        return;
+      }
+      const attempt = await buildArtifact(mode.id, raw, input, current, klass, flags, req.id);
+      if (attempt.ok) {
+        built = attempt;
+        break;
+      }
+      if (attempt.retryable && !shapeRetried) {
+        shapeRetried = true;
+        sysNow = sysNow + "\n\nIMPORTANT: your previous reply had the wrong format. Follow OUTPUT FORMAT exactly.";
+        continue;
+      }
+      if (attempt.blocked && fixesLeft-- > 0 && fixable(attempt.flags)) {
+        gentler(attempt.flags);
+        continue;
+      }
+      if (attempt.blocked) {
+        await holdOrBlock(req, attempt.message, [...flags, ...attempt.flags]);
+        return;
+      }
+      await finish(req, { status: "failed", message: attempt.message, flags: [...flags, ...attempt.flags] });
       return;
     }
     /* ---- Robotics, for everyone: a plan a child will flash onto hardware
@@ -475,7 +597,9 @@ async function complete(req: RequestRow, artifactInput: NewArtifact, flags: Flag
     remixOf: req.kind === "create" ? remixContexts.get(req.id)?.sourceId ?? null : null,
     projectId: await projectFor(req),
   });
-  await finish(req, { status: "done", message: artifactInput.kidNote ?? null, flags, resultArtifactId: artifact.id });
+  // The child reads what was repaired on the way, in the same note as the result.
+  const note = `${artifactInput.kidNote ?? ""}${fixNote(takeFixes(req.id))}`.trim() || null;
+  await finish(req, { status: "done", message: note, flags, resultArtifactId: artifact.id });
   if (!artifact.approved) {
     const { content, ...meta } = artifact;
     publish(req.class_id, { type: "approval", artifact: meta });
@@ -596,7 +720,8 @@ async function runBook(req: RequestRow, mode: ModeDef, input: ReturnType<typeof 
   if (!built.ok) {
     await settle([...writing, ...built.steps]);
     await discardMedia(req.id);
-    await finish(req, { status: built.blocked ? "blocked" : "failed", message: built.message, flags: [...flags, ...built.flags] });
+    if (built.blocked) await holdOrBlock(req, built.message, [...flags, ...built.flags]);
+    else await finish(req, { status: "failed", message: built.message, flags: [...flags, ...built.flags] });
     return;
   }
   const extraSteps: ForgeStep[] = [];
@@ -652,7 +777,8 @@ async function runMovie(req: RequestRow, storyboard: NewArtifact, flags: Flag[])
   await settle(built.steps);
   if (!built.ok) {
     await discardMedia(req.id);
-    await finish(req, { status: built.blocked ? "blocked" : "failed", message: built.message, flags: [...flags, ...built.flags] });
+    if (built.blocked) await holdOrBlock(req, built.message, [...flags, ...built.flags]);
+    else await finish(req, { status: "failed", message: built.message, flags: [...flags, ...built.flags] });
     return;
   }
   const hasClips = Boolean(built.movie.movie || built.movie.shots.some((s) => s.clip));

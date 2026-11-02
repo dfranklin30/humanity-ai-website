@@ -16,7 +16,7 @@ import { aikConfig, isContentSafetyConfigured } from "./config";
 import { logger } from "../lib/logger";
 
 export type Flag = {
-  layer: "pii" | "blocklist" | "content_safety" | "prompt_shield" | "code_scan" | "output" | "system" | "facilitator";
+  layer: "pii" | "blocklist" | "content_safety" | "prompt_shield" | "code_scan" | "output" | "system" | "facilitator" | "autofix";
   category: string;
   detail?: string;
   severity?: number;
@@ -44,7 +44,7 @@ export const KID_MESSAGES = {
  * Personal information catcher
  * ------------------------------------------------------------------ */
 
-const PII_PATTERNS: { re: RegExp; category: string }[] = [
+export const PII_PATTERNS: { re: RegExp; category: string }[] = [
   { re: /\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b/, category: "phone" },
   { re: /\b[\w.+-]+@[\w-]+\.[\w.]+\b/i, category: "email" },
   { re: /\b\d{1,5}\s+\w+(\s+\w+)?\s+(street|st|avenue|ave|road|rd|lane|ln|drive|dr|boulevard|blvd|court|ct|way)\b/i, category: "address" },
@@ -191,7 +191,8 @@ export async function contentSafetyText(text: string): Promise<Flag[]> {
   // Local testing (AIK_MOCK_AI, never in production): the token [[unsafe]]
   // stands in for a Content Safety hit, so the hold-for-facilitator path can
   // be exercised end to end without the service.
-  if (aikConfig.mockAI) return /\[\[unsafe\]\]/i.test(text) ? [{ layer: "content_safety", category: "Violence", severity: 4 }] : [];
+  // [[unsafe]] is repaired by the mock rewrite (autofix); [[stuck]] survives it, so the hold-for-facilitator path can still be tested.
+  if (aikConfig.mockAI) return /\[\[(unsafe|stuck)\]\]/i.test(text) ? [{ layer: "content_safety", category: "Violence", severity: 4 }] : [];
   const data = await csPost("text:analyze", {
     text: text.slice(0, 10_000),
     categories: ["Hate", "SelfHarm", "Sexual", "Violence"],

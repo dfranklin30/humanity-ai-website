@@ -320,6 +320,9 @@ export const aikConfig = {
   fidelityMin: Math.min(Math.max(Number(env.AIK_FIDELITY_MIN) || 6, 0), 10),
   ffmpeg: env.AIK_FFMPEG || "ffmpeg",
   kidsVerifyGames: env.AIK_KIDS_VERIFY_GAMES !== "false",
+  /** Finish every order: repair a screening hit (rewrite, redraw, refilm) instead of stopping; hold for the facilitator only when the repairs run out. See autofix.ts. */
+  autofix: env.AIK_AUTOFIX !== "false",
+  autofixTries: Math.min(Math.max(Number(env.AIK_AUTOFIX_TRIES) || 2, 1), 4),
   /** Characters per narrated page; keeps a six-page book readable aloud in about two minutes. */
   bookPageChars: 420,
 } as const;
@@ -414,6 +417,7 @@ export function capabilitySummary() {
     book: { pages: aikConfig.bookPages, illustrated: isImageConfigured(), narrated: isTtsConfigured() },
     movie: { shots: aikConfig.videoShots, ready: isVideoConfigured() },
     google: { configured: isGoogleConfigured(), ready: isGoogleConfigured() },
+    autofix: { enabled: aikConfig.autofix, tries: aikConfig.autofixTries },
     mock: aikConfig.mockAI,
   };
 }
