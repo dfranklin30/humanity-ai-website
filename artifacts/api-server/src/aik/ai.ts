@@ -430,6 +430,10 @@ export async function generateVideo(prompt: string, options: VideoOptions = {}):
   if (!isVideoConfigured()) throw new Error("Video provider not configured");
   const outage = videoOutage();
   if (outage) throw new VideoUnavailableError(outage.why);
+  if (aikConfig.providers.video === "runway") {
+    if (videoGate.queued) logger.info({ queued: videoGate.queued + 1, limit: aikConfig.videoConcurrency }, "[aik] video shot waiting for a free lane");
+    return videoGate.run(() => generateRunwayVideo(prompt, options));
+  }
   if (aikConfig.providers.video === "oss") {
     if (videoGate.queued) logger.info({ queued: videoGate.queued + 1, limit: aikConfig.videoConcurrency }, "[aik] video shot waiting for a free lane");
     return videoGate.run(() => generateVideoJobApi(prompt, options));
@@ -452,6 +456,110 @@ export async function generateVideo(prompt: string, options: VideoOptions = {}):
  * finishes must become an honest "it didn't come out this time" rather than a
  * request that hangs until the container is reclaimed.
  */
+/* ---- Runway (api.dev.runwayml.com) ----------------------------------
+ * Image-to-video from the shot's keyframe (the same hero in every shot),
+ * text-to-video when there is no keyframe. One task per shot, polled
+ * until it succeeds. Runway's own moderation refusals surface as
+ * ContentFilteredError, so the movie builder treats them like any other
+ * screening hit; a dead key or plan pauses movies via noteVideoOutage.  */
+const RUNWAY_BASE = "https://api.dev.runwayml.com/v1";
+const RUNWAY_VERSION = "2024-11-06";
+
+/** Snap a shot length to what the model accepts (gen4_turbo: 5 or 10; gen4.5: 2–10; veo: 4, 6 or 8). Pure, so it can be tested. */
+export function runwayDuration(model: string, seconds: number): number {
+  const s = Number.isFinite(seconds) && seconds > 0 ? seconds : 5;
+  if (model.startsWith("veo")) return s <= 4 ? 4 : s <= 6 ? 6 : 8;
+  if (model === "gen4_turbo" || model === "gen3a_turbo") return s <= 5 ? 5 : 10;
+  return Math.min(10, Math.max(2, Math.round(s)));
+}
+
+/** "1280x720" → "1280:720"; anything portrait → "720:1280". */
+export function runwayRatio(size: string): "1280:720" | "720:1280" {
+  const [w, h] = String(size || "").split("x").map(Number);
+  return w && h && h > w ? "720:1280" : "1280:720";
+}
+
+/** Runway failure codes that mean its moderation refused the input or the output. */
+export function runwayFailureIsSafety(code: string | undefined): boolean {
+  return /^SAFETY\.|^INPUT_PREPROCESSING\.SAFETY/.test(code ?? "");
+}
+
+async function generateRunwayVideo(prompt: string, options: VideoOptions): Promise<MediaResult> {
+  const headers = { authorization: `Bearer ${aikConfig.runway.key}`, "content-type": "application/json", "X-Runway-Version": RUNWAY_VERSION };
+  const size = options.size ?? aikConfig.videoSize;
+  const ratio = runwayRatio(size);
+  const promptText = prompt.slice(0, 1000);
+
+  // The keyframe rides along as a data URI (Runway's limit is 5 MB encoded), sized to the frame.
+  let promptImage: string | null = null;
+  if (options.reference) {
+    const [w, h] = size.split("x").map(Number);
+    const { default: sharp } = await import("sharp");
+    let png = await sharp(Buffer.from(options.reference, "base64")).resize(w || 1280, h || 720, { fit: "cover" }).png().toBuffer();
+    if (png.length > 3_300_000) png = await sharp(png).jpeg({ quality: 85 }).toBuffer();
+    const mime = png.length > 3_300_000 || png[0] === 0xff ? "image/jpeg" : "image/png";
+    promptImage = `data:${mime};base64,${png.toString("base64")}`;
+  }
+  const model = promptImage ? aikConfig.runway.videoModel : aikConfig.runway.textModel;
+  const duration = runwayDuration(model, options.seconds ?? aikConfig.videoShotSeconds);
+  const body: Record<string, unknown> = { model, promptText, ratio, duration };
+  if (promptImage) body.promptImage = promptImage;
+  if (model.startsWith("gen4")) body.contentModeration = { publicFigureThreshold: "low" };
+  const path = promptImage ? "image_to_video" : "text_to_video";
+
+  // Submit, waiting out a busy 429 in widening steps.
+  let start: Response | null = null;
+  for (let attempt = 1; attempt <= 6; attempt++) {
+    start = await fetchWithTimeout(`${RUNWAY_BASE}/${path}`, { method: "POST", headers, body: JSON.stringify(body) }, 60_000);
+    if (start.status !== 429) break;
+    const waitMs = Math.min(60_000, 4_000 * attempt * attempt);
+    logger.info({ attempt, waitMs }, "[aik] runway busy; waiting for a slot");
+    await new Promise((r) => setTimeout(r, waitMs));
+  }
+  if (!start) throw new Error("runway: no response");
+  if (!start.ok) {
+    const why = (await start.text().catch(() => "")).slice(0, 300);
+    if (start.status === 401 || start.status === 403 || /insufficient credits|credit/i.test(why) && start.status === 402) {
+      noteVideoOutage(`runway ${start.status} ${why}`);
+      logger.error({ status: start.status, why }, "[aik] runway refused the key or has no credits; movies paused");
+      throw new VideoUnavailableError(`runway ${start.status} ${why}`);
+    }
+    if (/moderation|safety|content/i.test(why) && start.status === 400) throw new ContentFilteredError(why);
+    throw new Error(`runway submit ${start.status}: ${why}`);
+  }
+  const { id } = (await start.json()) as { id?: string };
+  if (!id) throw new Error("runway: no task id returned");
+
+  // Poll until the task settles. THROTTLED and PENDING are just the queue.
+  const started = Date.now();
+  let last: any = null;
+  while (Date.now() - started < aikConfig.videoTimeoutMs) {
+    await new Promise((r) => setTimeout(r, 5_000));
+    let poll: Response;
+    try {
+      poll = await fetchWithTimeout(`${RUNWAY_BASE}/tasks/${id}`, { headers }, 30_000);
+    } catch (err) {
+      logger.warn({ id, err: String((err as Error)?.message ?? err).slice(0, 120) }, "[aik] runway poll hiccup");
+      continue;
+    }
+    if (poll.status === 429 || poll.status >= 500) continue;
+    if (!poll.ok) throw new Error(`runway poll ${poll.status}`);
+    last = await poll.json();
+    if (last.status === "SUCCEEDED") break;
+    if (last.status === "FAILED" || last.status === "CANCELLED") {
+      const code = String(last.failureCode ?? "");
+      const reason = String(last.failure ?? last.status).slice(0, 200);
+      if (runwayFailureIsSafety(code)) throw new ContentFilteredError(`${code}: ${reason}`);
+      throw new Error(`runway task ${last.status} ${code}: ${reason}`);
+    }
+  }
+  if (last?.status !== "SUCCEEDED") throw new Error(`runway task did not finish (last status: ${last?.status ?? "none"})`);
+  const url: string | undefined = Array.isArray(last.output) ? last.output[0] : undefined;
+  if (!url) throw new Error("runway: no output url");
+  logger.info({ ms: Date.now() - started, model, path }, "[aik] runway shot complete");
+  return { ...(await download(url)), provider: "runway", model };
+}
+
 async function generateVideoJobApi(prompt: string, options: VideoOptions): Promise<MediaResult> {
   const { videoBaseUrl, videoApiKey, videoModel } = aikConfig.oss;
   // Sora accepts a fixed set of lengths; snap to the nearest one it offers.

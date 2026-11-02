@@ -61,8 +61,12 @@ pipeline now recognises that (`isDeploymentDown` in `ai.ts`), remembers it for
 `AIK_VIDEO_OUTAGE_MINUTES` (default 15), and during that time Video Maker
 delivers the storyboard at once with an honest note, without paying for
 keyframes, a poster or nine failed submits. `/api/aik/config` shows
-`capabilities.video.outage` so the Hub can say so. The fix for the movie itself
-is a new video deployment or provider (`AIK_VIDEO_PROVIDER=fal` is wired).
+`capabilities.video.outage` so the Hub can say so. The replacement is
+**Runway** (`AIK_VIDEO_PROVIDER=runway`, `AIK_RUNWAY_API_KEY` from Key Vault):
+image-to-video with `gen4_turbo` from each shot's keyframe, so the hero stays
+the same across shots, and `gen4.5` text-to-video for a shot with no keyframe.
+Runway's own moderation refusals (`SAFETY.*`) count as screening hits; a bad
+key or empty credits pause movies the same way a dead deployment does.
 
 ## The Hub (`/aiforkids/hub`)
 

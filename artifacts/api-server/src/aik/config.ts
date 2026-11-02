@@ -18,7 +18,10 @@
  *   AIK_IMAGE_PROVIDER                bfl | azure | oss | fal   (default: whichever is configured)
  *   AIK_BFL_IMAGE_URL, AIK_BFL_API_KEY, AIK_BFL_MODEL   FLUX.2 on Foundry (provider route, see `bfl` below)
  *   AIK_VIDEO_PROVIDER                fal | none
- *   AIK_VIDEO_PROVIDER                oss | fal | none
+ *   AIK_VIDEO_PROVIDER                runway | oss | fal | none
+ *   AIK_RUNWAY_API_KEY                Runway (api.dev.runwayml.com). Image-to-video from each shot's keyframe,
+ *   AIK_RUNWAY_VIDEO_MODEL            default gen4_turbo (5 or 10 s clips; 5 credits/s)
+ *   AIK_RUNWAY_TEXT_MODEL             default gen4.5, used only for a shot with no keyframe
  *   AIK_OSS_VIDEO_BASE_URL            e.g. https://<res>.openai.azure.com/openai/v1
  *   AIK_OSS_VIDEO_API_KEY
  *   AIK_OSS_VIDEO_MODEL               the deployment name, e.g. sora-2
@@ -91,7 +94,7 @@ const isProduction = env.NODE_ENV === "production";
 
 export type TextProviderId = "anthropic" | "azure" | "oss";
 export type ImageProviderId = "azure" | "oss" | "bfl" | "fal" | "none";
-export type VideoProviderId = "oss" | "fal" | "none";
+export type VideoProviderId = "runway" | "oss" | "fal" | "none";
 export type MusicProviderId = "elevenlabs" | "fal" | "none";
 export type TtsProviderId = "azure" | "elevenlabs" | "none";
 
@@ -103,6 +106,7 @@ const azureTextConfigured = Boolean(env.AIK_AZURE_OPENAI_ENDPOINT && azureAuthCo
 const azureImageConfigured = Boolean(env.AIK_AZURE_OPENAI_ENDPOINT && azureAuthConfigured && env.AIK_AZURE_OPENAI_IMAGE_DEPLOYMENT);
 const ossImageConfigured = Boolean((env.AIK_OSS_IMAGE_BASE_URL || env.AIK_OSS_BASE_URL) && (env.AIK_OSS_IMAGE_API_KEY || env.AIK_OSS_API_KEY) && env.AIK_OSS_IMAGE_MODEL);
 const falConfigured = Boolean(env.AIK_FAL_KEY);
+const runwayConfigured = Boolean(env.AIK_RUNWAY_API_KEY);
 // FLUX.2 on Azure AI Foundry: the Black Forest Labs provider route, not the OpenAI images API.
 const bflConfigured = Boolean(env.AIK_BFL_IMAGE_URL && (env.AIK_BFL_API_KEY || env.AIK_OSS_IMAGE_API_KEY || env.AIK_OSS_API_KEY));
 const azureSpeechConfigured = Boolean(env.AIK_AZURE_SPEECH_KEY && env.AIK_AZURE_SPEECH_REGION);
@@ -129,7 +133,7 @@ export const aikConfig = {
     text: pick<TextProviderId>(env.AIK_TEXT_PROVIDER, ["anthropic", "azure", "oss"], anthropicKey ? "anthropic" : azureTextConfigured ? "azure" : "oss"),
     ossText: pick<TextProviderId>(env.AIK_OSS_TEXT_PROVIDER, ["oss", "anthropic", "azure"], ossConfigured ? "oss" : anthropicKey ? "anthropic" : "azure"),
     image: pick<ImageProviderId>(env.AIK_IMAGE_PROVIDER, ["azure", "oss", "bfl", "fal", "none"], bflConfigured ? "bfl" : azureImageConfigured ? "azure" : ossImageConfigured ? "oss" : falConfigured ? "fal" : "none"),
-    video: pick<VideoProviderId>(env.AIK_VIDEO_PROVIDER, ["oss", "fal", "none"], ossVideoConfigured ? "oss" : falConfigured ? "fal" : "none"),
+    video: pick<VideoProviderId>(env.AIK_VIDEO_PROVIDER, ["runway", "oss", "fal", "none"], ossVideoConfigured ? "oss" : runwayConfigured ? "runway" : falConfigured ? "fal" : "none"),
     music: pick<MusicProviderId>(env.AIK_MUSIC_PROVIDER, ["elevenlabs", "fal", "none"], elevenConfigured ? "elevenlabs" : falConfigured ? "fal" : "none"),
     tts: pick<TtsProviderId>(env.AIK_TTS_PROVIDER, ["azure", "elevenlabs", "none"], azureSpeechConfigured ? "azure" : elevenConfigured ? "elevenlabs" : "none"),
     /**
@@ -194,6 +198,11 @@ export const aikConfig = {
     imageDeployment: env.AIK_AZURE_OPENAI_IMAGE_DEPLOYMENT || "",
   },
 
+  runway: {
+    key: env.AIK_RUNWAY_API_KEY || "",
+    videoModel: env.AIK_RUNWAY_VIDEO_MODEL || "gen4_turbo",
+    textModel: env.AIK_RUNWAY_TEXT_MODEL || "gen4.5",
+  },
   fal: {
     key: env.AIK_FAL_KEY || "",
     imageModel: env.AIK_FAL_IMAGE_MODEL || "fal-ai/flux/schnell",
@@ -372,6 +381,7 @@ export function clearVideoOutage(): void {
 export function isVideoConfigured(): boolean {
   return (
     aikConfig.mockAI ||
+    (aikConfig.providers.video === "runway" && runwayConfigured) ||
     (aikConfig.providers.video === "fal" && falConfigured) ||
     (aikConfig.providers.video === "oss" && ossVideoConfigured)
   );
