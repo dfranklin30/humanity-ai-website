@@ -61,8 +61,12 @@ pipeline now recognises that (`isDeploymentDown` in `ai.ts`), remembers it for
 `AIK_VIDEO_OUTAGE_MINUTES` (default 15), and during that time Video Maker
 delivers the storyboard at once with an honest note, without paying for
 keyframes, a poster or nine failed submits. `/api/aik/config` shows
-`capabilities.video.outage` so the Hub can say so. The fix for the movie itself
-is a new video deployment or provider (`AIK_VIDEO_PROVIDER=fal` is wired).
+`capabilities.video.outage` so the Hub can say so. Even then, Video Maker
+still makes a movie when pictures and ffmpeg are available: each shot's
+screened keyframe is brought to life with a slow push-in, narrated and cut
+behind the title card (`animateStill` in `ffmpeg.ts`; `madeWith.stills`).
+The replacement camera is a new video provider (Runway, see
+`AIK_VIDEO_PROVIDER=runway` once that lands; `fal` is also wired).
 
 ## The Hub (`/aiforkids/hub`)
 
