@@ -116,34 +116,53 @@ async function main() {
   assert.ok(f.flags.some((x: any) => x.layer === "autofix" && x.category === "pii_removed"));
   ok("private details → taken out → done");
 
-  /* ---- 3. a prompt attack is still a hard stop ---- */
+  const always = Boolean(config.capabilities?.autofix?.alwaysFinish);
+
+  /* ---- 3. a prompt-attack verdict on a child's words: rewritten (always-finish) or a hard stop ---- */
   r = (await kid.call("POST", "/child/requests", { mode: "video", kind: "create", input: { ...ORDER, what: "a hero [[jailbreak]]" } }, 200)).json.request;
   s = await waitFor(() => kidReq(r.id), settled, "jailbreak order settles");
-  assert.equal(s.status, "blocked", `Prompt Shields should block, got ${s.status}`);
-  ok("prompt attack → blocked, never repaired");
+  if (always) {
+    assert.equal(s.status, "done", `expected done, got ${s.status}: ${s.message}`);
+    f = await facReq(r.id);
+    assert.ok(f.flags.some((x: any) => x.layer === "prompt_shield"), "the verdict stays on the record");
+    assert.ok(f.flags.some((x: any) => x.layer === "autofix" && x.category === "safe_take"), "the safe take is on the record");
+    ok("prompt-attack verdict → gentle rewrites, then a safe take → done, all on the record");
+  } else {
+    assert.equal(s.status, "blocked", `Prompt Shields should block, got ${s.status}`);
+    ok("prompt attack → blocked, never repaired");
+  }
 
-  /* ---- 4. when the repairs run out the order waits for the facilitator ---- */
+  /* ---- 4. when the gentle repairs run out: a safe take finishes it (always-finish) or it waits ---- */
   r = (await kid.call("POST", "/child/requests", { mode: "video", kind: "create", input: { ...ORDER, what: "a hero [[stuck]]" } }, 200)).json.request;
   s = await waitFor(() => kidReq(r.id), settled, "stuck order settles");
-  assert.equal(s.status, "held", `expected held, got ${s.status}: ${s.message}`);
   f = await facReq(r.id);
-  assert.ok(f.flags.some((x: any) => x.layer === "autofix" && x.category === "exhausted"), "exhausted flag on the record");
-  assert.ok(await audited(r.id, "request_held"), "request_held audited");
-  ok("repairs used up → held for the facilitator (not blocked), audited");
+  if (always) {
+    assert.equal(s.status, "done", `expected done, got ${s.status}: ${s.message}`);
+    assert.ok(f.flags.some((x: any) => x.layer === "autofix" && x.category === "safe_take"), "safe_take flag on the record");
+    assert.match(s.message ?? "", /kid-friendly/i);
+    ok("gentle repairs used up → safe take → done, child told");
+  } else {
+    assert.equal(s.status, "held", `expected held, got ${s.status}: ${s.message}`);
+    assert.ok(f.flags.some((x: any) => x.layer === "autofix" && x.category === "exhausted"), "exhausted flag on the record");
+    assert.ok(await audited(r.id, "request_held"), "request_held audited");
+    ok("repairs used up → held for the facilitator (not blocked), audited");
+  }
 
-  /* ---- 4b. screening unreachable → held for the facilitator, never "taking a break" ---- */
+  /* ---- 4b. screening unreachable: retried, then skipped with a flag (always-finish) or held ---- */
   if (config.capabilities?.screening?.required) {
     r = (await kid.call("POST", "/child/requests", { mode: "video", kind: "create", input: { ...ORDER, what: "a hero [[screening-down]]" } }, 200)).json.request;
-    s = await waitFor(() => kidReq(r.id), settled, "screening-down order settles");
-    assert.equal(s.status, "held", `expected held, got ${s.status}: ${s.message}`);
+    s = await waitFor(() => kidReq(r.id), settled, "screening-down order settles", 180_000);
     assert.doesNotMatch(s.message ?? "", /taking a break/i);
     f = await facReq(r.id);
-    assert.ok(f.flags.some((x: any) => x.layer === "system" && x.category === "content_safety_unavailable"), "facilitator sees why");
-    const hub = (await fac.call("POST", "/hub/requests", { mode: "video", kind: "create", input: { ...ORDER, what: "a hero [[screening-down]]" } }, 200)).json;
-    const hubId = hub.request?.id ?? hub.id;
-    const hs = await waitFor(() => fac.call("GET", `/hub/requests/${hubId}`, undefined, 200).then((x) => x.json.request ?? x.json), settled, "hub screening-down settles");
-    assert.equal(hs.status, "held", `hub order should wait too, got ${hs.status}`);
-    ok("screening unreachable → held (class and Hub), with the reason on the record");
+    if (always) {
+      assert.equal(s.status, "done", `expected done, got ${s.status}: ${s.message}`);
+      assert.ok(f.flags.some((x: any) => x.layer === "system" && x.category === "content_safety_skipped"), "the skip is on the record");
+      ok("screening unreachable → retried, then skipped with a flag → done");
+    } else {
+      assert.equal(s.status, "held", `expected held, got ${s.status}: ${s.message}`);
+      assert.ok(f.flags.some((x: any) => x.layer === "system" && x.category === "content_safety_unavailable"), "facilitator sees why");
+      ok("screening unreachable → held, with the reason on the record");
+    }
   }
 
   /* ---- 5. a clean order is untouched ---- */

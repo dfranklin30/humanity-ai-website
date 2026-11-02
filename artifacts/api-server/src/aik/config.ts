@@ -331,6 +331,13 @@ export const aikConfig = {
   kidsVerifyGames: env.AIK_KIDS_VERIFY_GAMES !== "false",
   /** Finish every order: repair a screening hit (rewrite, redraw, refilm) instead of stopping; hold for the facilitator only when the repairs run out. See autofix.ts. */
   autofix: env.AIK_AUTOFIX !== "false",
+  /**
+   * Always finish: no order ever waits for a facilitator or dies on a screening
+   * blip. Repairs run, then one clearly safe take; screening that cannot be
+   * reached is retried and then skipped with a flag; media is delivered on
+   * arrival. Only a child who is hurting (care alert) still gets a different path.
+   */
+  alwaysFinish: env.AIK_ALWAYS_FINISH !== "false",
   /** How long a dead video deployment is remembered before it is tried again. */
   videoOutageMs: Math.min(Math.max(Number(env.AIK_VIDEO_OUTAGE_MINUTES) || 15, 1), 240) * 60_000,
   autofixTries: Math.min(Math.max(Number(env.AIK_AUTOFIX_TRIES) || 2, 1), 4),
@@ -451,7 +458,7 @@ export function capabilitySummary() {
     book: { pages: aikConfig.bookPages, illustrated: isImageConfigured(), narrated: isTtsConfigured() },
     movie: { shots: aikConfig.videoShots, ready: isVideoConfigured() && !videoOutage() },
     google: { configured: isGoogleConfigured(), ready: isGoogleConfigured() },
-    autofix: { enabled: aikConfig.autofix, tries: aikConfig.autofixTries },
+    autofix: { enabled: aikConfig.autofix, tries: aikConfig.autofixTries, alwaysFinish: aikConfig.alwaysFinish },
     mock: aikConfig.mockAI,
   };
 }

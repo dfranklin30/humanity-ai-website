@@ -35,8 +35,7 @@ import { contentSafetyImage, type Flag } from "./safety";
 import { autofixFlag, autofixOn, GENTLE } from "./autofix";
 
 /** What the child reads when the video model is down: honest, and the storyboard is still theirs. */
-const MOVIES_PAUSED_NOTE =
-  "Here's your storyboard! The movie camera is taking a break right now, so the clips will have to wait. Your facilitator can make them later.";
+const MOVIES_PAUSED_NOTE = "Here's your storyboard! The movie camera is taking a break right now. Try again in a little while and I'll make the movie.";
 import { drawScreened } from "./book";
 import { ffmpegAvailable, withWorkDir, extractFrames, cutMovie, ensureAudioTrack, animateStill } from "./ffmpeg";
 import { scoreFrame, summarise, middleFrame, type FidelityReport, type ShotFidelity } from "./fidelity";
@@ -120,7 +119,8 @@ export async function buildMovie(opts: {
    * storyboard the whole product.                                         */
   const outage = videoOutage();
   const cameraOut = !isVideoConfigured() || Boolean(outage);
-  const stillMotion = cameraOut && isImageConfigured() && aikConfig.videoReference && (await ffmpegAvailable());
+  // `let`: a camera that dies mid-build switches the rest of the build to pictures.
+  let stillMotion = cameraOut && isImageConfigured() && aikConfig.videoReference && (await ffmpegAvailable());
   if (outage) flags.push({ layer: "system", category: "video_unavailable", detail: outage.why });
   if (cameraOut) {
     movie.madeWith.shots = false;
@@ -171,16 +171,24 @@ export async function buildMovie(opts: {
       steps.end("keyframes", drawn ? "done" : "skipped", `${drawn} of ${movie.shots.length}`);
     }
 
-    const film = async (s: Shot, i: number): Promise<Buffer | null> => {
-      if (stillMotion) {
-        // Picture-motion: the keyframe is already screened; it just needs to move.
-        const k = keyframes[i];
-        if (!k) return null;
-        return animateStill(dir, Buffer.from(k, "base64"), s.seconds, aikConfig.videoSize, `still-${i + 1}`).catch((err) => {
-          logger.warn({ requestId, shot: s.shot, err: String((err as Error)?.message ?? err).slice(0, 200) }, "[aik] picture-motion clip failed");
-          return null;
-        });
+    /* Picture-motion: the screened keyframe moves (push in, pull out, pan, in turn).
+     * No keyframe? The poster stands in; no poster? The title card. A shot is
+     * never empty, so the movie is never shorter than the child planned.    */
+    const stillClip = async (s: Shot, i: number): Promise<Buffer | null> => {
+      try {
+        const [w, h] = aikConfig.videoSize.split("x").map(Number);
+        const k = keyframes[i] ?? (await posterJob.catch(() => null));
+        const png = k ? Buffer.from(k, "base64") : await renderTitleCard(movie.title, w || 1280, h || 720, null);
+        const motion = (["in", "out", "pan"] as const)[i % 3];
+        return await animateStill(dir, png, s.seconds, aikConfig.videoSize, `still-${i + 1}`, motion);
+      } catch (err) {
+        logger.warn({ requestId, shot: s.shot, err: String((err as Error)?.message ?? err).slice(0, 200) }, "[aik] picture-motion clip failed");
+        return null;
       }
+    };
+
+    const film = async (s: Shot, i: number): Promise<Buffer | null> => {
+      if (stillMotion) return stillClip(s, i);
       // A shot that times out or hits a transient provider error gets one more take.
       // A shot the provider refuses on content grounds is refilmed once with a
       // gentler prompt (autofix), then dropped so the rest of the movie still cuts.
@@ -218,15 +226,26 @@ export async function buildMovie(opts: {
       clips = await Promise.all(movie.shots.map((s, i) => film(s, i)));
     } catch (err) {
       if (err instanceof VideoUnavailableError) {
-        steps.end("shots", "skipped", "the video model is unavailable");
         movie.madeWith.shots = false;
         flags.push({ layer: "system", category: "video_unavailable", detail: err.why.slice(0, 200) });
-        return { ok: true, movie, steps: steps.all(), flags, kidNote: MOVIES_PAUSED_NOTE };
-      }
+        if (canCut) {
+          // The camera died on us: bring the pictures to life instead, right now.
+          steps.end("shots", "done", "the video model is unavailable; bringing the pictures to life instead");
+          stillMotion = true;
+          movie.madeWith.stills = true;
+          steps.begin("shots", `Bringing ${movie.shots.length} picture${movie.shots.length === 1 ? "" : "s"} to life`);
+          clips = await Promise.all(movie.shots.map((s, i) => stillClip(s, i)));
+          steps.end("shots", clips.some(Boolean) ? "done" : "failed", `${clips.filter(Boolean).length} of ${movie.shots.length}`);
+        } else {
+          steps.end("shots", "skipped", "the video model is unavailable");
+          return { ok: true, movie, steps: steps.all(), flags, kidNote: MOVIES_PAUSED_NOTE };
+        }
+      } else {
       if (!(err instanceof ContentFilteredError)) throw err;
       flags.push({ layer: "content_safety", category: "provider_filter", detail: `The video model refused a shot: ${String(err.message).slice(0, 200)}` });
       steps.end("shots", "failed", "a shot was refused");
       return { ok: false, blocked: true, message: "One of the shots wasn't right for the club. Try a different idea!", flags, steps: steps.all() };
+      }
     }
     const got = clips.filter(Boolean).length;
     steps.end("shots", got === movie.shots.length ? "done" : "failed", `${got} of ${movie.shots.length}`);
@@ -391,13 +410,14 @@ export async function buildMovie(opts: {
       steps.end("cut", "skipped", "no cutting room on this server; the shots play one by one");
     }
 
+    const auto = aikConfig.classAutoApprove;
     const kidNote = stillMotion
       ? movie.movie
-        ? `The movie camera is resting, so I brought your pictures to life instead. Your movie is ready! Your facilitator will watch it first, then it's showtime.`
-        : `The movie camera is resting, so I brought your pictures to life instead. Your facilitator will look first.`
+        ? `The movie camera is resting, so I brought your pictures to life instead. Your movie is ready${auto ? " — press play!" : "! Your facilitator will watch it first, then it's showtime."}`
+        : `The movie camera is resting, so I brought your pictures to life instead.${auto ? " Watch them one by one!" : " Your facilitator will look first."}`
       : movie.movie
-        ? `Your movie is ready! Your facilitator will watch it first, then it's showtime.`
-        : `Your shots are ready! Your facilitator will watch them first.`;
+        ? `Your movie is ready${auto ? " — press play!" : "! Your facilitator will watch it first, then it's showtime."}`
+        : `Your shots are ready${auto ? " — watch them one by one!" : "! Your facilitator will watch them first."}`;
     return { ok: true, movie, steps: steps.all(), flags, kidNote };
   });
 }

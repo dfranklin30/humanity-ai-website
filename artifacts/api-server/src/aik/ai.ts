@@ -938,6 +938,7 @@ function mockText(opts: TextCallOptions): string {
     // The kid-safe rewrite (autofix.ts): [[unsafe]] comes out and any word the
     // blocklist named becomes a foam noodle. [[stuck]] is left in on purpose.
     case "rewrite": {
+      const safeTake = /^SAFE TAKE/m.test(opts.user ?? "");
       const m = /FIELDS \(JSON\): (\{.*\})\nFLAGGED FOR: (\[.*\])/s.exec(opts.user ?? "");
       let values: Record<string, string> = {};
       let flagged: string[] = [];
@@ -954,6 +955,10 @@ function mockText(opts: TextCallOptions): string {
         if (/\[\[unsafe\]\]/i.test(v)) {
           v = v.replace(/\s*\[\[unsafe\]\]\s*/gi, " ").trim();
           changes.push("I took out the part that wasn't right for the club.");
+        }
+        if (safeTake && /\[\[(stuck|jailbreak|screening-down)\]\]/i.test(v)) {
+          v = v.replace(/\s*\[\[(stuck|jailbreak|screening-down)\]\]\s*/gi, " ").trim();
+          changes.push("I made it a sunny, friendly version.");
         }
         for (const w of words) {
           const re = new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "gi");

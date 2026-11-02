@@ -32,6 +32,7 @@ export const KID_MESSAGES = {
   blocklist: "That's not something we make in the Studio. Try a different idea — maybe something silly or brave?",
   unsafe: "Hmm, let's try that a different way. Your facilitator can help you think of another idea.",
   held: "The helper wants a grown-up to check this one. Your facilitator is coming over to take a look. Hang tight!",
+  tryNew: "That one didn't come out, even after a few tries. Let's start a fresh idea!",
   injection: "The Studio only takes Director's Orders about your project. Let's try again!",
   unavailable: "The Studio helper is taking a break. Please tell your facilitator.",
   paused: "Your facilitator paused the Studio. Look up front!",
@@ -260,6 +261,20 @@ export function screenCare(text: string): boolean {
 export const CARE_REPLY =
   "Thank you for telling me. That sounds really hard, and you deserve help from a grown-up who cares about you. Please tell your facilitator or a trusted adult right now; I've let your facilitator know you might want to talk. If you ever feel unsafe, tell a grown-up straight away. You matter.";
 
+/** A screening call that fails for a reason unrelated to the words (network, 5xx, timeout) is tried three times over ~7 s before it counts as unreachable. */
+async function withScreeningRetries<T>(call: () => Promise<T>): Promise<T> {
+  let last: unknown;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      return await call();
+    } catch (err) {
+      last = err;
+      if (attempt < 3) await new Promise((r) => setTimeout(r, attempt === 1 ? 2_000 : 5_000));
+    }
+  }
+  throw last;
+}
+
 export async function screenInput(text: string): Promise<ScreenResult> {
   const flags: Flag[] = [];
 
@@ -271,17 +286,19 @@ export async function screenInput(text: string): Promise<ScreenResult> {
 
   if (isContentSafetyConfigured()) {
     try {
-      const [cs, shield] = await Promise.all([contentSafetyText(text), promptShield(text)]);
+      const [cs, shield] = await withScreeningRetries(() => Promise.all([contentSafetyText(text), promptShield(text)]));
       if (shield.length) return { ok: false, flags: shield, kidMessage: KID_MESSAGES.injection };
       if (cs.length) return { ok: false, flags: cs, kidMessage: KID_MESSAGES.unsafe };
     } catch (err) {
       logger.error({ err }, "[aik] Content Safety unavailable");
-      if (aikConfig.contentSafety.required) {
+      if (aikConfig.contentSafety.required && !aikConfig.alwaysFinish) {
         return { ok: false, flags: [{ layer: "system", category: "content_safety_unavailable" }], kidMessage: KID_MESSAGES.unavailable };
       }
+      // Always finish: the words still passed the PII catcher and the blocklist, the
+      // model runs under its own kid-safe rules, and the skip is on the record.
       flags.push({ layer: "system", category: "content_safety_skipped" });
     }
-  } else if (aikConfig.contentSafety.required) {
+  } else if (aikConfig.contentSafety.required && !aikConfig.alwaysFinish) {
     return { ok: false, flags: [{ layer: "system", category: "content_safety_not_configured" }], kidMessage: KID_MESSAGES.unavailable };
   } else {
     flags.push({ layer: "system", category: "content_safety_not_configured" });
@@ -304,13 +321,14 @@ export async function screenOutputText(text: string): Promise<ScreenResult> {
   if (blocked.length) return { ok: false, flags: blocked.map((f) => ({ ...f, layer: "output" as const })), kidMessage: KID_MESSAGES.unsafe };
   if (isContentSafetyConfigured()) {
     try {
-      const cs = await contentSafetyText(text);
+      const cs = await withScreeningRetries(() => contentSafetyText(text));
       if (cs.length) return { ok: false, flags: cs.map((f) => ({ ...f, layer: "output" as const })), kidMessage: KID_MESSAGES.unsafe };
     } catch (err) {
       logger.error({ err }, "[aik] Content Safety unavailable (output)");
-      if (aikConfig.contentSafety.required) {
+      if (aikConfig.contentSafety.required && !aikConfig.alwaysFinish) {
         return { ok: false, flags: [{ layer: "system", category: "content_safety_unavailable" }], kidMessage: KID_MESSAGES.unavailable };
       }
+      flags.push({ layer: "system", category: "content_safety_skipped" });
     }
   }
   return { ok: true, flags };

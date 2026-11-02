@@ -45,8 +45,11 @@ export function autofixFlag(category: string, detail?: string): Flag {
 /** Can this set of screening flags be repaired, or must the order stop here? */
 export function fixable(flags: Flag[]): boolean {
   if (!aikConfig.autofix) return false;
+  if (flags.some((f) => f.category === "care_alert")) return false;
+  // Always finish: everything else is rewritten, including a prompt-attack verdict on a child's words.
+  if (aikConfig.alwaysFinish) return true;
   return !flags.some(
-    (f) => f.layer === "prompt_shield" || f.layer === "system" || f.category === "care_alert" || f.category === "content_safety_unavailable",
+    (f) => f.layer === "prompt_shield" || f.layer === "system" || f.category === "content_safety_unavailable",
   );
 }
 
@@ -107,12 +110,21 @@ Reply with ONLY a JSON object, no markdown fences:
 {"values": {<the same keys, every one of them, rewritten where needed>}, "changes": [<one short sentence per change, for the child, like "I swapped the sword for a giant foam noodle.">]}`;
 
 /** Ask the fast model for a kid-safe version of the order. Returns null when the reply is unusable. */
-export async function rewriteOrder(mode: Pick<ModeDef, "name" | "createFields">, values: Record<string, string>, flags: Flag[]): Promise<{ values: Record<string, string>; changes: Fix[] } | null> {
+const SAFE_TAKE_RULE = `
+
+SAFE TAKE: an earlier gentle rewrite still tripped the safety screen. This time be decisive: keep the hero's name and any harmless setting, and replace every other flagged element with something clearly wholesome and fun (friendly animals, silly inventions, helping a friend, a treasure hunt). The result must read as a sunny children's story idea with nothing a cautious grown-up could object to.`;
+
+export async function rewriteOrder(
+  mode: Pick<ModeDef, "name" | "createFields">,
+  values: Record<string, string>,
+  flags: Flag[],
+  strength: "gentle" | "safe" = "gentle",
+): Promise<{ values: Record<string, string>; changes: Fix[] } | null> {
   const flagged = flags.map((f) => [f.category, f.detail].filter(Boolean).join(": ")).filter(Boolean);
-  const user = `Project: ${mode.name}\nFIELDS (JSON): ${JSON.stringify(values)}\nFLAGGED FOR: ${JSON.stringify(flagged)}`;
+  const user = `${strength === "safe" ? "SAFE TAKE\n" : ""}Project: ${mode.name}\nFIELDS (JSON): ${JSON.stringify(values)}\nFLAGGED FOR: ${JSON.stringify(flagged)}`;
   let raw: string;
   try {
-    raw = await completeText({ system: REWRITE_SYSTEM, user, maxTokens: 600, temperature: 0.4, tier: "fast", mockKind: "rewrite" });
+    raw = await completeText({ system: REWRITE_SYSTEM + (strength === "safe" ? SAFE_TAKE_RULE : ""), user, maxTokens: 600, temperature: 0.4, tier: "fast", mockKind: "rewrite" });
   } catch {
     return null;
   }
@@ -133,6 +145,11 @@ export async function rewriteOrder(mode: Pick<ModeDef, "name" | "createFields">,
 }
 
 /** The instruction added to the system prompt when a reply is generated again after a screening hit. */
+/** The last resort before giving up on a reply: a clearly safe version, keeping only what cannot offend. */
+export function safeTakeRule(): string {
+  return `\n\nSAFE TAKE: earlier versions kept tripping the safety screen. Make this version clearly wholesome for children aged 8 to 11: keep the hero's name and any harmless setting, replace everything else that could be read as unsafe with friendly, silly, kind alternatives, and keep the same output format.`;
+}
+
 export function softenRule(flags: Flag[]): string {
   const why = [...new Set(flags.map((f) => f.category).filter((c) => c && c !== "provider_filter"))].join(", ");
   return `\n\nIMPORTANT: your previous reply was flagged by the safety screen${why ? ` for: ${why}` : ""}. Make this version gentler, sillier and clearly for children aged 8 to 11: no weapons, no blood, no fighting, nothing scary, no romance, no real people, no brand characters, no grown-up topics. Keep the child's idea and the same output format.`;
