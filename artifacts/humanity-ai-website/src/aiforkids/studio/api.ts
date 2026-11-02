@@ -21,7 +21,7 @@ export type ModeDef = {
   needsApproval: boolean;
 };
 
-export type Capability = { provider: string; ready: boolean };
+export type Capability = { provider: string; ready: boolean; outage?: { since: string; why: string } };
 export type StudioConfig = {
   googleReady?: boolean;
   signupsOpen?: boolean;

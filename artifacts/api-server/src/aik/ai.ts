@@ -13,10 +13,26 @@
  * facilitator approval before a child sees anything.
  */
 import { AzureOpenAI } from "openai";
-import { aikConfig, isImageConfigured, isElevenLabsConfigured, isAzureSpeechConfigured, isMusicConfigured, isTextConfigured, isTtsConfigured, isVideoConfigured, textProviderConfigured, textFallbackProvider, type TextProviderId } from "./config";
+import { aikConfig, isImageConfigured, isElevenLabsConfigured, isAzureSpeechConfigured, isMusicConfigured, isTextConfigured, isTtsConfigured, isVideoConfigured, textProviderConfigured, textFallbackProvider, type TextProviderId, videoOutage, noteVideoOutage } from "./config";
 import { logger } from "../lib/logger";
 import { mockLanguageBook, mockLanguageCheck } from "./langdata";
 import { defaultElevenVoiceId } from "./voices";
+
+/** The video deployment itself is gone (retired model, disabled deployment): nothing about the order will fix it. */
+export class VideoUnavailableError extends Error {
+  constructor(public why: string) {
+    super(`Video model unavailable: ${why.slice(0, 200)}`);
+    this.name = "VideoUnavailableError";
+  }
+}
+
+/** Does this failed submit mean the deployment is gone, rather than this one request being wrong? Pure, so it can be tested. */
+export function isDeploymentDown(status: number, body: string): boolean {
+  if (status === 410) return true;
+  if (status === 429 || status >= 500) return false;
+  if (/content|policy|safety|moderat/i.test(body)) return false;
+  return /BadRequestForDependentService|DeploymentNotFound|deployment[^"]{0,60}(disabled|retired|not found|does not exist)|model[^"]{0,40}(retired|deprecated)/i.test(body);
+}
 
 export class ContentFilteredError extends Error {
   constructor(provider: string) {
@@ -412,6 +428,8 @@ const videoGate = new Gate(aikConfig.videoConcurrency);
 export async function generateVideo(prompt: string, options: VideoOptions = {}): Promise<MediaResult> {
   if (aikConfig.mockAI) return { base64: MOCK_MP4, mime: "video/mp4", provider: "mock", model: "mock" };
   if (!isVideoConfigured()) throw new Error("Video provider not configured");
+  const outage = videoOutage();
+  if (outage) throw new VideoUnavailableError(outage.why);
   if (aikConfig.providers.video === "oss") {
     if (videoGate.queued) logger.info({ queued: videoGate.queued + 1, limit: aikConfig.videoConcurrency }, "[aik] video shot waiting for a free lane");
     return videoGate.run(() => generateVideoJobApi(prompt, options));
@@ -510,7 +528,17 @@ async function generateVideoJobApi(prompt: string, options: VideoOptions): Promi
     await new Promise((r) => setTimeout(r, waitMs));
     start = await submit();
   }
-  if (!start.ok) throw new Error(`Video submit ${start.status}: ${(await start.text().catch(() => "")).slice(0, 300)}`);
+  if (!start.ok) {
+    const why = (await start.text().catch(() => "")).slice(0, 300);
+    if (isDeploymentDown(start.status, why)) {
+      // Not this order's fault: the deployment behind the model is gone. Remember it so the
+      // next orders go straight to the storyboard, and tell the Hub (capabilities.video.outage).
+      noteVideoOutage(`${start.status} ${why}`);
+      logger.error({ status: start.status, why }, "[aik] video deployment unavailable; movies paused");
+      throw new VideoUnavailableError(`${start.status} ${why}`);
+    }
+    throw new Error(`Video submit ${start.status}: ${why}`);
+  }
   const job: any = await start.json();
   const jobId = job?.id;
   if (!jobId) throw new Error("Video job: no id returned");
