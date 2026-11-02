@@ -630,6 +630,7 @@ function toolReady(state: HubState, id: ModeId): boolean {
 function toolNote(state: HubState, id: ModeId): string | null {
   const c = state.capabilities;
   if (id === "prompt" && !c.image.ready) return "Writes and assembles the prompt. Turn on an image model to see the picture.";
+  if (id === "video" && c.video.outage) return `Writes the storyboard. The video model has been unavailable since ${new Date(c.video.outage.since).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}; clips are paused until it is back.`;
   if (id === "video" && !c.video.ready) return "Writes the storyboard. Turn on a video model to render the clip.";
   if (id === "music" && !c.music.ready) return "Writes the lyrics. Turn on a music model to hear it performed.";
   return null;

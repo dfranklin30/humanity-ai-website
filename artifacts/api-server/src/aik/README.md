@@ -53,6 +53,17 @@ done; PII → done; attack → blocked; repairs used up → held; every studio t
 from the Hub), and `soak.e2e.ts` (a real deployment: every studio, N rounds,
 from a facilitator's Hub, reports what came back).
 
+### When the video model is gone
+
+Sora 2 on Azure was retired on 2026-11-02 and the deployment flipped to
+"Disabled"; every shot failed with `400 BadRequestForDependentService`. The
+pipeline now recognises that (`isDeploymentDown` in `ai.ts`), remembers it for
+`AIK_VIDEO_OUTAGE_MINUTES` (default 15), and during that time Video Maker
+delivers the storyboard at once with an honest note, without paying for
+keyframes, a poster or nine failed submits. `/api/aik/config` shows
+`capabilities.video.outage` so the Hub can say so. The fix for the movie itself
+is a new video deployment or provider (`AIK_VIDEO_PROVIDER=fal` is wired).
+
 ## The Hub (`/aiforkids/hub`)
 
 The staff side. One signed-in place where Humanity + AI does its own AI work:

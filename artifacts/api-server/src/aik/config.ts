@@ -322,6 +322,8 @@ export const aikConfig = {
   kidsVerifyGames: env.AIK_KIDS_VERIFY_GAMES !== "false",
   /** Finish every order: repair a screening hit (rewrite, redraw, refilm) instead of stopping; hold for the facilitator only when the repairs run out. See autofix.ts. */
   autofix: env.AIK_AUTOFIX !== "false",
+  /** How long a dead video deployment is remembered before it is tried again. */
+  videoOutageMs: Math.min(Math.max(Number(env.AIK_VIDEO_OUTAGE_MINUTES) || 15, 1), 240) * 60_000,
   autofixTries: Math.min(Math.max(Number(env.AIK_AUTOFIX_TRIES) || 2, 1), 4),
   /** Characters per narrated page; keeps a six-page book readable aloud in about two minutes. */
   bookPageChars: 420,
@@ -349,6 +351,24 @@ export function isImageConfigured(): boolean {
   const p = aikConfig.providers.image;
   return (p === "azure" && azureImageConfigured) || (p === "oss" && ossImageConfigured) || (p === "bfl" && bflConfigured) || (p === "fal" && falConfigured);
 }
+/**
+ * A video deployment that is gone (model retired, deployment disabled) is
+ * remembered for a while so every order in a class does not spend nine
+ * submits and three pictures finding out again. Cleared on its own.
+ */
+let videoOutageState: { since: number; until: number; why: string } | null = null;
+export function noteVideoOutage(why: string, ms = aikConfig.videoOutageMs): void {
+  const now = Date.now();
+  videoOutageState = { since: videoOutageState?.since ?? now, until: now + ms, why: why.slice(0, 300) };
+}
+export function videoOutage(): { since: number; until: number; why: string } | null {
+  if (videoOutageState && videoOutageState.until <= Date.now()) videoOutageState = null;
+  return videoOutageState;
+}
+export function clearVideoOutage(): void {
+  videoOutageState = null;
+}
+
 export function isVideoConfigured(): boolean {
   return (
     aikConfig.mockAI ||
@@ -408,14 +428,18 @@ export function capabilitySummary() {
     text: { provider: aikConfig.providers.text, ready: isTextConfigured() },
     ossText: { provider: aikConfig.providers.ossText, ready: isOssTextConfigured() },
     image: { provider: aikConfig.providers.image, ready: isImageConfigured() },
-    video: { provider: aikConfig.providers.video, ready: isVideoConfigured() },
+    video: {
+      provider: aikConfig.providers.video,
+      ready: isVideoConfigured() && !videoOutage(),
+      ...(videoOutage() ? { outage: { since: new Date(videoOutage()!.since).toISOString(), why: videoOutage()!.why } } : {}),
+    },
     music: { provider: aikConfig.providers.music, ready: isMusicConfigured() },
     tts: { provider: aikConfig.providers.tts, ready: isTtsConfigured() },
     screening: { configured: isContentSafetyConfigured(), required: aikConfig.contentSafety.required },
     textFallback: { provider: textFallbackProvider(aikConfig.providers.text) ?? "none", ready: Boolean(textFallbackProvider(aikConfig.providers.text)) },
     mediaStore: { provider: isMediaStoreConfigured() ? "azure-blob" : "inline", ready: true },
     book: { pages: aikConfig.bookPages, illustrated: isImageConfigured(), narrated: isTtsConfigured() },
-    movie: { shots: aikConfig.videoShots, ready: isVideoConfigured() },
+    movie: { shots: aikConfig.videoShots, ready: isVideoConfigured() && !videoOutage() },
     google: { configured: isGoogleConfigured(), ready: isGoogleConfigured() },
     autofix: { enabled: aikConfig.autofix, tries: aikConfig.autofixTries },
     mock: aikConfig.mockAI,

@@ -27,12 +27,16 @@
  * facilitator before a child sees it.
  */
 import sharp from "sharp";
-import { aikConfig, isContentSafetyConfigured, isImageConfigured, isTtsConfigured, isVideoConfigured } from "./config";
-import { generateVideo, speak, ContentFilteredError, usableVoice, type VoiceChoice } from "./ai";
+import { aikConfig, isContentSafetyConfigured, isImageConfigured, isTtsConfigured, isVideoConfigured, videoOutage } from "./config";
+import { generateVideo, speak, ContentFilteredError, usableVoice, type VoiceChoice, VideoUnavailableError } from "./ai";
 import { Steps, type ForgeStep } from "./forge";
 import { putMedia, type MediaRef } from "./media";
 import { contentSafetyImage, type Flag } from "./safety";
 import { autofixFlag, autofixOn, GENTLE } from "./autofix";
+
+/** What the child reads when the video model is down: honest, and the storyboard is still theirs. */
+const MOVIES_PAUSED_NOTE =
+  "Here's your storyboard! The movie camera is taking a break right now, so the clips will have to wait. Your facilitator can make them later.";
 import { drawScreened } from "./book";
 import { ffmpegAvailable, withWorkDir, extractFrames, cutMovie, ensureAudioTrack } from "./ffmpeg";
 import { scoreFrame, summarise, middleFrame, type FidelityReport, type ShotFidelity } from "./fidelity";
@@ -111,6 +115,13 @@ export async function buildMovie(opts: {
   if (!isVideoConfigured()) {
     return { ok: true, movie, steps: steps.all(), flags, kidNote: "Here's your storyboard! Video clips aren't switched on for this class yet." };
   }
+  const outage = videoOutage();
+  if (outage) {
+    // The video model is gone for now: no shots, no keyframes, no poster paid for. The storyboard is the product.
+    movie.madeWith.shots = false;
+    flags.push({ layer: "system", category: "video_unavailable", detail: outage.why });
+    return { ok: true, movie, steps: steps.all(), flags, kidNote: MOVIES_PAUSED_NOTE };
+  }
   if (!isContentSafetyConfigured() && aikConfig.contentSafety.required) {
     return { ok: false, blocked: true, message: "Movies are switched off until screening is set up. Ask your facilitator.", flags: [{ layer: "system", category: "content_safety_not_configured" }], steps: steps.all() };
   }
@@ -178,6 +189,7 @@ export async function buildMovie(opts: {
             }
             throw err;
           }
+          if (err instanceof VideoUnavailableError) throw err;
           logger.warn({ requestId, shot: s.shot, take, err: String((err as Error)?.message ?? err).slice(0, 200) }, "[aik] shot failed");
         }
       }
@@ -189,6 +201,12 @@ export async function buildMovie(opts: {
     try {
       clips = await Promise.all(movie.shots.map((s, i) => film(s, i)));
     } catch (err) {
+      if (err instanceof VideoUnavailableError) {
+        steps.end("shots", "skipped", "the video model is unavailable");
+        movie.madeWith.shots = false;
+        flags.push({ layer: "system", category: "video_unavailable", detail: err.why.slice(0, 200) });
+        return { ok: true, movie, steps: steps.all(), flags, kidNote: MOVIES_PAUSED_NOTE };
+      }
       if (!(err instanceof ContentFilteredError)) throw err;
       flags.push({ layer: "content_safety", category: "provider_filter", detail: `The video model refused a shot: ${String(err.message).slice(0, 200)}` });
       steps.end("shots", "failed", "a shot was refused");
