@@ -22,7 +22,16 @@
         "ITSAppUsesNonExemptEncryption": false
       }
     },
-    "android": {},
+    "android": {
+      "package": "org.humanityplusai.app",
+      "versionCode": 10,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#0a2117"
+      },
+      "permissions": ["INTERNET"],
+      "blockedPermissions": ["android.permission.CAMERA", "android.permission.RECORD_AUDIO", "android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_COARSE_LOCATION"]
+    },
     "web": {
       "favicon": "./assets/images/icon.png"
     },

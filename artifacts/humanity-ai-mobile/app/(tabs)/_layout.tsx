@@ -28,6 +28,10 @@ function NativeTabLayout() {
         <Icon sf={{ default: "graduationcap", selected: "graduationcap.fill" }} />
         <Label>Programs</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="studio">
+        <Icon sf={{ default: "sparkles", selected: "sparkles" }} />
+        <Label>Studio</Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="updates">
         <Icon sf={{ default: "newspaper", selected: "newspaper.fill" }} />
         <Label>Updates</Label>
@@ -109,6 +113,18 @@ function ClassicTabLayout() {
               <SymbolView name="graduationcap" tintColor={color} size={24} />
             ) : (
               <Feather name="book-open" size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="studio"
+        options={{
+          title: "Studio",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="sparkles" tintColor={color} size={24} />
+            ) : (
+              <Feather name="zap" size={22} color={color} />
             ),
         }}
       />
