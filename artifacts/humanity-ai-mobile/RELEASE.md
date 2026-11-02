@@ -13,6 +13,13 @@ person running the steps below.
 
 ## Android (Google Play)
 
+> **Status, 2 Nov 2026.** Build `199b6048` (v1.1.0, versionCode 13, Studio
+> tab + padded adaptive icon) is built and downloaded. Its upload key is the
+> keystore held in the `dfranklin30s-team` Expo account, which differs from
+> the key Play knew; an upload key reset was requested and Play says the new
+> key becomes valid on **4 Nov 2026, 7:15 AM**. Upload to Internal testing
+> after that; the tester list is already attached to the track.
+
 1. **Version.** In `app.json`, raise `expo.android.versionCode` above the
    highest code Play has ever seen for this app (Play Console → Release →
    App bundle explorer shows it). Codes only go up; Play rejects a bundle
