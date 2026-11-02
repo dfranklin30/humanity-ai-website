@@ -192,7 +192,11 @@ export async function contentSafetyText(text: string): Promise<Flag[]> {
   // stands in for a Content Safety hit, so the hold-for-facilitator path can
   // be exercised end to end without the service.
   // [[unsafe]] is repaired by the mock rewrite (autofix); [[stuck]] survives it, so the hold-for-facilitator path can still be tested.
-  if (aikConfig.mockAI) return /\[\[(unsafe|stuck)\]\]/i.test(text) ? [{ layer: "content_safety", category: "Violence", severity: 4 }] : [];
+  if (aikConfig.mockAI) {
+    // [[screening-down]] stands for the screening service being unreachable.
+    if (/\[\[screening-down\]\]/i.test(text)) throw new Error("mock: Content Safety unreachable");
+    return /\[\[(unsafe|stuck)\]\]/i.test(text) ? [{ layer: "content_safety", category: "Violence", severity: 4 }] : [];
+  }
   const data = await csPost("text:analyze", {
     text: text.slice(0, 10_000),
     categories: ["Hate", "SelfHarm", "Sexual", "Violence"],

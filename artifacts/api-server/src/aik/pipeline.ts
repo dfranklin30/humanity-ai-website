@@ -173,11 +173,18 @@ function hiddenNumber(req: RequestRow, key: string): number | null {
 const HOLD_LAYERS = new Set<string>(["content_safety", "output"]);
 const HARD_LAYERS = new Set<string>(["pii", "blocklist", "prompt_shield", "system"]);
 const HARD_CATEGORIES = new Set<string>(["redirect", "care_alert"]);
+/** Screening itself being unreachable is not the child's fault: the order waits for a grown-up instead of dying. */
+const SCREENING_DOWN = new Set<string>(["content_safety_unavailable", "content_safety_not_configured"]);
+export function isScreeningDown(flags: unknown[]): boolean {
+  return ((flags ?? []) as { category?: string }[]).some((f) => SCREENING_DOWN.has(String(f?.category)));
+}
 
 /** Would this set of flags hold the order for the facilitator rather than block it? Pure, so it can be tested. */
 export function shouldHold(flags: unknown[]): boolean {
   const fs = (flags ?? []) as { layer?: string; category?: string }[];
-  return fs.some((f) => HOLD_LAYERS.has(String(f?.layer))) && !fs.some((f) => HARD_LAYERS.has(String(f?.layer)) || HARD_CATEGORIES.has(String(f?.category)));
+  const hard = (f: { layer?: string; category?: string }) =>
+    (HARD_LAYERS.has(String(f?.layer)) && !SCREENING_DOWN.has(String(f?.category))) || HARD_CATEGORIES.has(String(f?.category));
+  return fs.some((f) => HOLD_LAYERS.has(String(f?.layer)) || SCREENING_DOWN.has(String(f?.category))) && !fs.some(hard);
 }
 
 /** The flag a facilitator's "unblock" leaves on the request; the next run reads it. */
@@ -194,8 +201,8 @@ export function wasUnblocked(r: Pick<RequestRow, "flags">): boolean {
 async function holdOrBlock(req: RequestRow, message: string, flags: Flag[]): Promise<void> {
   fixNotes.delete(req.id);
   const klass = await store.getClass(req.class_id);
-  const hard = flags.some((f) => f.layer === "prompt_shield" || f.layer === "system" || f.category === "care_alert");
-  if (!aikConfig.autofix || hard || !klass || klass.kind === "workspace") {
+  const hard = flags.some((f) => f.layer === "prompt_shield" || (f.layer === "system" && !isScreeningDown([f])) || f.category === "care_alert");
+  if (!aikConfig.autofix || hard || !klass || (klass.kind === "workspace" && !isScreeningDown(flags))) {
     await finish(req, { status: "blocked", message, flags });
     await store.audit(req.class_id, "system", null, "request_blocked", { requestId: req.id, flags }).catch(() => {});
     return;
@@ -253,9 +260,11 @@ async function finish(req: RequestRow, patch: Parameters<typeof store.finishRequ
   if (patch.status === "blocked") {
     const flags: any[] = patch.flags ?? [];
     if (shouldHold(flags)) {
-      // Hub work is the adult's own; only a class order waits for a facilitator.
+      // Hub work is the adult's own; only a class order waits for a facilitator,
+      // except when screening itself is down: then the Hub order waits too, and
+      // the facilitator re-runs it ("unblock") once screening is back.
       const klass = await store.getClass(req.class_id);
-      if (klass && klass.kind !== "workspace") {
+      if (klass && (klass.kind !== "workspace" || isScreeningDown(flags))) {
         next = { ...patch, status: "held", message: KID_MESSAGES.held };
         await store.audit(req.class_id, "system", null, "request_held", { requestId: req.id, flags, screeningMessage: patch.message }).catch(() => {});
       }
