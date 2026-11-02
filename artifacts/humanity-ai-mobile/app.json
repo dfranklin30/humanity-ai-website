@@ -26,8 +26,8 @@
       "package": "org.humanityplusai.app",
       "versionCode": 13,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
-        "backgroundColor": "#0a2117"
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#0b0b0b"
       },
       "permissions": ["INTERNET"],
       "blockedPermissions": ["android.permission.CAMERA", "android.permission.RECORD_AUDIO", "android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_COARSE_LOCATION"]
