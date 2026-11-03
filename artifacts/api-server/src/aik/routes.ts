@@ -27,6 +27,7 @@ import { getMedia, referencedNames } from "./media";
 import { bookNarrationText, type Book } from "./book";
 import { LOUNGE_STARTERS, youtubeIdOf, validateLoungeUrl } from "./lounge";
 import { renderBookPdf } from "./bookpdf";
+import { exportArtifact, exportBundle, safeFileName } from "./export";
 import { registerConsoleRoutes } from "./console";
 import { registerHubExtrasRoutes } from "./hubextras";
 
@@ -1879,6 +1880,76 @@ export function registerAikRoutes(app: Express): void {
       res.setHeader("Content-Disposition", `attachment; filename="${safeName}.${ext}"`);
       res.setHeader("Cache-Control", "private, no-store");
       res.end(m.bytes);
+    }),
+  );
+
+  /* One file to keep, for any kind of piece: the game, the book as a PDF, the
+   * movie, the song, the picture, a printable sheet, a transcript (export.ts). */
+  app.get(
+    `${base}/artifacts/:aid/export`,
+    wrap(async (req, res) => {
+      const a = await artifactAccess(req, res);
+      if (!a) return;
+      const f = await exportArtifact(a);
+      await store.audit(a.class_id, req.session.aikFacilitator ? "facilitator" : "child", req.session.aikFacilitator?.id ?? req.session.aikChild?.id ?? null, "artifact_exported", { artifactId: a.id, kind: a.kind, file: f.name }).catch(() => {});
+      res.setHeader("Content-Type", f.mime);
+      res.setHeader("Content-Disposition", `attachment; filename="${f.name.replace(/"/g, "")}"`);
+      res.setHeader("Cache-Control", "private, no-store");
+      res.end(f.bytes);
+    }),
+  );
+
+  /* Everything a child made, as one ZIP: every piece as a file, plus an index. */
+  app.get(
+    `${base}/child/export.zip`,
+    requireChild,
+    wrap(async (req, res) => {
+      const childId = req.session.aikChild!.id;
+      const child = await store.getChild(childId);
+      const metas = (await store.listPortfolio(childId)).filter((a) => a.approved);
+      const full = (await Promise.all(metas.map((m) => store.getArtifact(m.id)))).filter((a): a is store.ArtifactRow => Boolean(a));
+      const zip = await exportBundle(full);
+      await store.audit(child?.class_id ?? null, "child", childId, "portfolio_exported", { pieces: full.length }).catch(() => {});
+      res.setHeader("Content-Type", "application/zip");
+      res.setHeader("Content-Disposition", `attachment; filename="${safeFileName(child?.nickname ?? "my", "my")} - studio work.zip"`);
+      res.setHeader("Cache-Control", "private, no-store");
+      res.end(zip);
+    }),
+  );
+
+  /* Everything a class made, as one ZIP, one folder per child. */
+  app.get(
+    `${base}/facilitator/classes/:id/export.zip`,
+    requireRunClasses,
+    wrap(async (req, res) => {
+      const klass = await ownedClass(req, res);
+      if (!klass) return;
+      const data = await store.exportClass(klass.id);
+      const children: { id: number; nickname?: string }[] = data.children ?? [];
+      const names = new Map(children.map((c) => [c.id, c.nickname ?? `child-${c.id}`]));
+      const zip = await exportBundle(data.artifacts as store.ArtifactRow[], (a) => (a.child_id ? names.get(a.child_id) ?? `child-${a.child_id}` : "facilitator"));
+      await store.audit(klass.id, "facilitator", (req as FReq).facilitator.id, "class_work_exported", { pieces: data.artifacts?.length ?? 0 }).catch(() => {});
+      res.setHeader("Content-Type", "application/zip");
+      res.setHeader("Content-Disposition", `attachment; filename="${safeFileName(klass.name, `class-${klass.id}`)} - studio work.zip"`);
+      res.setHeader("Cache-Control", "private, no-store");
+      res.end(zip);
+    }),
+  );
+
+  /* Everything in the facilitator's own Hub workspace, as one ZIP. */
+  app.get(
+    `${base}/hub/export.zip`,
+    requireFacilitator,
+    wrap(async (req, res) => {
+      const ws = await workspaceFor(req);
+      const metas = await store.listWorkspaceArtifacts(ws.id, null, 500);
+      const full = (await Promise.all(metas.map((m) => store.getArtifact(m.id)))).filter((a): a is store.ArtifactRow => Boolean(a));
+      const zip = await exportBundle(full);
+      await store.audit(ws.id, "facilitator", (req as FReq).facilitator.id, "hub_exported", { pieces: full.length }).catch(() => {});
+      res.setHeader("Content-Type", "application/zip");
+      res.setHeader("Content-Disposition", `attachment; filename="hub work.zip"`);
+      res.setHeader("Cache-Control", "private, no-store");
+      res.end(zip);
     }),
   );
 

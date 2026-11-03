@@ -101,6 +101,11 @@ export function mediaSrc(artifactId: number, ref: string | undefined | null, mim
 }
 export const downloadUrl = (artifactId: number) => `/api/aik/artifacts/${artifactId}/download`;
 export const bookPdfUrl = (artifactId: number) => `/api/aik/artifacts/${artifactId}/book.pdf`;
+/** One file to keep, for any kind of piece. */
+export const exportUrl = (artifactId: number) => `/api/aik/artifacts/${artifactId}/export`;
+export const wordsUrl = (artifactId: number) => `/api/aik/artifacts/${artifactId}/words.txt`;
+export const childExportZipUrl = "/api/aik/child/export.zip";
+export const hubExportZipUrl = "/api/aik/hub/export.zip";
 
 /** A finished picture book, as Story Maker stores it. */
 export type BookPage = { n: number; text: string; scene: string; image?: string; audio?: string };
@@ -309,6 +314,7 @@ export const fProjector = (classId: number, body: { mode: ModeId; kind: "create"
   call<{ request: StudioRequest }>("POST", `/facilitator/classes/${classId}/projector`, body);
 export const fRequest = (id: number) => call<{ request: StudioRequest }>("GET", `/facilitator/requests/${id}`);
 export const fExportUrl = (classId: number) => `/api/aik/facilitator/classes/${classId}/export`;
+export const fExportZipUrl = (classId: number) => `/api/aik/facilitator/classes/${classId}/export.zip`;
 export const fFeedUrl = (classId: number) => `/api/aik/facilitator/classes/${classId}/feed`;
 
 /* ------------------------------------------------------------------ *
@@ -449,7 +455,6 @@ export const hubRemixSuggest = (artifactId: number, mode: ModeId) =>
 export const hubRemixIdeas = (artifactId: number) => call<{ source: { id: number; title: string; kind: string }; ideas: Idea[] }>("POST", "/hub/remix/ideas", { artifactId });
 export const hubSendProject = (projectId: number, body: { participantName?: string; participantEmail: string; note?: string; send?: boolean }) =>
   call<{ project: Project; sent: boolean; saved?: boolean; reason?: string | null; to?: string; cc?: string[]; attached?: number; pieces?: number }>("POST", `/hub/projects/${projectId}/send`, body);
-export const wordsUrl = (artifactId: number) => `/api/aik/artifacts/${artifactId}/words.txt`;
 
 /* ---- Hub extras: AI box on every menu, Lounge video finder ---------- */
 export const hubAssist = (menu: string, prompt: string) => call<{ reply: string; menu: string }>("POST", "/hub/assist", { menu, prompt });

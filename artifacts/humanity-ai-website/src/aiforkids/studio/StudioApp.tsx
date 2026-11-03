@@ -32,8 +32,7 @@ import {
   type StudioConfig,
   type StudioRequest,
   type VoiceChoice,
-  type VoiceOption,
-} from "./api";
+  type VoiceOption, childExportZipUrl } from "./api";
 import { ArtifactLoader, BigButton, Card, ChangeBox, ChatPanel, ModeForm, Notice, RequestStatus, Spinner, kindEmoji, type ChatMsg } from "./components";
 import { KidsRemixTab, type KidStart } from "./KidsRemix";
 import { RoomIcon, ROOM_THEME, roomIdFor } from "./icons";
@@ -784,6 +783,13 @@ function TicketMeter({ used, limit }: { used: number; limit: number }) {
 function Portfolio({ items, onOpen }: { items: ArtifactMeta[]; onOpen: (a: ArtifactMeta) => void }) {
   if (!items.length) return <Card tone="tint">Nothing here yet. Make something!</Card>;
   return (
+    <div className="space-y-3">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <p className="text-sm font-semibold text-slate-600">{items.length} thing{items.length === 1 ? "" : "s"} you made</p>
+      <a href={childExportZipUrl} className="rounded-full bg-violet-600 px-4 py-1.5 text-sm font-bold text-white hover:bg-violet-700" data-testid="export-all">
+        ⬇️ Export everything I made (.zip)
+      </a>
+    </div>
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {items.map((a) => (
         <button key={a.id} onClick={() => onOpen(a)} className="rounded-3xl bg-white p-4 text-left ring-2 ring-violet-100 transition hover:-translate-y-0.5 hover:ring-violet-400">
@@ -795,6 +801,7 @@ function Portfolio({ items, onOpen }: { items: ArtifactMeta[]; onOpen: (a: Artif
           </p>
         </button>
       ))}
+    </div>
     </div>
   );
 }
