@@ -39,10 +39,17 @@ nothing was made. Now the pipeline repairs and keeps going (`autofix.ts`):
 | A refused or flagged movie shot | Refilmed gentler once, then that shot is dropped; the rest is cut |
 | A game that fails its checks, a text provider hiccup | Plain build as a second chance; two quiet retries before the fallback provider |
 
-What still stops an order, always: a prompt attack (Prompt Shields) and a child
-who is hurting (care alert). Screening itself being unreachable no longer ends
-an order: it is **held** for the facilitator (Hub orders too), who re-runs it
-once screening is back; nothing is ever made unscreened. When the
+**Always finish** (`AIK_ALWAYS_FINISH`, default on): no order waits for a
+facilitator and none dies on a screening blip. After the gentle repairs, one
+clearly **safe take** rewrites the order (or the reply) into a wholesome version
+that keeps the hero and setting; a prompt-attack verdict on a child's words is
+rewritten like any other hit. Screening that cannot be reached is retried three
+times over ~7 s, then skipped with a `content_safety_skipped` flag (the PII
+catcher, the blocklist and the model's own kid-safe rules still apply). Media
+is delivered on arrival (`AIK_CLASS_AUTO_APPROVE`, default on). Only a child
+who is hurting (care alert) gets a different path. If even the safe take does
+not pass, the order ends as "try a fresh idea", never as a wait.
+Set `AIK_ALWAYS_FINISH=false` to get the hold-for-facilitator behaviour back. When the
 repairs run out, a class order is **held** for the facilitator, never silently
 blocked, so the child's idea is not lost. Every repair is a flag
 (`layer: "autofix"`, blue on the dashboard) and an audit event

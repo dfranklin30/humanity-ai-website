@@ -65,6 +65,11 @@ function ok(label: string) {
 }
 
 async function main() {
+  const cfg = (await (await fetch(`${API}/config`)).json()) as any;
+  if (cfg?.capabilities?.autofix?.alwaysFinish) {
+    console.log("hold.e2e: always-finish is on, so no order is ever held; nothing to test here (set AIK_ALWAYS_FINISH=false to run).");
+    return;
+  }
   const db = new pg.Client({ connectionString: DB });
   await db.connect();
 

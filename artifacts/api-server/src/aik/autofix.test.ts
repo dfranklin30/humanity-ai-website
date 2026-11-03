@@ -21,10 +21,10 @@ test("a required field that was only private details gets a stand-in", () => {
   assert.deepEqual(r.touched, ["Hero"]);
 });
 
-test("a prompt attack, a care alert and a screening outage are never repaired", () => {
-  assert.equal(fixable([{ layer: "prompt_shield", category: "jailbreak" }]), false);
+test("a care alert is never repaired; with always-finish on, everything else is", () => {
   assert.equal(fixable([{ layer: "output", category: "care_alert" }]), false);
-  assert.equal(fixable([{ layer: "system", category: "content_safety_unavailable" }]), false);
+  assert.equal(fixable([{ layer: "prompt_shield", category: "jailbreak" }]), true);
+  assert.equal(fixable([{ layer: "blocklist", category: "weapons" }, { layer: "care_alert" as any, category: "care_alert" }]), false);
 });
 
 test("private data, the blocklist, Content Safety and output screening are repairable", () => {
@@ -35,8 +35,8 @@ test("private data, the blocklist, Content Safety and output screening are repai
   assert.equal(fixable([{ layer: "content_safety", category: "provider_filter" }]), true);
 });
 
-test("one hard flag in the set stops the repair", () => {
-  assert.equal(fixable([{ layer: "blocklist", category: "weapons" }, { layer: "prompt_shield", category: "jailbreak" }]), false);
+test("a prompt-attack verdict on a child's words is rewritten like any other hit", () => {
+  assert.equal(fixable([{ layer: "blocklist", category: "weapons" }, { layer: "prompt_shield", category: "jailbreak" }]), true);
 });
 
 test("the gentler instruction names what was flagged and keeps the format", () => {

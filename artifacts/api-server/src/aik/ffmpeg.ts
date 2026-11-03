@@ -152,7 +152,7 @@ export async function cutMovie(dir: string, opts: CutOptions): Promise<Buffer> {
  * push-in so the frame breathes. Used when no video model is available, so
  * Video Maker still delivers a movie made from the pictures it painted.
  */
-export async function animateStill(dir: string, png: Buffer, seconds: number, size: string, name: string): Promise<Buffer> {
+export async function animateStill(dir: string, png: Buffer, seconds: number, size: string, name: string, motion: "in" | "out" | "pan" = "in"): Promise<Buffer> {
   const [w, h] = size.split("x").map(Number);
   const W = w || 1280;
   const H = h || 720;
@@ -162,10 +162,19 @@ export async function animateStill(dir: string, png: Buffer, seconds: number, si
   const fps = 24;
   const frames = Math.max(fps, Math.round(Math.max(1, seconds) * fps));
   // Work at 2x so the zoom does not shimmer, push in to ~10% over the clip, then size down.
+  const zoom =
+    motion === "out"
+      ? `z='max(1.10-0.10*on/${frames},1.0)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`
+      : motion === "pan"
+        ? `z='1.08':x='(iw-iw/zoom)*on/${frames}':y='ih/2-(ih/zoom/2)'`
+        : `z='min(1+0.10*on/${frames},1.10)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`;
+  const fade = Math.min(0.5, Math.max(0.2, seconds / 10));
   const vf = [
     `scale=${W * 2}:${H * 2}:force_original_aspect_ratio=increase`,
     `crop=${W * 2}:${H * 2}`,
-    `zoompan=z='min(1+0.10*on/${frames},1.10)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${W}x${H}:fps=${fps}`,
+    `zoompan=${zoom}:d=${frames}:s=${W}x${H}:fps=${fps}`,
+    `fade=t=in:st=0:d=${fade}`,
+    `fade=t=out:st=${Math.max(0, seconds - fade).toFixed(2)}:d=${fade}`,
     "format=yuv420p",
   ].join(",");
   await run(

@@ -264,7 +264,9 @@ export async function buildBook(opts: {
     ? `Your ${pageCount}-page story is ready to read! Pictures aren't switched on for this class yet.`
     : picCount === 0
       ? `Your ${pageCount}-page story is ready to read! The pictures didn't come out this time — try once more later.`
-      : `Your ${pageCount}-page picture book is ready. Your facilitator will look at the pictures, then it's yours to read${narration ? " and listen to" : ""}.`;
+      : aikConfig.classAutoApprove
+        ? `Your ${pageCount}-page picture book is ready to read${narration ? " and listen to" : ""}!`
+        : `Your ${pageCount}-page picture book is ready. Your facilitator will look at the pictures, then it's yours to read${narration ? " and listen to" : ""}.`;
 
   return { ok: true, book, steps: steps.all(), flags, kidNote };
 }

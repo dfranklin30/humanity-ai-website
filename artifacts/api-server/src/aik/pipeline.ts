@@ -19,7 +19,7 @@ import { stripArt, carryArt, type GameHero } from "./gameart";
 import { writeBookDraft, buildBook, bookTextOnly, type Book, type BookDraft } from "./book";
 import { findLanguage, writeLanguageDraft, languageUserPrompt, languageTextOnly, langBlock, recordWords, spokenText, type LangBook, type LangDef, type LangDraft } from "./language";
 import { buildMovie, type Movie } from "./movie";
-import { autofixFlag, fixable, fixNote, rewriteOrder, softenRule, stripPIIFromValues, type Fix } from "./autofix";
+import { autofixFlag, fixable, fixNote, rewriteOrder, safeTakeRule, softenRule, stripPIIFromValues, type Fix } from "./autofix";
 import { putMedia, discardMedia } from "./media";
 import { verifyMicrobitCode } from "./verify";
 import { loadRemixContext, remixBlock, type RemixContext } from "./remix";
@@ -200,6 +200,13 @@ export function wasUnblocked(r: Pick<RequestRow, "flags">): boolean {
  */
 async function holdOrBlock(req: RequestRow, message: string, flags: Flag[]): Promise<void> {
   fixNotes.delete(req.id);
+  if (aikConfig.alwaysFinish) {
+    // Nothing waits for a grown-up. The repairs and the safe take have all run; this is a fresh start, not a hold.
+    const done = [...flags, autofixFlag("exhausted", "repairs and the safe take did not pass; the child was asked for a fresh idea")];
+    await finish(req, { status: "failed", message: KID_MESSAGES.tryNew, flags: done });
+    await store.audit(req.class_id, "system", null, "request_failed_after_repairs", { requestId: req.id, flags: done, screeningMessage: message }).catch(() => {});
+    return;
+  }
   const klass = await store.getClass(req.class_id);
   const hard = flags.some((f) => f.layer === "prompt_shield" || (f.layer === "system" && !isScreeningDown([f])) || f.category === "care_alert");
   if (!aikConfig.autofix || hard || !klass || (klass.kind === "workspace" && !isScreeningDown(flags))) {
@@ -251,13 +258,23 @@ async function repairOrder(
     if (!fixable(again.flags)) return null;
     flagsNow = again.flags;
   }
-  return null;
+  if (!aikConfig.alwaysFinish) return null;
+  // One clearly safe take before anything is given up on.
+  const safe = await rewriteOrder(fields, values, flagsNow, "safe");
+  if (!safe) return null;
+  fixes.push(...safe.changes);
+  added.push(autofixFlag("safe_take", safe.changes.join("; ")));
+  const next = validateInput(mode, input.kind, safe.values, { staff });
+  if (!next.ok) return null;
+  const again = await screenInput(next.text);
+  if (!again.ok) return null;
+  return { input: next, fixes, flags: [...added, ...again.flags] };
 }
 
 async function finish(req: RequestRow, patch: Parameters<typeof store.finishRequest>[1]): Promise<RequestRow> {
   remixContexts.delete(req.id);
   let next = patch;
-  if (patch.status === "blocked") {
+  if (patch.status === "blocked" && !aikConfig.alwaysFinish) {
     const flags: any[] = patch.flags ?? [];
     if (shouldHold(flags)) {
       // Hub work is the adult's own; only a class order waits for a facilitator,
@@ -457,10 +474,20 @@ export async function runRequest(requestId: number): Promise<void> {
     let sysNow = sys;
     let shapeRetried = false;
     let fixesLeft = aikConfig.autofix ? aikConfig.autofixTries : 0;
+    let safeTaken = false;
     const gentler = (why: Flag[]) => {
       flags.push(autofixFlag("regenerated", why.map((f) => f.category).join(", ")));
       rememberFixes(req.id, ["I made it a bit gentler"]);
       sysNow = sys + softenRule(why);
+    };
+    // After the gentle retries, one clearly safe take; only then is the order given up on.
+    const safeTake = (why: Flag[]): boolean => {
+      if (!aikConfig.alwaysFinish || safeTaken) return false;
+      safeTaken = true;
+      flags.push(autofixFlag("safe_take", why.map((f) => f.category).join(", ")));
+      rememberFixes(req.id, ["I made it a sunny, friendly version"]);
+      sysNow = sys + softenRule(why) + safeTakeRule();
+      return true;
     };
     while (!built) {
       let raw: string;
@@ -473,6 +500,7 @@ export async function runRequest(requestId: number): Promise<void> {
           gentler(hit);
           continue;
         }
+        if (safeTake(hit)) continue;
         await holdOrBlock(req, KID_MESSAGES.unsafe, [...flags, ...hit]);
         return;
       }
@@ -482,6 +510,7 @@ export async function runRequest(requestId: number): Promise<void> {
           gentler(hit);
           continue;
         }
+        if (safeTake(hit)) continue;
         await holdOrBlock(req, "That's a grown-up question. Let's ask your facilitator!", [...flags, ...hit]);
         return;
       }
@@ -499,6 +528,7 @@ export async function runRequest(requestId: number): Promise<void> {
         gentler(attempt.flags);
         continue;
       }
+      if (attempt.blocked && fixable(attempt.flags) && safeTake(attempt.flags)) continue;
       if (attempt.blocked) {
         await holdOrBlock(req, attempt.message, [...flags, ...attempt.flags]);
         return;
@@ -1148,7 +1178,7 @@ async function buildArtifact(
       return {
         ok: true,
         artifact: { kind: "audio", title, content: ref, mime: media.mime, summary: sheet, approved: false,
-          kidNote: tip || "Your song is ready. Your facilitator will listen, then play it for everyone." },
+          kidNote: tip || (aikConfig.classAutoApprove ? "Your song is ready. Press play!" : "Your song is ready. Your facilitator will listen, then play it for everyone.") },
       };
     } catch (err) {
       if (err instanceof ContentFilteredError) return { ok: false, retryable: false, blocked: true, message: KID_MESSAGES.unsafe, flags: [{ layer: "content_safety", category: "provider_filter" }] };
