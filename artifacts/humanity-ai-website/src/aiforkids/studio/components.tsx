@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { cx } from "../components/ui";
 import { WovenText, LanguageExtras } from "./LanguagePassport";
 import { RobotStage } from "./RobotStage";
-import { getArtifact, mediaSrc, downloadUrl, bookPdfUrl, type Artifact, type ArtifactMeta, type Book, type Movie, type FieldDef, type ModeDef, type StudioRequest, type FileLink, type Hero } from "./api";
+import { getArtifact, mediaSrc, downloadUrl, bookPdfUrl, type Artifact, type ArtifactMeta, type Book, type Movie, type FieldDef, type ModeDef, type StudioRequest, type FileLink, type Hero, exportUrl, wordsUrl } from "./api";
 
 /* ------------------------------------------------------------------ *
  * Primitives sized for small hands and projectors
@@ -112,7 +112,42 @@ export function GameFrame({ html, title, tall }: { html: string; title: string; 
  * Artifact viewers
  * ------------------------------------------------------------------ */
 
-export function ArtifactView({ artifact, compact, showFidelity }: { artifact: Artifact; compact?: boolean; /** Staff only: the hero-consistency check for movies. */ showFidelity?: boolean }) {
+const EXPORT_LABEL: Record<string, string> = {
+  game: "Export the game (.html)",
+  story: "Export the book (.pdf)",
+  quest: "Export the sheet",
+  robot: "Export the build sheet",
+  image: "Export the picture",
+  audio: "Export the song",
+  video: "Export the movie",
+  chat: "Export the chat (.txt)",
+  hero: "Export the hero",
+};
+
+/** Every piece can leave the Studio as a file: one button, the same place, on every result. */
+export function ExportBar({ artifactId, kind }: { artifactId: number; kind: string }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 pt-1" data-testid="export-bar">
+      <a href={exportUrl(artifactId)} className="rounded-full bg-violet-600 px-4 py-1.5 text-sm font-bold text-white hover:bg-violet-700" download>
+        ⬇️ {EXPORT_LABEL[kind] ?? "Export"}
+      </a>
+      <a href={wordsUrl(artifactId)} target="_blank" rel="noreferrer" className="rounded-full bg-white px-3 py-1.5 text-sm font-bold text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50">
+        📄 The words (.txt)
+      </a>
+    </div>
+  );
+}
+
+export function ArtifactView(props: { artifact: Artifact; compact?: boolean; /** Staff only: the hero-consistency check for movies. */ showFidelity?: boolean }) {
+  return (
+    <div className="space-y-3">
+      <ArtifactBody {...props} />
+      {!props.compact && <ExportBar artifactId={props.artifact.id} kind={props.artifact.kind} />}
+    </div>
+  );
+}
+
+function ArtifactBody({ artifact, compact, showFidelity }: { artifact: Artifact; compact?: boolean; showFidelity?: boolean }) {
   if (artifact.kind === "hero") {
     let hero: Hero | null = null;
     try {

@@ -40,8 +40,7 @@ import {
   type ModeId,
   type PublicClass,
   type StudioConfig,
-  type StudioRequest,
-} from "./api";
+  type StudioRequest, fExportZipUrl } from "./api";
 import { ArtifactLoader, BigButton, Card, ChangeBox, ModeForm, Notice, RequestStatus, Spinner, kindEmoji, summarizeInput } from "./components";
 
 export default function FacilitatorApp() {
@@ -368,6 +367,9 @@ function ClassDashboard({ config, me, classId, onGone }: { config: StudioConfig;
                 </SmallBtn>
                 <a href={fExportUrl(classId)} className="rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-200">
                   Export class data
+                </a>
+                <a href={fExportZipUrl(classId)} className="rounded-lg bg-violet-100 px-3 py-1.5 text-sm font-semibold text-violet-800 hover:bg-violet-200" title="Every piece the class made, as files, one folder per child">
+                  ⬇️ Export class work (.zip)
                 </a>
               </div>
             </div>

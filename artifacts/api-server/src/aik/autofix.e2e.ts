@@ -190,6 +190,23 @@ async function main() {
   console.log(results.map((x) => `    ${x}`).join("\n"));
   ok(`every studio made a product twice (${config.modes.length} studios)`);
 
+  /* ---- 7. everything is exportable: one file per piece, and a ZIP of all of it ---- */
+  const mine = (await kid.call("GET", "/child/me", undefined, 200)).json.portfolio as any[];
+  assert.ok(mine.length >= 1, "the child has pieces to export");
+  for (const piece of mine) {
+    const res = await fetch(`${API}/artifacts/${piece.id}/export`, { headers: { cookie: kid.cookie } });
+    assert.equal(res.status, 200, `export of ${piece.kind} #${piece.id} → ${res.status}`);
+    assert.match(res.headers.get("content-disposition") ?? "", /attachment/);
+    assert.ok((await res.arrayBuffer()).byteLength > 0, `${piece.kind} export is not empty`);
+  }
+  const zipRes = await fetch(`${API}/child/export.zip`, { headers: { cookie: kid.cookie } });
+  assert.equal(zipRes.status, 200);
+  const zipBytes = Buffer.from(await zipRes.arrayBuffer());
+  assert.equal(zipBytes.readUInt32LE(0), 0x04034b50, "a real ZIP");
+  const hubZip = await fetch(`${API}/hub/export.zip`, { headers: { cookie: fac.cookie } });
+  assert.equal(hubZip.status, 200);
+  ok(`every piece exports as a file (${mine.length} checked) and the portfolio and Hub export as ZIPs`);
+
   await db.end();
   console.log(`\n${passed} checks passed`);
 }

@@ -81,6 +81,18 @@ text-to-video for a shot with no keyframe. Runway's own moderation refusals
 (`SAFETY.*`) count as screening hits; a bad key or empty credits pause movies
 the same way a dead deployment does. `fal` is also wired.
 
+## Export: every piece as a file
+
+`GET /api/aik/artifacts/:id/export` returns one file to keep for any kind of
+piece (`export.ts`): the game (.html), the book (.pdf), a printable quest sheet
+with its answer key, a robot build sheet with the code, the picture, the song,
+the movie (or a printable storyboard), a chat transcript, the hero's portrait.
+Every result card shows the same **Export** button, next to "The words (.txt)".
+Bundles: `GET /api/aik/child/export.zip` (a child's portfolio),
+`GET /api/aik/facilitator/classes/:id/export.zip` (a whole class, one folder
+per child) and `GET /api/aik/hub/export.zip` (the Hub workspace); each ZIP has
+an `index.txt`. The ZIP writer is in-house (store only), so no new dependency.
+
 ## The Hub (`/aiforkids/hub`)
 
 The staff side. One signed-in place where Humanity + AI does its own AI work:

@@ -57,8 +57,7 @@ import {
   type AuditEntry,
   type Role,
   type StudioConfig,
-  type StudioRequest,
-} from "./api";
+  type StudioRequest, hubExportZipUrl } from "./api";
 import { ArtifactView, BigButton, Card, ChangeBox, ForgeSteps, ModeForm, Notice, RequestStatus, Spinner, kindEmoji } from "./components";
 import { fLounge, fLoungeAdd, fLoungeRemove, type LoungeItem } from "./api";
 import { BASE } from "../content/program";
@@ -582,6 +581,9 @@ function Welcome({ state }: { state: HubState }) {
             🛡️ Screening {state.capabilities.screening.configured ? "on" : "off"}
             {state.capabilities.screening.required ? " · fail closed" : ""}
           </span>
+          <a href={hubExportZipUrl} className="rounded-full bg-violet-600 px-3 py-1 text-xs font-bold text-white hover:bg-violet-700" title="Every piece in your Hub, as files">
+            ⬇️ Export all my work (.zip)
+          </a>
         </div>
       </div>
     </Card>
