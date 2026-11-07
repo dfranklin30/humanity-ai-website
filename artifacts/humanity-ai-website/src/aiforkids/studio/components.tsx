@@ -952,13 +952,38 @@ export function ForgeSteps({ steps }: { steps: NonNullable<StudioRequest["progre
  * from one that fires on something genuinely wrong, so the person responsible
  * for judging it cannot judge it.
  */
-export function RequestStatus({ request, showReason, steps = true }: { request: StudioRequest; showReason?: boolean; /** Hub screens draw the steps in their own card. */ steps?: boolean }) {
+export function RequestStatus({
+  request,
+  showReason,
+  steps = true,
+  onWait,
+}: {
+  request: StudioRequest;
+  showReason?: boolean;
+  /** Hub screens draw the steps in their own card. */
+  steps?: boolean;
+  /** Studio only: lets a child go to the Lounge or Arcade while the helper works; the order keeps going and shows up in My stuff. */
+  onWait?: (tab: "lounge" | "arcade") => void;
+}) {
   if (request.status === "queued" || request.status === "working")
     return (
       <div className="space-y-3">
         <Spinner label={request.status === "queued" ? "In line…" : request.mode === "video" ? "Filming your movie… this takes a few minutes" : "The helper is working on it…"} />
         {/* A movie takes a few minutes. The server reports each step; a child watching a lone spinner thinks it broke. */}
         {steps && request.progress && request.progress.length > 0 && <ForgeSteps steps={request.progress} />}
+        {onWait && (
+          <div className="rounded-2xl bg-violet-50 p-3 ring-1 ring-violet-200">
+            <p className="text-sm font-semibold text-violet-900">No need to watch it cook. Your order keeps going and lands in My stuff.</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <BigButton variant="secondary" className="!px-4 !py-2 !text-base" onClick={() => onWait("lounge")}>
+                📺 Hang out in the Lounge
+              </BigButton>
+              <BigButton variant="secondary" className="!px-4 !py-2 !text-base" onClick={() => onWait("arcade")}>
+                🕹️ Play in the Arcade
+              </BigButton>
+            </div>
+          </div>
+        )}
       </div>
     );
 
