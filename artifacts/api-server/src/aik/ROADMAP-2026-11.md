@@ -46,9 +46,9 @@ Studio
     ├── Lounge   ← facilitator-curated videos & links; always available, also while waiting
     └── Gallery  ← shared books, movies, songs, pictures, quests, robots
 ```
-- 4.1 ⬜ One "Put in the Hub" action; the artifact's kind decides where it appears (game → Arcade, everything else → Gallery). Facilitator approval still gates it.
-- 4.2 ⬜ Hub shows other kids' approved work across the class (and, with a facilitator switch, across the club's classes), not only games.
-- 4.3 ⬜ Lounge reachable from the top bar at all times and from the waiting screen (1.4 done).
+- 4.1 ✅ One "Put in the Hub" action; the artifact's kind decides where it appears (game → Arcade, everything else → Gallery). Facilitator approval still gates it. (`store.hubShelf`, `GET child/hub`, `Hub.tsx`)
+- 4.2 ✅ Hub shows other kids' approved work across the class (and, with the facilitator switch "Hub shows the whole club", across the club's classes), not only games.
+- 4.3 ✅ Lounge reachable from the top bar at all times and from the waiting screen (1.4 done).
 
 ## 5. Robotics Lab
 The 3D robot is one model with paint and moves. The class wants variety and a bridge to physical kits.
@@ -58,9 +58,9 @@ The 3D robot is one model with paint and moves. The class wants variety and a br
 
 ## 6. Guardrails: a satisfying "no"
 Holds and unblocks work. When the answer stays no, the child needs a good door to walk through, not a wall.
-- 6.1 ⬜ On a held or blocked order, offer three doors: *Try the idea a different way* (suggested rewording), *Lounge*, and *Advanced Special Training*.
-- 6.2 ⬜ **Advanced Special Training** (opt-in, facilitator-enabled): a track for kids who have outgrown the themes — build a one-page website, a choose-your-own-adventure, a data poster, a music video from their own song; same screening, more freedom in form. Output lands in My stuff and can go to the Hub.
-- 6.3 ⬜ Facilitator view: which doors kids take, so the themes can be tuned.
+- 6.1 ✅ On a held or blocked order, offer three doors: *Try the idea a different way* (suggested rewording from `POST child/requests/:rid/door`, screened), *Lounge*, and *Advanced Special Training* (when the class has it on). `Doors.tsx`.
+- 6.2 🔧 **Advanced Special Training** (opt-in, facilitator-enabled): a track for kids who have outgrown the themes. Shipped: a one-page website (HTML, hardened like a game) and a choose-your-own-adventure (JSON pages and choices), mode `advanced` in `modes.ts`; same screening, output lands in My stuff and can go to the Hub Gallery. Not yet: a data poster, a music video from their own song.
+- 6.3 ✅ Facilitator view: every door is audited as `door_taken`; the class dashboard shows the session's counts (reword · Lounge · Advanced).
 
 ## 7. Waiting
 - 7.1 ✅ Lounge/Arcade from the waiting screen (1.4).

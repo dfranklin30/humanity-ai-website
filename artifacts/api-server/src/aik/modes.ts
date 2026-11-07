@@ -314,6 +314,36 @@ export const MODES: Record<ModeId, ModeDef> = {
     ],
     needsApproval: false,
   },
+  /* Advanced Special Training (roadmap 6.2): an opt-in track for children who
+   * have outgrown the themed rooms. Same screening as everything else, more
+   * freedom in form. A facilitator switches it on per class; it never appears
+   * in ALL_MODES, so a class that has not opted in never sees it. */
+  advanced: {
+    id: "advanced",
+    name: "Advanced Special Training",
+    emoji: "🧪",
+    tagline: "More freedom. Same rules. Build a real website or a story with choices.",
+    blurb: "Build a one-page website about anything you love, or write a choose-your-own-adventure where the reader picks what happens. It lands in My stuff and can go to the Hub Gallery.",
+    artifactKind: "site",
+    interaction: "form",
+    tier: "default",
+    needsApproval: false,
+    createFields: [
+      { key: "make", label: "I want to build a…", hint: "pick one", required: true, choices: ["one-page website", "choose-your-own-adventure"] },
+      { key: "title", label: "Title", hint: "Everything About Axolotls, The Haunted Lighthouse (not scary!)", required: true, maxChars: 60 },
+      { key: "about", label: "What it's about", hint: "a page about my favourite animal; a story where you explore a cave", required: true },
+      { key: "look", label: "The look or the mood", hint: "dark mode with neon, calm and leafy, funny and loud", required: false },
+      { key: "parts", label: "Must have…", hint: "a fun-facts box and a quiz; three endings and a secret room", required: false },
+    ],
+    changeHint: "Add a section about ___, make the buttons bigger, add a choice on page 2, change the ending…",
+    maxTokens: 7000,
+    temperature: 0.6,
+    starters: [
+      { label: "A fan page for an animal", values: { make: "one-page website", title: "Everything About Axolotls", about: "a page about axolotls: where they live, what they eat, why they smile", look: "calm, watery blues and pinks", parts: "a fun-facts box, a photo caption area, and a three-question quiz" } },
+      { label: "A cave adventure", values: { make: "choose-your-own-adventure", title: "The Glow Cave", about: "you explore a cave full of glowing mushrooms looking for a lost puppy", look: "mysterious but friendly, a little funny", parts: "at least three endings and a secret room" } },
+      { label: "My club's page", values: { make: "one-page website", title: "The Tuesday Makers", about: "a page about an after-school club that builds robots and games", look: "bright and bold, big buttons", parts: "a schedule box, a 'what we made' list, and a joke of the week" } },
+    ],
+  },
 };
 
 export function getMode(id: string): ModeDef | null {
@@ -540,6 +570,22 @@ OUTPUT FORMAT:
 - Controls: arrow keys AND mouse/touch pointer movement. Show score and lives on screen. Show a friendly "Game over! Score N" and a Play Again button (a <button> element with an onclick handler is fine).
 - Make the game genuinely playable: things fall or move, the hero collects and dodges, difficulty rises gently.
 - Include the game title at the top of the page. Put a one-line HTML comment at the very top of the <body>: <!-- SUMMARY: one short sentence describing the game for a child -->`;
+    case "advanced":
+      return `You build small, real things with children who are ready for more freedom: a one-page website, or a choose-your-own-adventure story.${COMMON_RULES}
+The order says which one to build ("I want to build a…"). Follow that exactly.
+
+IF IT IS A ONE-PAGE WEBSITE:
+- Reply with ONE complete HTML document and nothing else: no markdown fences, no explanation before or after. Start with <!DOCTYPE html>.
+- All CSS in one <style>, all JavaScript (if any) in one inline <script>. No external files, fonts, libraries or imports.
+- Absolutely no network: no fetch, XMLHttpRequest, WebSocket, <a href> links to anywhere, <form>, <iframe>, or URLs of any kind. No localStorage or cookies. No alert/prompt/confirm. No window.parent or window.top. No sound.
+- Keep the whole document under 12,000 characters. Make it look designed: a header, two to five sections with headings, a colour scheme that matches the look the child asked for, readable text sizes, emoji for pictures (there are no image files). A small in-page interaction (a quiz with buttons, a toggle, a counter) is welcome; it must work with the script inline.
+- Put a one-line HTML comment at the very top of the <body>: <!-- SUMMARY: one short sentence describing the page for a child -->
+
+IF IT IS A CHOOSE-YOUR-OWN-ADVENTURE:
+- Reply with ONLY a JSON object, no markdown fences:
+  {"title": string, "start": "p1", "pages": [{"id": "p1", "text": string, "choices": [{"text": string, "go": "p2"}]} x6-12]}
+- Every page's text is 40 to 110 words a 9-year-old reads easily. Each page has 2 or 3 choices, except endings, which have an empty choices list. At least 2 different endings, every one of them kind or funny. Every "go" must be the id of a page in the list, and every page must be reachable from "start".
+- Nothing scary beyond a friendly, silly spooky; nothing is hurt.`;
     case "story":
       // Story Maker's prompt lives with the rest of the book pipeline in book.ts
       // (bookSystemPrompt); the pipeline routes "story" there before reaching here.
@@ -628,6 +674,9 @@ You are changing ONE thing in work that already exists and that someone is proud
 Someone should be able to look at the before and after and point at exactly one
 difference.`;
 
+  if (mode.id === "advanced" && /<html[\s>]/i.test(currentContent ?? "")) {
+    return `Here is the current web page (a complete HTML document):\n\n${currentContent ?? ""}\n\n${KEEP}\n\nThe director's order:\n"${input.change}"\n\nReply with the full updated HTML document only. Update the SUMMARY comment only if the change made it inaccurate.`;
+  }
   if (mode.id === "game") {
     return `Here is the current game (a complete HTML document):\n\n${currentContent ?? ""}\n\n${KEEP}\n\nThe director's order:\n"${input.change}"\n\nReply with the full updated HTML document only. Update the SUMMARY comment only if the change made it inaccurate.`;
   }

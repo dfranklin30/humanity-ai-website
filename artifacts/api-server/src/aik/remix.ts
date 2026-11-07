@@ -198,6 +198,8 @@ const KIND_NAMES: Record<string, string> = {
   image: "picture",
   quest: "fact list",
   robot: "robot plan",
+  site: "website",
+  adventure: "choose-your-own-adventure",
 };
 
 export function kindName(kind: string): string {
@@ -258,6 +260,15 @@ export function representation(a: Pick<ArtifactRow, "kind" | "title" | "content"
   } else if (a.kind === "game") {
     add("Game", a.title);
     add("How it plays", a.summary);
+  } else if (a.kind === "site") {
+    add("Website", a.title);
+    add("What it shows", a.summary);
+    const visible = a.content.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    add("On the page", visible.slice(0, 1200));
+  } else if (a.kind === "adventure") {
+    const v = safeJson(a.content);
+    add("Adventure", v?.title ?? a.title);
+    (v?.pages ?? []).forEach((p: any) => add(`Page ${p?.id}`, [p?.text, ...(p?.choices ?? []).map((c: any) => `→ ${c?.text}`)].filter(Boolean).join(" ")));
   } else if (a.kind === "quest") {
     const q = safeJson(a.content);
     add("Topic", q?.title ?? a.title);
@@ -308,6 +319,7 @@ export function filesOf(a: Pick<ArtifactRow, "id" | "kind" | "title" | "content"
   };
   const id = a.id;
   if (a.kind === "game") push("Game (HTML, plays in any browser)", `${API}/artifacts/${id}/download`, "html");
+  if (a.kind === "site") push("Website (HTML, opens in any browser)", `${API}/artifacts/${id}/download`, "html");
   if (a.kind === "story") {
     const b = safeJson(a.content);
     if (b?.format === "book") {
@@ -333,7 +345,7 @@ export function filesOf(a: Pick<ArtifactRow, "id" | "kind" | "title" | "content"
     push("Portrait", mediaUrl(id, h?.portrait), "image");
     push(`Voice sample${h?.voice?.name ? ` (${h.voice.name})` : ""}`, mediaUrl(id, h?.sample), "audio");
   }
-  if (a.kind === "quest" || a.kind === "robot") push("Data (JSON)", `${API}/artifacts/${id}/download`, "json");
+  if (a.kind === "quest" || a.kind === "robot" || a.kind === "adventure") push("Data (JSON)", `${API}/artifacts/${id}/download`, "json");
   push("The words (text)", `${API}/artifacts/${id}/words.txt`, "text");
   return out;
 }
