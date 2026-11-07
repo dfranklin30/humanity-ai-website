@@ -4,6 +4,7 @@ import { cx } from "../components/ui";
 import { WovenText, LanguageExtras } from "./LanguagePassport";
 import { RobotStage } from "./RobotStage";
 import { getArtifact, mediaSrc, downloadUrl, bookPdfUrl, type Artifact, type ArtifactMeta, type Book, type Movie, type FieldDef, type ModeDef, type StudioRequest, type FileLink, type Hero, exportUrl, wordsUrl } from "./api";
+import { SiteView, AdventureView } from "./AdvancedViews";
 
 /* ------------------------------------------------------------------ *
  * Primitives sized for small hands and projectors
@@ -122,6 +123,8 @@ const EXPORT_LABEL: Record<string, string> = {
   video: "Export the movie",
   chat: "Export the chat (.txt)",
   hero: "Export the hero",
+  site: "Export the website (.html)",
+  adventure: "Export the adventure",
 };
 
 /** Every piece can leave the Studio as a file: one button, the same place, on every result. */
@@ -168,6 +171,10 @@ function ArtifactBody({ artifact, compact, showFidelity }: { artifact: Artifact;
         )}
       </div>
     );
+
+  // Advanced Special Training results live in their own file.
+  if (artifact.kind === "site") return <SiteView artifact={artifact} compact={compact} />;
+  if (artifact.kind === "adventure") return <AdventureView artifact={artifact} />;
 
   if (artifact.kind === "story") {
     let data: any = {};
@@ -489,7 +496,7 @@ export function ArtifactLoader({ id, compact }: { id: number; compact?: boolean 
 }
 
 export function kindEmoji(kind: ArtifactMeta["kind"]): string {
-  return { game: "🎮", story: "📚", image: "🎨", quest: "🧭", video: "🎬", robot: "🤖", chat: "💬", audio: "🎵", hero: "🦸" }[kind] ?? "✨";
+  return { game: "🎮", story: "📚", image: "🎨", quest: "🧭", video: "🎬", robot: "🤖", chat: "💬", audio: "🎵", hero: "🦸", site: "🌐", adventure: "🗺️" }[kind] ?? "✨";
 }
 
 /* ------------------------------------------------------------------ *
@@ -957,6 +964,7 @@ export function RequestStatus({
   showReason,
   steps = true,
   onWait,
+  doors,
 }: {
   request: StudioRequest;
   showReason?: boolean;
@@ -964,6 +972,8 @@ export function RequestStatus({
   steps?: boolean;
   /** Studio only: lets a child go to the Lounge or Arcade while the helper works; the order keeps going and shows up in My stuff. */
   onWait?: (tab: "lounge" | "arcade") => void;
+  /** Studio only: the three doors a child can take when the answer is held or no (see Doors.tsx). Drawn inside the held/blocked card. */
+  doors?: ReactNode;
 }) {
   if (request.status === "queued" || request.status === "working")
     return (
@@ -999,17 +1009,23 @@ export function RequestStatus({
 
   if (request.status === "held")
     return (
-      <Notice>
-        🙋 {request.message ?? "Your facilitator is coming over to take a look. Hang tight!"}
-        {reason}
-      </Notice>
+      <div className="space-y-3">
+        <Notice>
+          🙋 {request.message ?? "Your facilitator is coming over to take a look. Hang tight!"}
+          {reason}
+        </Notice>
+        {doors}
+      </div>
     );
   if (request.status === "blocked")
     return (
-      <Notice>
-        {request.message ?? "Let's try that a different way."}
-        {reason}
-      </Notice>
+      <div className="space-y-3">
+        <Notice>
+          {request.message ?? "Let's try that a different way."}
+          {reason}
+        </Notice>
+        {doors}
+      </div>
     );
   if (request.status === "failed")
     return (

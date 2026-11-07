@@ -274,6 +274,7 @@ const MODE_LABELS: Record<ModeId, string> = {
   robot: "🤖 Robotics Lab",
   homework: "📝 Homework Help",
   language: "🛂 Language Passport",
+  advanced: "🧪 Advanced Special Training",
 };
 
 function ClassDashboard({ config, me, classId, onGone }: { config: StudioConfig; me: Facilitator; classId: number; onGone: () => void }) {
@@ -387,7 +388,7 @@ function ClassDashboard({ config, me, classId, onGone }: { config: StudioConfig;
           <p className="text-sm font-bold text-slate-700">Studios — all open</p>
           <p className="mt-1 text-xs text-slate-500">Every class gets all eight studios; there is nothing to unlock. Use <b>Close the Studio</b> above to shut the whole class down, or mute one child on the roster.</p>
           <div className="mt-2 flex flex-wrap gap-1">
-            {(Object.keys(MODE_LABELS) as ModeId[]).map((m) => (
+            {(Object.keys(MODE_LABELS) as ModeId[]).filter((m) => m !== "advanced").map((m) => (
               <span key={m} className="rounded-lg bg-violet-50 px-2 py-1 text-xs font-bold text-violet-800">{MODE_LABELS[m]}</span>
             ))}
           </div>
@@ -415,6 +416,25 @@ function ClassDashboard({ config, me, classId, onGone }: { config: StudioConfig;
             <span className="font-bold text-slate-700">Lock portfolios (Expo)</span>
             <input type="checkbox" checked={k.locked} onChange={(e) => patch({ locked: e.target.checked })} />
           </label>
+          <label className="mt-2 flex items-center justify-between gap-3 text-sm">
+            <span className="font-bold text-slate-700">
+              Advanced Special Training
+              <span className="block text-xs font-normal text-slate-500">A ninth room for kids who have outgrown the themes: a one-page website or a choose-your-own-adventure. Same screening. Also offered as a door after a held or blocked order.</span>
+            </span>
+            <input type="checkbox" checked={k.advancedEnabled === true} onChange={(e) => patch({ advancedEnabled: e.target.checked })} data-testid="advanced-switch" />
+          </label>
+          <label className="mt-2 flex items-center justify-between gap-3 text-sm">
+            <span className="font-bold text-slate-700">
+              Hub shows the whole club
+              <span className="block text-xs font-normal text-slate-500">The Arcade and Gallery also show approved, shared work from your other classes, not only this one.</span>
+            </span>
+            <input type="checkbox" checked={k.hubAllClasses === true} onChange={(e) => patch({ hubAllClasses: e.target.checked })} data-testid="hub-all-switch" />
+          </label>
+          {detail.doors && (
+            <p className="mt-3 text-xs text-slate-600" title="After a held or blocked order, which door the child chose. Use it to tune the themes.">
+              <b>Doors taken this session:</b> 💡 reword {detail.doors.reword ?? 0} · 📺 Lounge {detail.doors.lounge ?? 0} · 🧪 Advanced {detail.doors.advanced ?? 0}
+            </p>
+          )}
         </Card>
       </div>
 

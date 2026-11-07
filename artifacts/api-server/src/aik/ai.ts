@@ -1068,6 +1068,20 @@ function mockText(opts: TextCallOptions): string {
         ],
         coverPrompt: "A smiling cartoon pancake rolling through a sunny garden of giant sunflowers, bright colors, friendly, no people",
       });
+    // Advanced Special Training: a website when the order asks for one, else an adventure.
+    case "advanced":
+      if (/one-page website/i.test(opts.user ?? "") || /<html[\s>]/i.test(opts.user ?? "")) return MOCK_SITE;
+      return JSON.stringify({
+        title: "The Glow Cave",
+        start: "p1",
+        pages: [
+          { id: "p1", text: "You step into a cave lit by glowing blue mushrooms. Somewhere ahead, a puppy yips. Two tunnels open in front of you: one sparkles, one hums.", choices: [{ text: "Take the sparkly tunnel", go: "p2" }, { text: "Take the humming tunnel", go: "p3" }] },
+          { id: "p2", text: "The sparkly tunnel is full of glittering crystals that giggle when you touch them. The puppy's yip is louder now. A crystal rolls over to show a tiny door.", choices: [{ text: "Open the tiny door", go: "p4" }, { text: "Follow the yip", go: "p5" }] },
+          { id: "p3", text: "The humming comes from a choir of friendly moths. They hum louder when you step left. Left it is! The puppy is sitting in a nest of soft moss, wagging.", choices: [] },
+          { id: "p4", text: "Behind the tiny door is the secret room: a snack bar run by a mole. The puppy is here too, eating a mushroom muffin. You both get one.", choices: [] },
+          { id: "p5", text: "You follow the yip to a glowing pool. The puppy splashes out, shakes water everywhere, and leads you home.", choices: [] },
+        ],
+      });
     case "quest":
       return JSON.stringify({
         title: "Amazing Octopus Facts",
@@ -1113,6 +1127,13 @@ requestAnimationFrame(loop)}loop();
 </script></body></html>`;
 
 // 1x1 transparent PNG
+const MOCK_SITE = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Everything About Axolotls</title>
+<style>body{font-family:system-ui,sans-serif;margin:0;background:#e0f2fe;color:#0c4a6e}header{background:#f9a8d4;padding:24px;text-align:center}h1{margin:0;font-size:32px}section{max-width:640px;margin:16px auto;background:#fff;border-radius:16px;padding:16px}button{font-size:16px;padding:8px 14px;border-radius:999px;border:0;background:#0ea5e9;color:#fff}</style></head>
+<body><!-- SUMMARY: A fan page about axolotls with fun facts and a tiny quiz. -->
+<header><h1>🦎 Everything About Axolotls</h1><p>The smiling salamander that never grows up.</p></header>
+<section><h2>Fun facts</h2><ul><li>Axolotls can regrow a whole leg.</li><li>They stay babies their whole lives.</li><li>They live in lakes near Mexico City.</li></ul></section>
+<section><h2>Quiz</h2><p>Can an axolotl regrow a leg?</p><button onclick="document.getElementById('a').textContent='Yes! Amazing, right?'">Yes</button> <button onclick="document.getElementById('a').textContent='Try again!'">No</button><p id="a"></p></section>
+</body></html>`;
 const MOCK_PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 // Tiny silent MP3 frame and an (intentionally empty) MP4 placeholder for the mock path only.
 const MOCK_MP3 = "SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQxAADB8AhSmxhIIEVCSiJrDCQBTcu3UrAIwUdkRgQbFAZC1CQEwTJ9mjRvBA4UOLD8nKVOWfh+UlK3z/177OXrfOdKl7pyn3Xf//WreyTRUoAWgBgkOAGbZHBgG1OF6zM82DWbZaUmMBptgQhGjsyYqc9ae9XFz280948NMBWInluyEeTvX+/oMTYyQAAAAA//tQxAADBOAhCmxhIIEVCSiJrDCQBTcu3UrAIwUdkRgQbFAZC1CQEwTJ9mjRvBA4UOLD8nKVOWfh+UlK3z/177OXrfOdKl7pyn3Xf//WreyTRUoAWgBgkOAGbZHBgG1OF6zM82DWbZaUmMBptgQhGjsyYqc9ae9XFz280948NMBWInluyEeTvX+/oMTYyQAAAAA=";
