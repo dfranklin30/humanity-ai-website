@@ -13,6 +13,7 @@
  * happens to them). Nothing here talks to the server.
  */
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import type * as React from "react";
 import { cx } from "../components/ui";
 
 /** Served from the website's public folder; see public/aiforkids/robots/README.md for provenance. */
@@ -73,15 +74,9 @@ function hexToRgb(hex: string): [number, number, number, number] {
   return [c((n >> 16) & 255), c((n >> 8) & 255), c(n & 255), 1];
 }
 
-/* <model-viewer> is a custom element; React 19 needs to be told it exists (JSX lives on the react module now). */
-declare module "react" {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
-  namespace JSX {
-    interface IntrinsicElements {
-      "model-viewer": React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & Record<string, unknown>;
-    }
-  }
-}
+/* <model-viewer> is a custom element React knows nothing about. Rendering it through a typed
+   tag alias sidesteps the JSX.IntrinsicElements augmentation, which moved between @types/react versions. */
+const ModelViewerTag = "model-viewer" as unknown as React.ComponentType<Record<string, unknown> & { children?: React.ReactNode; ref?: React.Ref<unknown> }>;
 
 type ModelViewerElement = HTMLElement & {
   availableAnimations?: string[];
@@ -145,7 +140,7 @@ const Viewer = lazy(async () => {
       );
     }
     return (
-      <model-viewer
+      <ModelViewerTag
         ref={ref}
         src={ROBOT_MODEL_URL}
         alt={`A 3D robot called ${name}`}
@@ -166,7 +161,7 @@ const Viewer = lazy(async () => {
         <div slot="poster" className="flex h-full items-center justify-center text-sm font-semibold text-violet-700">
           Warming up the robot…
         </div>
-      </model-viewer>
+      </ModelViewerTag>
     );
   }
   return { default: ModelViewer };

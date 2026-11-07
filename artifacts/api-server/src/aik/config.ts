@@ -242,7 +242,8 @@ export const aikConfig = {
   maxPinAttempts: 5,
   /** Default Director's Orders (create/change) per child per session. Enough to
    *  walk the whole Remix cycle: a hero, a few pieces, a few remixes and changes. */
-  defaultTicketLimit: 12,
+  /** Director's Orders per child per session for a new class. 20 fits an elementary club hour; facilitators change it per class. */
+  defaultTicketLimit: 20,
   /** Pictures, clips and songs a child makes are theirs straight away (Content
    *  Safety has already screened them); set AIK_CLASS_AUTO_APPROVE=false to hold
    *  every one for a facilitator click in the Review queue again. */

@@ -184,7 +184,11 @@ export async function buildMovie(opts: {
     const got = clips.filter(Boolean).length;
     steps.end("shots", got === movie.shots.length ? "done" : "failed", `${got} of ${movie.shots.length}`);
     if (!got) {
-      return { ok: true, movie, steps: steps.all(), flags, kidNote: "Here's your storyboard! The clips didn't come out this time; try once more later." };
+      // Every shot failed and none was refused on content grounds: the video model itself is down
+      // (Sora 2 was retired on Azure on 2 Nov 2026 with no successor). Say so instead of "try again".
+      flags.push({ layer: "system", category: "video_unavailable" });
+      logger.error({ requestId, shots: movie.shots.length }, "[aik] no shot came back from the video provider; movie delivered as a storyboard");
+      return { ok: true, movie, steps: steps.all(), flags, kidNote: "Here's your storyboard! The movie camera is switched off right now, so there are no clips today. Your facilitator knows." };
     }
 
     /* 1b. Hero fidelity: same character in every shot? ---------------- */

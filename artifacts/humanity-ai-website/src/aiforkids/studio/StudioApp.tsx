@@ -240,7 +240,7 @@ type Tab = "make" | "remix" | "portfolio" | "arcade" | "lounge";
 function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut: () => void }) {
   const [me, setMe] = useState<ChildMe | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>("make");
+  const [tab, setTab] = useState<Tab>("remix");
   const [modeId, setModeId] = useState<ModeId | null>(null); // null = Studio hall
   const [active, setActive] = useState<StudioRequest | null>(null); // the order being watched
   const [project, setProject] = useState<ArtifactMeta | null>(null); // the artifact being worked on
@@ -402,7 +402,8 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
           </span>
         </div>
         <nav className="flex flex-wrap gap-2">
-          {(["make", "remix", "portfolio", "arcade", "lounge"] as Tab[]).map((t) => {
+          {/* Remix first: the class starts from something that already exists and makes it their own. The rooms are one tap away. */}
+          {(["remix", "make", "portfolio", "arcade", "lounge"] as Tab[]).map((t) => {
             const room = t === "make" ? "video" : t === "remix" ? "story" : t === "portfolio" ? "portfolio" : t === "arcade" ? "arcade" : "lounge";
             const label = t === "make" ? "Rooms" : t === "remix" ? "Remix" : t === "portfolio" ? "My stuff" : t === "arcade" ? "Arcade" : "Lounge";
             return (
@@ -535,7 +536,7 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
               </div>
 
               <div className="space-y-3">
-                {active && <RequestStatus request={active} />}
+                {active && <RequestStatus request={active} onWait={(t) => setTab(t)} />}
                 {project && project.approved !== false ? (
                   <Card>
                     <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
