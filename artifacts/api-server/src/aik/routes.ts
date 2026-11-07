@@ -649,6 +649,7 @@ export function registerAikRoutes(app: Express): void {
           paused: z.boolean().optional(),
           locked: z.boolean().optional(),
           soundEnabled: z.boolean().optional(),
+          micEnabled: z.boolean().optional(),
         })
         .safeParse(req.body);
       if (!body.success) return void res.status(400).json({ error: "Invalid settings." });
@@ -660,6 +661,7 @@ export function registerAikRoutes(app: Express): void {
       if (body.data.paused !== undefined) patch.paused = body.data.paused;
       if (body.data.locked !== undefined) patch.locked = body.data.locked;
       if (body.data.soundEnabled !== undefined) patch.sound_enabled = body.data.soundEnabled;
+      if (body.data.micEnabled !== undefined) patch.mic_enabled = body.data.micEnabled;
       const updated = await store.updateClass(klass.id, patch);
       if (!updated) return void res.status(404).json({ error: "Class not found." });
       await store.audit(klass.id, "facilitator", (req as FReq).facilitator.id, "class_updated", body.data);
@@ -1155,7 +1157,7 @@ export function registerAikRoutes(app: Express): void {
       ]);
       res.json({
         child: { id: child.id, nickname: child.nickname, avatar: child.avatar, muted: child.muted },
-        class: { id: klass.id, name: klass.name, modes: store.ALL_MODES, paused: klass.paused, locked: klass.locked, ticketLimit: klass.ticket_limit, chatTurnLimit: klass.chat_turn_limit },
+        class: { id: klass.id, name: klass.name, modes: store.ALL_MODES, paused: klass.paused, locked: klass.locked, ticketLimit: klass.ticket_limit, chatTurnLimit: klass.chat_turn_limit, micEnabled: klass.mic_enabled },
         ticketsUsed: tickets,
         chatTurnsUsed: chatTurns,
         requests: requests.map(toChildRequest),

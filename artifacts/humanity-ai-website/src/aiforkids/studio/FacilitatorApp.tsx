@@ -418,6 +418,13 @@ function ClassDashboard({ config, me, classId, onGone }: { config: StudioConfig;
             <input type="checkbox" checked={k.soundEnabled} onChange={(e) => patch({ soundEnabled: e.target.checked })} />
           </label>
           <label className="mt-2 flex items-center justify-between text-sm">
+            <span className="font-bold text-slate-700">
+              Microphones allowed
+              <span className="block text-xs font-normal text-slate-500">Kids can say an order instead of typing. The browser turns speech into text; nothing is recorded.</span>
+            </span>
+            <input type="checkbox" checked={k.micEnabled !== false} onChange={(e) => patch({ micEnabled: e.target.checked })} />
+          </label>
+          <label className="mt-2 flex items-center justify-between text-sm">
             <span className="font-bold text-slate-700">Lock portfolios (Expo)</span>
             <input type="checkbox" checked={k.locked} onChange={(e) => patch({ locked: e.target.checked })} />
           </label>

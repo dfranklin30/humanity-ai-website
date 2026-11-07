@@ -18,6 +18,12 @@ export type FieldDef = {
   required?: boolean;
   /** Fixed choices render as chips; otherwise a short text input. */
   choices?: string[];
+  /**
+   * Tappable ideas for a free-text field: the chips fill the box and the
+   * child can still type anything. Unlike `choices`, nothing is enforced,
+   * so remix and autofix leave these fields alone. Wired from IDEAS below.
+   */
+  ideas?: string[];
   maxChars?: number;
 };
 
@@ -315,6 +321,69 @@ export const MODES: Record<ModeId, ModeDef> = {
     needsApproval: false,
   },
 };
+
+/* ------------------------------------------------------------------ *
+ * Idea banks: tap-to-choose options for every free-text field.
+ *
+ * The Monday club asked for "lots of choices to tap" with typing still
+ * there. Each bank has at least twelve ideas, written for a reader of eight
+ * to eleven, with no real people, brands, characters or anything else the
+ * screen would hold. "Surprise me" in the form picks one from each bank.
+ * ------------------------------------------------------------------ */
+export const IDEAS: Partial<Record<ModeId, Record<string, string[]>>> = {
+  game: {
+    title: ["Star Catcher", "Pancake Panic", "Rocket Run", "Dragon Diner", "Jelly Jump", "Cookie Chase", "Moon Hop", "Sock Storm", "Bubble Bounce", "Taco Tower", "Penguin Dash", "Cloud Kingdom", "Robot Rescue", "Super Snail"],
+    hero: ["a cat in a cape", "a round little robot", "a flying taco", "a brave penguin", "a smiling basket on wheels", "a tiny dragon", "a rocket with a face", "a skateboarding hedgehog", "a bouncing jelly", "a kid inventor with goggles", "a hungry monster who is very polite", "a snail with a jet pack", "a cloud with sunglasses", "a talking backpack"],
+    good: ["sparkly stars", "warm cookies", "flying pancakes", "shiny coins", "rainbow gems", "floating balloons", "golden keys", "fresh strawberries", "lost puppies to bring home", "letters that spell a word", "glowing fireflies", "ice cream scoops", "music notes", "friendly bubbles"],
+    bad: ["stinky socks", "grumpy rain clouds", "spiky pinecones", "tumbling asteroids", "sneezing cacti", "wobbly jelly blobs", "spinning tires", "bouncing boulders", "soggy broccoli", "buzzing bees", "falling anvils (cartoon ones)", "slippery banana peels", "ticklish feathers", "giant hiccups"],
+    power: ["a shield bubble that lasts 5 seconds", "a speed boost", "a magnet that pulls good things in", "a double-points rainbow", "an extra life heart", "a giant jump", "a slow-motion clock", "a tiny helper who catches for you", "an umbrella that blocks the bad stuff", "a freeze ray that stops everything for 3 seconds", "a mega size-up", "invisible mode for 4 seconds"],
+    win: ["you catch 20 stars", "you reach the moon", "you fill the basket to the top", "you score 100 points", "you survive for one minute", "you collect all five keys", "you feed the dragon 25 pancakes", "you spell the secret word", "you climb to the top of the tower", "you bring all the puppies home", "you hit a combo of 10 in a row", "the sun comes up"],
+    silly: ["everything is upside down on Tuesdays", "the hero hiccups when it is full", "the bad things say sorry when you dodge them", "the music gets faster every 10 points", "the hero grows a hat every time you score", "a cat walks across the screen every 30 seconds", "the background changes color when you jump", "the stars giggle when you catch them", "the hero can only move while dancing", "every tenth thing you catch is a rubber duck", "the clouds blow raspberries", "gravity flips when you say boo"],
+  },
+  story: {
+    hero: ["a shy dragon named Pim", "a small robot named Bolt", "a pancake who wants to see the sea", "a kid inventor with a toolbox", "a curious otter", "a cloud that cannot rain", "a lonely lighthouse", "a snail who is always late", "a brave little teapot", "a puppy who is scared of leaves", "twin squirrels who never agree", "a sock looking for its pair", "a moon rock with big dreams", "a girl who can talk to bicycles"],
+    place: ["a treehouse above a noisy kitchen", "the moon", "a library that never closes", "a rainy fairground", "a school garden", "a tiny island with one palm tree", "a snowy mountain village", "a bakery at dawn", "the bottom of a pond", "a train that goes everywhere", "a castle made of boxes", "an underwater city", "a busy market", "the inside of a giant shoe"],
+    problem: ["the moon lost its glow", "all the colors have gone missing", "a storm blew the map away", "nobody can remember the song", "the bridge is broken and the party is tonight", "a giant egg appears in the garden", "the hero forgot its own name", "everyone has swapped voices", "the river stopped flowing", "the last cookie is gone", "the clock is running backwards", "a tiny visitor from space needs a ride home", "the lights go out before the big show", "the hero's best friend moved away"],
+    ending: ["happy and a little funny", "warm and surprising", "a big party", "everyone becomes friends", "the hero finds a new home", "a surprise twist", "the problem turns into a gift", "the hero learns a new trick", "they all laugh about it", "calm and cozy", "the hero goes back to help someone else", "a sunrise and a new plan"],
+    detail: ["the dragon is afraid of butterflies", "the robot hums when it is thinking", "it leaves a trail of syrup footprints", "the moon likes jokes", "the otter collects shiny spoons", "the hat can talk but only whispers", "every door is a different color", "the clouds taste like cotton candy", "the teapot sings when it is happy", "the map is drawn in crayon", "the hero has one green sock and one red one", "it snows upwards", "the bakery smells like rain", "the boat is made of leaves"],
+  },
+  language: {
+    hero: ["a curious otter", "a kid detective", "a talking backpack", "a friendly robot", "a shy dragon", "a brave penguin", "a dancing fox", "a sleepy cat", "a chatty parrot", "a tiny elephant", "a kid with a big map", "a bouncing kangaroo"],
+    place: ["a busy market", "a snowy mountain", "a school garden", "a sunny beach", "a noisy kitchen", "a train station", "a farm at sunrise", "a city park", "a rainy street", "a tiny village", "a library", "a boat on a lake"],
+    detail: ["the otter collects shiny spoons", "the backpack knows every road", "the robot loves to count", "the dragon is afraid of butterflies", "the parrot repeats every new word", "the cat naps in a different spot each day", "the fox wears a tiny scarf", "everyone waves hello", "the kangaroo keeps snacks in its pouch", "the map is upside down", "the penguin slides everywhere", "the elephant paints pictures"],
+  },
+  prompt: {
+    what: ["a robot gardener", "a friendly octopus", "a dragon reading a book", "a cat astronaut", "a treehouse city", "a dinosaur eating ice cream", "a tiny house on a turtle", "a penguin band", "a flying bicycle", "a lighthouse made of candy", "a fox in a raincoat", "a snail racing a rocket", "a whale with a garden on its back", "a giant friendly bear in a tiny hat"],
+    where: ["on the moon", "in a rainforest", "under the sea", "in a snowy forest", "at a busy market", "on a floating island", "inside a giant teacup", "on top of a mountain", "in a sunny meadow", "in a city made of boxes", "at a night-time fair", "in a cozy library", "on a beach at sunset", "in a cave full of crystals"],
+    mood: ["sunny and bright", "spooky-fun purple", "calm blue and silver", "rainbow and sparkly", "warm orange like a campfire", "cool and misty", "neon and electric", "soft pink and gold", "deep green jungle", "pastel like candy", "stormy gray with one light", "golden like a sunset", "icy white and blue", "cozy and brown like cocoa"],
+  },
+  music: {
+    about: ["our club", "a cat who loves pizza", "the last day of school", "my best friend", "a robot learning to dance", "the rain", "a rocket counting down", "brushing your teeth", "the smell of pancakes", "a dog who can skateboard", "a trip to the moon", "recess", "a dragon who cannot roar", "being brave on the first day"],
+    chant: ["Make it with AI!", "We can do it, yes we can!", "Jump, jump, jump!", "Hello, hello, hello!", "One more time!", "Here we go, here we go!", "Up, up, up to the sky!", "Clap your hands, stomp your feet!", "Go team, go!", "Everybody sing!", "Round and round we go!", "Shine, shine, shine!"],
+    extra: ["add a drum solo", "start quiet then get loud", "a part where everyone claps", "a silly voice in the middle", "whistling at the end", "a slow part, then a fast part", "a trumpet in the chorus", "a countdown at the start", "a part that sounds like rain", "robot beeps in the beat", "a big ending with everyone singing", "a part where it goes super slow"],
+  },
+  quest: {
+    topic: ["octopuses", "volcanoes", "soccer", "bridges", "the water cycle", "honeybees", "the moon", "dinosaurs", "rainforests", "how planes fly", "sharks", "recycling", "ancient castles", "the human heart", "robots", "penguins", "weather", "pyramids"],
+    audience: ["my class", "my little brother", "my little sister", "the Expo", "my grandma", "my teacher", "the whole school", "my team", "my cousins", "kids in first grade", "my club", "my family at dinner"],
+  },
+  video: {
+    title: ["Robot Gardener on the Moon", "The Pancake Parade", "Penguin Takes Flight", "The Sock That Could", "Dragon's First Day", "Snail Speed", "The Great Cookie Rescue", "Cloud Catchers", "The Tiny Giant", "Lost Kite", "Jelly Jamboree", "Midnight Bakery"],
+    what: ["a round friendly robot", "a penguin with a backpack", "a dragon who is scared of heights", "a pancake with legs", "a kid and a kite", "a snail on a skateboard", "two squirrels", "a cat captain", "a dancing broom", "a tiny elephant", "a cloud with a face", "a puppy detective", "a bear in a bow tie", "a robot dog"],
+    action: ["waters glowing flowers", "learns to fly", "races a snail", "bakes a giant cake", "finds a lost kite", "builds a bridge out of pillows", "dances in the rain", "rescues a cookie from a tall shelf", "paints the sky", "goes sledding", "plants a garden", "throws a surprise party", "chases a bouncing ball", "delivers a letter across town"],
+    where: ["on the moon at night", "in a rainy city", "at a sunny beach", "in a snowy forest", "on a tiny island", "inside a bakery", "at a fairground", "under the sea", "on a mountain top", "in a treehouse", "at a train station", "in a flower meadow", "on a rooftop at sunset", "in a cozy library"],
+  },
+  robot: {
+    name: ["Snack Scout", "Beep Buddy", "Wobble", "Pip", "Zoomer", "Tidy Bot", "Blink", "Rolo", "Sparky", "Nudge", "Doodle", "Captain Clank", "Mop Top", "Gizmo"],
+    job: ["finds a dropped snack and beeps", "waters the plants", "follows a line on the floor", "wakes me up with a song", "sorts socks by color", "dances when it hears music", "stops before it bumps a wall", "carries a pencil to a friend", "says hello when someone comes in", "counts how many times a door opens", "lights up when the room gets dark", "draws a circle on paper", "cheers when a goal is scored", "feeds the class fish"],
+    extra: ["it smiles with LEDs", "it hums while it works", "it has googly eyes", "it wears a tiny hat", "it beeps a tune when it is done", "it spins in a circle when it is happy", "it has a flag that waves", "it blinks twice to say yes", "it has a bell", "it is painted like a ladybug", "it has a little trailer", "it says good night when the lights go off"],
+  },
+};
+
+for (const mode of Object.values(MODES)) {
+  const bank = IDEAS[mode.id];
+  if (!bank) continue;
+  for (const f of mode.createFields) if (!f.choices && bank[f.key]) f.ideas = bank[f.key];
+}
 
 export function getMode(id: string): ModeDef | null {
   return (MODES as Record<string, ModeDef>)[id] ?? null;
