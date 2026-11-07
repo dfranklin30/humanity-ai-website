@@ -13,12 +13,15 @@ person running the steps below.
 
 ## Android (Google Play)
 
-> **Status, 2 Nov 2026.** Build `199b6048` (v1.1.0, versionCode 13, Studio
-> tab + padded adaptive icon) is built and downloaded. Its upload key is the
-> keystore held in the `dfranklin30s-team` Expo account, which differs from
-> the key Play knew; an upload key reset was requested and Play says the new
-> key becomes valid on **4 Nov 2026, 7:15 AM**. Upload to Internal testing
-> after that; the tester list is already attached to the track.
+> **Status, 6 Nov 2026.** v1.1.0 (13) — Studio tab + padded adaptive icon —
+> is **live on the Internal testing track** ("Available to internal testers",
+> published 6 Nov 8:33 PM). The upload key reset (new key from the
+> `dfranklin30s-team` Expo keystore) was approved on 4 Nov. Testers join at
+> https://play.google.com/apps/internaltest/4701749917874965167 — install,
+> open the Studio tab, sign in with a class code, make something, open a
+> robot, press back inside the Studio. Then promote the same release to
+> Production from Play Console (Release → Production → Create new release →
+> Add from library).
 
 1. **Version.** In `app.json`, raise `expo.android.versionCode` above the
    highest code Play has ever seen for this app (Play Console → Release →
