@@ -41,6 +41,7 @@ import { AvatarPlayground } from "./AvatarPlayground";
 import { RoomIcon, ROOM_THEME, roomIdFor } from "./icons";
 import { Hub, type HubShelf } from "./Hub";
 import { GuardrailDoors } from "./Doors";
+import { HeroGuide } from "./HeroGuide";
 import { DESK_TOOLS, DESK_SUBJECTS, type DeskTool, type DeskSubject } from "./api";
 
 type Stage = { step: "code" } | { step: "pick"; code: string; className: string; children: { id: number; nickname: string; avatar: string }[] } | { step: "in" };
@@ -269,6 +270,7 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("remix");
   const [hubShelf, setHubShelf] = useState<HubShelf>("arcade");
+  const [guideOpen, setGuideOpen] = useState(false);
   /* A door's rewording fills the form; the child still reads it and presses Make. */
   const [prefill, setPrefill] = useState<{ values: Record<string, string>; changes: string[]; n: number } | null>(null);
   const goHub = (shelf: HubShelf) => {
@@ -472,8 +474,37 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
             <RoomIcon id="lounge" size={18} tile={!(tab === "hub" && hubShelf === "lounge")} />
             Lounge
           </button>
+          {/* The Hero Guide: the child's own hero gives the tour. */}
+          <button
+            type="button"
+            onClick={() => setGuideOpen((o) => !o)}
+            aria-pressed={guideOpen}
+            className={cx("flex items-center gap-1.5 rounded-full py-1.5 px-4 text-base font-extrabold transition", guideOpen ? "bg-fuchsia-600 text-white" : "bg-white/80 text-fuchsia-700 ring-1 ring-fuchsia-200 hover:bg-white")}
+            data-testid="tab-guide"
+          >
+            <span aria-hidden>🧭</span> Guide
+          </button>
         </nav>
       </div>
+      {guideOpen && (
+        <HeroGuide
+          me={me}
+          config={config}
+          onClose={() => setGuideOpen(false)}
+          go={(where) => {
+            if (where === "remix" || where === "make") {
+              setModeId(null);
+              setTab(where);
+            } else if (where === "hub") goHub("arcade");
+            else goHub(where);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+          onMadeHero={() => {
+            setModeId(null);
+            setTab("remix");
+          }}
+        />
+      )}
       {emojiOpen && config.customAvatars && (
         <AvatarPlayground
           playground={config.playground}
