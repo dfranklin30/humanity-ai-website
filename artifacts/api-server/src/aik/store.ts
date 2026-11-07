@@ -93,6 +93,8 @@ export type ClassRow = {
   paused: boolean;
   locked: boolean;
   sound_enabled: boolean;
+  /** Microphone buttons in the Studio (browser speech-to-text; nothing is recorded). */
+  mic_enabled: boolean;
   session_started_at: string;
   created_at: string;
 };
@@ -204,6 +206,10 @@ export function ensureTables(): Promise<void> {
       // facilitator set by hand afterwards is left alone.
       await db.execute(sql`
         ALTER TABLE aik_classes ADD COLUMN IF NOT EXISTS limits_v integer NOT NULL DEFAULT 0`);
+      // Speak-instead-of-type (Nov 2026 club feedback). On by default; a
+      // facilitator turns it off per class.
+      await db.execute(sql`
+        ALTER TABLE aik_classes ADD COLUMN IF NOT EXISTS mic_enabled boolean NOT NULL DEFAULT true`);
       await db.execute(sql`
         UPDATE aik_classes SET ticket_limit = 12, limits_v = 1 WHERE limits_v = 0 AND ticket_limit < 12`);
       await db.execute(sql`
@@ -539,7 +545,7 @@ export async function getClassByCode(code: string): Promise<ClassRow | null> {
 
 export async function updateClass(
   id: number,
-  patch: Partial<Pick<ClassRow, "name" | "modes" | "ticket_limit" | "chat_turn_limit" | "paused" | "locked" | "sound_enabled">>,
+  patch: Partial<Pick<ClassRow, "name" | "modes" | "ticket_limit" | "chat_turn_limit" | "paused" | "locked" | "sound_enabled" | "mic_enabled">>,
 ): Promise<ClassRow | null> {
   await ensureTables();
   const current = await getClass(id);
@@ -554,7 +560,8 @@ export async function updateClass(
         chat_turn_limit = ${next.chat_turn_limit},
         paused = ${next.paused},
         locked = ${next.locked},
-        sound_enabled = ${next.sound_enabled}
+        sound_enabled = ${next.sound_enabled},
+        mic_enabled = ${next.mic_enabled}
       WHERE id = ${id}
       RETURNING *`),
   );

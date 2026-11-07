@@ -459,6 +459,7 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
                   turnsLeft={chatsLeft}
                   maxChars={config.maxChatChars}
                   avatar={me.child.avatar}
+                  mic={me.class.micEnabled !== false}
                   placeholder={mode.id === "homework" ? DESK_TOOLS.find((t) => t.id === deskTool)?.placeholder : undefined}
                 />
               </div>
@@ -492,6 +493,7 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
                           hint={mode.changeHint}
                           maxChars={config.maxFieldChars}
                           busy={busy}
+                          mic={me.class.micEnabled !== false}
                           quick={mode.id === "music" ? REMIXES : undefined}
                           onSubmit={(change) => submit("change", { change }, project.id)}
                         />
@@ -513,14 +515,14 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
                             <button type="button" onClick={() => setStart(null)} className="text-xs font-bold text-emerald-700 underline">Start blank instead</button>
                           </div>
                         )}
-                        <ModeForm key={start ? `remix-${start.remixFrom}` : "blank"} mode={mode} maxChars={config.maxFieldChars} busy={busy} initialValues={start?.values} onSubmit={(values) => submit("create", values)} submitLabel={start ? "Remix it! 🔁" : undefined} />
+                        <ModeForm key={start ? `remix-${start.remixFrom}` : "blank"} mode={mode} maxChars={config.maxFieldChars} busy={busy} initialValues={start?.values} mic={me.class.micEnabled !== false} onSubmit={(values) => submit("create", values)} submitLabel={start ? "Remix it! 🔁" : undefined} />
                       </div>
                     )}
                   </div>
                   {ticketsLeft === 0 && <div className="mt-3"><Notice>You've used all your Director's Orders for today. Time to play and test!</Notice></div>}
                 </Card>
                 {showChat && mode.interaction === "both" && (
-                  <ChatPanel mode={mode} messages={chat.messages} onSend={sendChat} busy={chat.busy} turnsLeft={chatsLeft} maxChars={config.maxChatChars} avatar={me.child.avatar} />
+                  <ChatPanel mode={mode} messages={chat.messages} onSend={sendChat} busy={chat.busy} turnsLeft={chatsLeft} maxChars={config.maxChatChars} avatar={me.child.avatar} mic={me.class.micEnabled !== false} />
                 )}
                 {!showChat && (
                   <Card tone="tint" className="text-sm text-slate-700">
