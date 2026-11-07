@@ -179,3 +179,17 @@ accepts both shapes.
 5. **Second region**: Sora and FLUX live on one Foundry resource in East US 2;
    a second deployment elsewhere would let `movie.ts` and `book.ts` fail over
    the way text already does.
+
+## Avatars and the Emoji Playground (`avatars.ts`)
+
+A child's `avatar` column is either an emoji from `AVATARS` or `img:<id>-<token>`
+pointing at a row in `aik_avatars`. The browser draws emoji from the 3D Fluent
+Emoji PNGs under `public/aiforkids/avatars` (`Avatar.tsx`), and custom ones from
+`GET /api/aik/avatars/:id/:token`, which needs no session because the join screen
+shows classmates' avatars before anyone signs in; the 16-hex token is the key and
+the picture is a sticker the child designed, never a photo. Making one
+(`POST /child/avatar/make` with the class code, or `POST /child/avatar` signed in)
+screens any typed words with `screenInput`, draws with `generateImage`, screens the
+picture with `contentSafetyImage`, shrinks it to 256px WebP with sharp, and stores it
+under `a<id>/` in the media store. A made-but-unused avatar stays unclaimed; joining
+or changing to it sets `child_id`. Every make and block is audited.

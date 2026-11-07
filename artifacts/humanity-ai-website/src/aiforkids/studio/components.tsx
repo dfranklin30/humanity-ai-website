@@ -4,6 +4,7 @@ import { cx } from "../components/ui";
 import { WovenText, LanguageExtras } from "./LanguagePassport";
 import { RobotStage } from "./RobotStage";
 import { ChoiceField, MicButton, pickOne } from "./ChoiceField";
+import { Avatar } from "./Avatar";
 import { getArtifact, mediaSrc, downloadUrl, bookPdfUrl, type Artifact, type ArtifactMeta, type Book, type Movie, type FieldDef, type ModeDef, type StudioRequest, type FileLink, type Hero, exportUrl, wordsUrl } from "./api";
 
 /* ------------------------------------------------------------------ *
@@ -533,7 +534,7 @@ export function Transcript({ turns, avatar }: { turns: { role: string; text: str
         <div key={i} className={cx("flex", t.role === "user" ? "justify-end" : "justify-start")}>
           <div className={cx("max-w-[85%] whitespace-pre-line break-words rounded-2xl px-4 py-2 text-base leading-relaxed", t.role === "user" ? "bg-violet-600 text-white" : t.role === "system" ? "bg-amber-50 text-amber-900 ring-1 ring-amber-200" : "bg-white text-slate-900 ring-2 ring-violet-100")}>
             {t.role === "assistant" && <span className="mr-1">🤖</span>}
-            {t.role === "user" && avatar && <span className="mr-1">{avatar}</span>}
+            {t.role === "user" && avatar && <Avatar value={avatar} size="xs" className="mr-1" />}
             {formatInline(t.text)}
           </div>
         </div>

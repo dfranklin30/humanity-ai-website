@@ -46,7 +46,7 @@ export function blobNameOf(ref: string): string | null {
   if (!isStoredRef(ref)) return null;
   const name = ref.slice(PREFIX.length);
   // Only our own shape, so a reference can never reach outside the container.
-  return /^r\d+\/[a-z0-9_-]+\.[a-z0-9]+$/i.test(name) ? name : null;
+  return /^[ra]\d+\/[a-z0-9_-]+\.[a-z0-9]+$/i.test(name) ? name : null;
 }
 
 type Container = import("@azure/storage-blob").ContainerClient;
@@ -81,9 +81,17 @@ async function getContainer(): Promise<Container> {
  * the artifact. Falls back to inline data when there is no store.
  */
 export async function putMedia(requestId: number, name: string, bytes: Buffer, mime: string): Promise<MediaRef> {
+  return putMediaAt(`r${requestId}/${name}`, bytes, mime);
+}
+
+/** An Emoji Playground avatar lives under `a<avatarId>/`, apart from any request. */
+export async function putAvatarMedia(avatarId: number, bytes: Buffer, mime: string): Promise<MediaRef> {
+  return putMediaAt(`a${avatarId}/avatar.${mime === "image/webp" ? "webp" : "png"}`, bytes, mime);
+}
+
+async function putMediaAt(blobName: string, bytes: Buffer, mime: string): Promise<MediaRef> {
   if (mime.startsWith("image/")) mime = sniffImageMime(bytes, mime);
   if (!isMediaStoreConfigured()) return `data:${mime};base64,${bytes.toString("base64")}`;
-  const blobName = `r${requestId}/${name}`;
   const c = await getContainer();
   await c.getBlockBlobClient(blobName).uploadData(bytes, { blobHTTPHeaders: { blobContentType: mime } });
   logger.info({ blobName, bytes: bytes.length, mime }, "[aik] media stored");
