@@ -224,6 +224,18 @@ export function ensureTables(): Promise<void> {
           created_at timestamptz NOT NULL DEFAULT now(),
           UNIQUE (class_id, nickname)
         )`);
+      // Emoji Playground avatars: one row per picture a child made, claimed by
+      // the child who joins with it. See avatars.ts.
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS aik_avatars (
+          id serial PRIMARY KEY,
+          class_id integer NOT NULL REFERENCES aik_classes(id) ON DELETE CASCADE,
+          child_id integer REFERENCES aik_children(id) ON DELETE SET NULL,
+          token text NOT NULL,
+          media_ref text NOT NULL DEFAULT '',
+          prompt text NOT NULL DEFAULT '',
+          created_at timestamptz NOT NULL DEFAULT now()
+        )`);
       await db.execute(sql`
         CREATE TABLE IF NOT EXISTS aik_artifacts (
           id serial PRIMARY KEY,
@@ -1181,4 +1193,42 @@ export async function removeLounge(id: number, facilitatorId: number): Promise<b
   await ensureTables();
   const r = rows(await db.execute(sql`DELETE FROM aik_lounge WHERE id = ${id} AND facilitator_id = ${facilitatorId} RETURNING id`));
   return r.length > 0;
+}
+
+/* ------------------------------------------------------------------ *
+ * Emoji Playground avatars (avatars.ts)
+ * ------------------------------------------------------------------ */
+export type AvatarRow = { id: number; class_id: number; child_id: number | null; token: string; media_ref: string; prompt: string; created_at: string };
+
+export async function createAvatar(classId: number, token: string, prompt: string, childId: number | null = null): Promise<AvatarRow> {
+  await ensureTables();
+  return one<AvatarRow>(
+    await db.execute(sql`INSERT INTO aik_avatars (class_id, child_id, token, prompt) VALUES (${classId}, ${childId}, ${token}, ${prompt}) RETURNING *`),
+  )!;
+}
+
+export async function setAvatarMedia(id: number, mediaRef: string): Promise<void> {
+  await db.execute(sql`UPDATE aik_avatars SET media_ref = ${mediaRef} WHERE id = ${id}`);
+}
+
+export async function getAvatar(id: number): Promise<AvatarRow | null> {
+  await ensureTables();
+  return one<AvatarRow>(await db.execute(sql`SELECT * FROM aik_avatars WHERE id = ${id}`));
+}
+
+/** Tie a made avatar to the child now using it; a picture made but never used stays unclaimed. */
+export async function claimAvatar(id: number, childId: number): Promise<void> {
+  await db.execute(sql`UPDATE aik_avatars SET child_id = ${childId} WHERE id = ${id}`);
+}
+
+export async function countAvatarsSince(classId: number, minutes: number): Promise<number> {
+  await ensureTables();
+  const r = one<{ n: number | string }>(await db.execute(sql`SELECT count(*)::int AS n FROM aik_avatars WHERE class_id = ${classId} AND created_at > now() - make_interval(mins => ${minutes})`));
+  return Number(r?.n ?? 0);
+}
+
+/** Avatars a class made, newest first, for the facilitator's view. */
+export async function listAvatars(classId: number, limit = 50): Promise<AvatarRow[]> {
+  await ensureTables();
+  return rows<AvatarRow>(await db.execute(sql`SELECT * FROM aik_avatars WHERE class_id = ${classId} AND media_ref <> '' ORDER BY id DESC LIMIT ${limit}`));
 }
