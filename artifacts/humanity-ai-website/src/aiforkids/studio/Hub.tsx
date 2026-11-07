@@ -16,6 +16,7 @@ import { childHub, type ArtifactMeta } from "./api";
 import { ArtifactLoader, BigButton, Card, Spinner, kindEmoji } from "./components";
 import { RoomIcon, ROOM_THEME, type RoomId } from "./icons";
 import { Lounge } from "./Lounge";
+import { Avatar } from "./Avatar";
 
 export type HubShelf = "arcade" | "lounge" | "gallery";
 
@@ -77,7 +78,7 @@ export function Hub({ shelf, onShelf }: { shelf: HubShelf; onShelf: (s: HubShelf
             <h3 className="text-xl font-extrabold">
               {kindEmoji(open.kind)} {open.title}{" "}
               <span className="text-sm font-semibold text-slate-500">
-                by {open.avatar} {open.nickname ?? "the facilitator"}
+                by <Avatar value={open.avatar} size="sm" /> {open.nickname ?? "the facilitator"}
                 {data.acrossClasses && open.class_name ? ` · ${open.class_name}` : ""}
               </span>
             </h3>
@@ -135,7 +136,7 @@ function Shelf({ shelf, items, across, onOpen }: { shelf: "arcade" | "gallery"; 
           <p className="mt-1 text-lg font-extrabold">{a.title}</p>
           <p className="text-sm text-slate-600">{blurb(a)}</p>
           <p className="mt-2 text-xs font-semibold text-slate-500">
-            by {a.avatar} {a.nickname ?? "the facilitator"}
+            by <Avatar value={a.avatar} size="sm" /> {a.nickname ?? "the facilitator"}
             {across && a.class_name ? ` · ${a.class_name}` : ""}
           </p>
         </button>

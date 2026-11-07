@@ -6,6 +6,7 @@
  * every Director's Order with its flags, Projector mode, export and delete.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Avatar } from "./Avatar";
 import { cx } from "../components/ui";
 import {
   ApiError,
@@ -345,6 +346,11 @@ function ClassDashboard({ config, me, classId, onGone }: { config: StudioConfig;
   const k = detail.class;
   const childName = (id: number | null) => (id === null ? "Projector" : detail.children.find((c) => c.id === id)?.nickname ?? `#${id}`);
   const childAvatar = (id: number | null) => (id === null ? "📽️" : detail.children.find((c) => c.id === id)?.avatar ?? "");
+  const who = (id: number | null) => (
+    <>
+      <Avatar value={childAvatar(id)} size="sm" /> {childName(id)}
+    </>
+  );
 
   return (
     <div className="space-y-5">
@@ -413,6 +419,13 @@ function ClassDashboard({ config, me, classId, onGone }: { config: StudioConfig;
             <input type="checkbox" checked={k.soundEnabled} onChange={(e) => patch({ soundEnabled: e.target.checked })} />
           </label>
           <label className="mt-2 flex items-center justify-between text-sm">
+            <span className="font-bold text-slate-700">
+              Microphones allowed
+              <span className="block text-xs font-normal text-slate-500">Kids can say an order instead of typing. The browser turns speech into text; nothing is recorded.</span>
+            </span>
+            <input type="checkbox" checked={k.micEnabled !== false} onChange={(e) => patch({ micEnabled: e.target.checked })} />
+          </label>
+          <label className="mt-2 flex items-center justify-between text-sm">
             <span className="font-bold text-slate-700">Lock portfolios (Expo)</span>
             <input type="checkbox" checked={k.locked} onChange={(e) => patch({ locked: e.target.checked })} />
           </label>
@@ -444,7 +457,7 @@ function ClassDashboard({ config, me, classId, onGone }: { config: StudioConfig;
           <h2 className="text-lg font-extrabold">🖼️🎬 Waiting for your approval ({detail.approvals.length})</h2>
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             {detail.approvals.map((a) => (
-              <ApprovalCard key={a.id} artifact={a} who={`${childAvatar(a.childId)} ${childName(a.childId)}`} onDone={load} />
+              <ApprovalCard key={a.id} artifact={a} who={who(a.childId)} onDone={load} />
             ))}
           </div>
         </Card>
@@ -457,7 +470,7 @@ function ClassDashboard({ config, me, classId, onGone }: { config: StudioConfig;
           <p className="text-xs text-slate-500">Every Director's Order and result. Red badges show exactly which safety layer spoke up.</p>
           <ul className="mt-3 max-h-[640px] space-y-2 overflow-y-auto pr-1">
             {[...detail.requests].reverse().map((r) => (
-              <FeedItem key={r.id} r={r} who={`${childAvatar(r.childId)} ${childName(r.childId)}`} modes={config.modes} onPreview={setPreview} previewing={preview === r.resultArtifactId} />
+              <FeedItem key={r.id} r={r} who={who(r.childId)} modes={config.modes} onPreview={setPreview} previewing={preview === r.resultArtifactId} />
             ))}
             {detail.requests.length === 0 && <li className="text-sm text-slate-500">Nothing yet. Orders appear here the moment a child submits one.</li>}
           </ul>
@@ -558,7 +571,7 @@ function HeldReview({ r, modes }: { r: StudioRequest; modes: StudioConfig["modes
   );
 }
 
-function FeedItem({ r, who, modes, onPreview, previewing }: { r: StudioRequest; who: string; modes: StudioConfig["modes"]; onPreview: (id: number | null) => void; previewing: boolean }) {
+function FeedItem({ r, who, modes, onPreview, previewing }: { r: StudioRequest; who: React.ReactNode; modes: StudioConfig["modes"]; onPreview: (id: number | null) => void; previewing: boolean }) {
   const tone =
     r.status === "held"
       ? "border-rose-400 bg-rose-50 ring-2 ring-rose-200"
@@ -601,7 +614,7 @@ function FeedItem({ r, who, modes, onPreview, previewing }: { r: StudioRequest; 
   );
 }
 
-function ApprovalCard({ artifact, who, onDone }: { artifact: ArtifactMeta; who: string; onDone: () => void }) {
+function ApprovalCard({ artifact, who, onDone }: { artifact: ArtifactMeta; who: React.ReactNode; onDone: () => void }) {
   return (
     <div className="rounded-xl bg-white p-3 ring-1 ring-amber-200">
       <p className="text-sm font-extrabold">
@@ -666,8 +679,8 @@ function Roster({ detail, config, onChange }: { detail: ClassDetail; config: Stu
         <p className="text-sm font-bold text-slate-700">Add a child</p>
         <div className="flex flex-wrap gap-1">
           {config.avatars.map((a) => (
-            <button type="button" key={a} onClick={() => setForm({ ...form, avatar: a })} className={cx("rounded-lg px-1.5 py-0.5 text-2xl ring-2", form.avatar === a ? "ring-violet-600" : used.has(a) ? "opacity-30 ring-transparent" : "ring-transparent hover:ring-violet-200")}>
-              {a}
+            <button type="button" key={a} onClick={() => setForm({ ...form, avatar: a })} aria-label={`Avatar ${a}`} className={cx("rounded-lg p-1 ring-2", form.avatar === a ? "ring-violet-600" : used.has(a) ? "opacity-30 ring-transparent" : "ring-transparent hover:ring-violet-200")}>
+              <Avatar value={a} size="sm" />
             </button>
           ))}
         </div>
@@ -689,7 +702,7 @@ function Roster({ detail, config, onChange }: { detail: ClassDetail; config: Stu
 function RosterRow({ c, limit, classId, onAct }: { c: ChildSummary; limit: number; classId: number; onAct: (fn: () => Promise<unknown>) => Promise<void> }) {
   return (
     <li className="flex flex-wrap items-center gap-2 py-2">
-      <span className="text-2xl">{c.avatar}</span>
+      <Avatar value={c.avatar} size="md" />
       <span className="font-extrabold">{c.nickname}</span>
       <span className="text-xs text-slate-500">
         {c.ticketsUsed}/{limit} orders · {c.chatTurnsUsed} chats

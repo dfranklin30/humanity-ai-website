@@ -104,6 +104,7 @@ export type PublicClass = {
   paused: boolean;
   locked: boolean;
   soundEnabled: boolean;
+  micEnabled: boolean;
   sessionStartedAt: string;
   createdAt: string;
 };
@@ -118,6 +119,7 @@ export function toPublicClass(c: ClassRow): PublicClass {
     paused: c.paused,
     locked: c.locked,
     soundEnabled: c.sound_enabled,
+    micEnabled: c.mic_enabled,
     sessionStartedAt: c.session_started_at,
     createdAt: c.created_at,
   };

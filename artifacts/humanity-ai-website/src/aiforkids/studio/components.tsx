@@ -3,6 +3,8 @@ import { Link } from "wouter";
 import { cx } from "../components/ui";
 import { WovenText, LanguageExtras } from "./LanguagePassport";
 import { RobotStage } from "./RobotStage";
+import { ChoiceField, MicButton, pickOne } from "./ChoiceField";
+import { Avatar } from "./Avatar";
 import { getArtifact, mediaSrc, downloadUrl, bookPdfUrl, type Artifact, type ArtifactMeta, type Book, type Movie, type FieldDef, type ModeDef, type StudioRequest, type FileLink, type Hero, exportUrl, wordsUrl } from "./api";
 import { SiteView, AdventureView } from "./AdvancedViews";
 
@@ -539,7 +541,7 @@ export function Transcript({ turns, avatar }: { turns: { role: string; text: str
         <div key={i} className={cx("flex", t.role === "user" ? "justify-end" : "justify-start")}>
           <div className={cx("max-w-[85%] whitespace-pre-line break-words rounded-2xl px-4 py-2 text-base leading-relaxed", t.role === "user" ? "bg-violet-600 text-white" : t.role === "system" ? "bg-amber-50 text-amber-900 ring-1 ring-amber-200" : "bg-white text-slate-900 ring-2 ring-violet-100")}>
             {t.role === "assistant" && <span className="mr-1">🤖</span>}
-            {t.role === "user" && avatar && <span className="mr-1">{avatar}</span>}
+            {t.role === "user" && avatar && <Avatar value={avatar} size="xs" className="mr-1" />}
             {formatInline(t.text)}
           </div>
         </div>
@@ -558,6 +560,7 @@ export function ChatPanel({
   onSendPhoto,
   avatar,
   placeholder,
+  mic = true,
 }: {
   mode: ModeDef;
   messages: ChatMsg[];
@@ -570,8 +573,11 @@ export function ChatPanel({
   avatar?: string;
   /** Overrides the mode's placeholder (the Study Desk changes it per tool). */
   placeholder?: string;
+  /** False hides the microphone button (class setting). */
+  mic?: boolean;
 }) {
   const [text, setText] = useState("");
+  const [interim, setInterim] = useState<string | null>(null);
   const [photo, setPhoto] = useState<{ dataUri: string; name: string } | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -669,13 +675,28 @@ export function ChatPanel({
           </>
         )}
         <input
-          value={text}
+          value={interim ?? text}
           maxLength={maxChars}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setInterim(null);
+            setText(e.target.value);
+          }}
           placeholder={turnsLeft > 0 ? placeholder ?? mode.chatPlaceholder ?? "Ask a question…" : "No chats left today"}
           disabled={busy || turnsLeft <= 0}
           autoComplete="off"
-          className="flex-1 rounded-2xl border-2 border-violet-200 bg-white px-4 py-3 text-lg text-slate-900 placeholder:text-slate-400 focus:border-violet-500 focus:outline-none disabled:opacity-60"
+          className={cx(
+            "flex-1 rounded-2xl border-2 bg-white px-4 py-3 text-lg text-slate-900 placeholder:text-slate-400 focus:border-violet-500 focus:outline-none disabled:opacity-60",
+            interim !== null ? "border-rose-300 bg-rose-50" : "border-violet-200",
+          )}
+        />
+        <MicButton
+          allowed={mic}
+          disabled={busy || turnsLeft <= 0}
+          onInterim={(t) => setInterim((text.trim() ? `${text.trim()} ${t}` : t).slice(0, maxChars))}
+          onText={(t) => {
+            setInterim(null);
+            setText((cur) => (cur.trim() ? `${cur.trim()} ${t}` : t).slice(0, maxChars));
+          }}
         />
         <BigButton type="submit" disabled={text.trim().length < 2 || busy || turnsLeft <= 0}>
           Send
@@ -696,6 +717,7 @@ export function ModeForm({
   busy,
   submitLabel = "Make it!",
   initialValues,
+  mic = true,
 }: {
   mode: ModeDef;
   maxChars: number;
@@ -704,10 +726,22 @@ export function ModeForm({
   submitLabel?: string;
   /** Remix workflow: start from values carried over from another piece. */
   initialValues?: Record<string, string>;
+  /** False hides the microphone buttons (class setting). */
+  mic?: boolean;
 }) {
   const [values, setValues] = useState<Record<string, string>>(() => ({ ...(initialValues ?? {}) }));
   const missing = useMemo(() => mode.createFields.filter((f) => f.required && !(values[f.key] ?? "").trim()), [mode, values]);
   const starters = (mode.starters ?? []).filter((s) => s.values);
+  const canSurprise = mode.createFields.some((f) => f.ideas?.length || f.choices?.length);
+  /** Fill every box from the idea banks (and pick a random fixed choice where there is one). */
+  function surprise() {
+    const next: Record<string, string> = {};
+    for (const f of mode.createFields) {
+      const bank = f.choices?.length ? f.choices : f.ideas;
+      if (bank?.length) next[f.key] = pickOne(bank);
+    }
+    setValues(next);
+  }
   return (
     <form
       className="space-y-4"
@@ -741,8 +775,21 @@ export function ModeForm({
           </p>
         </div>
       )}
+      {canSurprise && (
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-violet-50 px-4 py-3 ring-1 ring-violet-100">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={surprise}
+            className="rounded-full bg-white px-4 py-2 text-sm font-extrabold text-violet-800 ring-2 ring-violet-300 transition hover:bg-violet-100 hover:ring-violet-500 disabled:opacity-50"
+          >
+            🎲 Surprise me
+          </button>
+          <span className="text-sm text-slate-600">Tap an idea under each box, type your own, or let the dice fill the whole order. You can change anything after.</span>
+        </div>
+      )}
       {mode.createFields.map((f) => (
-        <Field key={f.key} def={f} value={values[f.key] ?? ""} maxChars={f.maxChars ?? maxChars} onChange={(v) => setValues((s) => ({ ...s, [f.key]: v }))} />
+        <Field key={f.key} def={f} value={values[f.key] ?? ""} maxChars={f.maxChars ?? maxChars} mic={mic} busy={busy} onChange={(v) => setValues((s) => ({ ...s, [f.key]: v }))} />
       ))}
       <div className="flex items-center gap-3">
         <BigButton type="submit" disabled={Boolean(missing.length) || busy}>
@@ -754,22 +801,28 @@ export function ModeForm({
   );
 }
 
-function Field({ def, value, maxChars, onChange }: { def: FieldDef; value: string; maxChars: number; onChange: (v: string) => void }) {
+/**
+ * A fixed-choice field (a style, a language) stays pick-one: the server
+ * expects one of those exact values. Every other field is a ChoiceField:
+ * idea chips, a free-text box, and a microphone.
+ */
+function Field({ def, value, maxChars, mic, busy, onChange }: { def: FieldDef; value: string; maxChars: number; mic?: boolean; busy?: boolean; onChange: (v: string) => void }) {
   const id = `f-${def.key}`;
-  return (
-    <div>
-      <label htmlFor={id} className="block text-base font-bold text-slate-800">
-        {def.label} {def.required && <span className="text-rose-500">*</span>}
-      </label>
-      {def.choices ? (
+  if (def.choices) {
+    return (
+      <div>
+        <label htmlFor={id} className="block text-base font-bold text-slate-800">
+          {def.label} {def.required && <span className="text-rose-500">*</span>}
+        </label>
         <div className="mt-2 flex flex-wrap gap-2">
           {def.choices.map((c) => (
             <button
               type="button"
               key={c}
+              disabled={busy}
               onClick={() => onChange(c)}
               className={cx(
-                "rounded-full px-4 py-2 text-base font-semibold ring-2 transition",
+                "rounded-full px-4 py-2 text-base font-semibold ring-2 transition disabled:opacity-50",
                 value === c ? "bg-violet-600 text-white ring-violet-600" : "bg-white text-violet-800 ring-violet-200 hover:bg-violet-50",
               )}
             >
@@ -777,19 +830,10 @@ function Field({ def, value, maxChars, onChange }: { def: FieldDef; value: strin
             </button>
           ))}
         </div>
-      ) : (
-        <input
-          id={id}
-          value={value}
-          maxLength={maxChars}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={def.hint}
-          autoComplete="off"
-          className="mt-1 w-full rounded-2xl border-2 border-slate-200 px-4 py-3 text-lg text-slate-900 placeholder:text-slate-400 focus:border-violet-500 focus:outline-none"
-        />
-      )}
-    </div>
-  );
+      </div>
+    );
+  }
+  return <ChoiceField id={id} label={def.label} hint={def.hint} required={def.required} value={value} onChange={onChange} ideas={def.ideas} maxChars={maxChars} mic={mic} disabled={busy} />;
 }
 
 /**
@@ -861,8 +905,9 @@ function QuestView({ data, title, compact }: { data: { title?: string; items?: {
   );
 }
 
-export function ChangeBox({ hint, maxChars, onSubmit, busy, quick }: { hint: string; maxChars: number; onSubmit: (change: string) => void; busy?: boolean; quick?: { label: string; change: string }[] }) {
+export function ChangeBox({ hint, maxChars, onSubmit, busy, quick, mic = true }: { hint: string; maxChars: number; onSubmit: (change: string) => void; busy?: boolean; quick?: { label: string; change: string }[]; mic?: boolean }) {
   const [change, setChange] = useState("");
+  const [interim, setInterim] = useState<string | null>(null);
   return (
     <form
       className="flex flex-col gap-3 sm:flex-row sm:items-end sm:flex-wrap"
@@ -892,15 +937,32 @@ export function ChangeBox({ hint, maxChars, onSubmit, busy, quick }: { hint: str
         <label htmlFor="change" className="block text-base font-bold text-slate-800">
           Director's Order: make one change
         </label>
-        <input
-          id="change"
-          value={change}
-          maxLength={maxChars}
-          onChange={(e) => setChange(e.target.value)}
-          placeholder={hint}
-          autoComplete="off"
-          className="mt-1 w-full rounded-2xl border-2 border-slate-200 px-4 py-3 text-lg text-slate-900 placeholder:text-slate-400 focus:border-violet-500 focus:outline-none"
-        />
+        <div className="mt-1 flex items-center gap-2">
+          <input
+            id="change"
+            value={interim ?? change}
+            maxLength={maxChars}
+            onChange={(e) => {
+              setInterim(null);
+              setChange(e.target.value);
+            }}
+            placeholder={hint}
+            autoComplete="off"
+            className={cx(
+              "w-full rounded-2xl border-2 px-4 py-3 text-lg text-slate-900 placeholder:text-slate-400 focus:border-violet-500 focus:outline-none",
+              interim !== null ? "border-rose-300 bg-rose-50" : "border-slate-200",
+            )}
+          />
+          <MicButton
+            allowed={mic}
+            disabled={busy}
+            onInterim={setInterim}
+            onText={(t) => {
+              setInterim(null);
+              setChange(t.slice(0, maxChars));
+            }}
+          />
+        </div>
       </div>
       <BigButton type="submit" disabled={change.trim().length < 3 || busy}>
         {busy ? "Working…" : "🎬 Change it"}

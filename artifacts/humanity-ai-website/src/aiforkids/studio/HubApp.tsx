@@ -59,6 +59,7 @@ import {
   type StudioConfig,
   type StudioRequest, hubExportZipUrl } from "./api";
 import { ArtifactView, BigButton, Card, ChangeBox, ForgeSteps, ModeForm, Notice, RequestStatus, Spinner, kindEmoji } from "./components";
+import { MicButton } from "./ChoiceField";
 import { fLounge, fLoungeAdd, fLoungeRemove, type LoungeItem } from "./api";
 import { BASE } from "../content/program";
 import { WEEK_MODULES, SESSION_RHYTHM, type WeekModule } from "../content/weeks";
@@ -1211,6 +1212,7 @@ function ToolRunner({ state, mode, onBack, start, onOpenTool }: { state: HubStat
                   disabled={busy}
                   className="flex-1 rounded-xl border-2 border-slate-200 px-3 py-2 text-base focus:border-violet-500 focus:outline-none disabled:opacity-60"
                 />
+                <MicButton size="md" disabled={busy} onText={(t) => setChatText((cur) => (cur.trim() ? `${cur.trim()} ${t}` : t).slice(0, STAFF_CHAT_CHARS))} />
                 <BigButton type="submit" disabled={busy || (!photo && chatText.trim().length < 2)}>
                   Send
                 </BigButton>

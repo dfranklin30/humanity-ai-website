@@ -3,7 +3,8 @@
  * Thin fetch wrappers; all requests carry the site session cookie.
  */
 
-export type FieldDef = { key: string; label: string; hint: string; required?: boolean; choices?: string[]; maxChars?: number };
+/** `choices`: pick one (enforced). `ideas`: tappable suggestions for a free-text box; typing anything is still fine. */
+export type FieldDef = { key: string; label: string; hint: string; required?: boolean; choices?: string[]; ideas?: string[]; maxChars?: number };
 export type ModeId = "game" | "story" | "prompt" | "music" | "quest" | "video" | "robot" | "homework" | "language" | "advanced";
 export type ModeDef = {
   id: ModeId;
@@ -33,9 +34,17 @@ export type StudioConfig = {
   capabilities: { text: Capability; ossText: Capability; image: Capability; video: Capability; music: Capability; tts: Capability; screening: { configured: boolean; required: boolean }; mock: boolean };
   modes: ModeDef[];
   avatars: string[];
+  /** Emoji Playground on? (off when the image model is not configured). */
+  customAvatars: boolean;
+  playground: Playground;
   maxFieldChars: number;
   maxChatChars: number;
 };
+
+export type PlaygroundField = "who" | "look" | "extra" | "mood";
+export type PlaygroundOption = { id: string; label: string; emoji: string; prompt: string };
+export type Playground = Record<PlaygroundField, { label: string; options: PlaygroundOption[] }>;
+export type PlaygroundPick = Partial<Record<PlaygroundField, string>> & { text?: string };
 
 export type Flag = { layer: string; category: string; detail?: string; severity?: number };
 
@@ -160,6 +169,7 @@ export type PublicClass = {
   soundEnabled: boolean;
   advancedEnabled?: boolean;
   hubAllClasses?: boolean;
+  micEnabled: boolean;
   sessionStartedAt: string;
   createdAt: string;
 };
@@ -232,9 +242,13 @@ export const childLogin = (code: string, childId: number, pin: string) => call<{
 /** Sign in with just the class key: tap an existing name, or join with a new nickname + avatar. */
 export const childJoin = (code: string, who: { childId: number } | { nickname: string; avatar: string }) => call<{ ok: true }>("POST", "/child/join", { code, ...who });
 export const childLogout = () => call<{ ok: true }>("POST", "/child/logout");
+/** Emoji Playground before joining: the class code is the key. Resolves to an `img:…` avatar value. */
+export const childMakeAvatar = (code: string, pick: PlaygroundPick) => call<{ avatar: string; description: string }>("POST", "/child/avatar/make", { code, ...pick });
+/** Signed in: draw a new one (pick) or put on an existing value (avatar); either way it is worn at once. */
+export const childSetAvatar = (body: PlaygroundPick | { avatar: string }) => call<{ avatar: string; description?: string }>("POST", "/child/avatar", body);
 export type ChildMe = {
   child: { id: number; nickname: string; avatar: string; muted: boolean };
-  class: { id: number; name: string; modes: ModeId[]; paused: boolean; locked: boolean; ticketLimit: number; chatTurnLimit: number; advancedEnabled?: boolean; hubAllClasses?: boolean };
+  class: { id: number; name: string; modes: ModeId[]; paused: boolean; locked: boolean; ticketLimit: number; chatTurnLimit: number; advancedEnabled?: boolean; hubAllClasses?: boolean; micEnabled?: boolean };
   ticketsUsed: number;
   chatTurnsUsed: number;
   requests: StudioRequest[];
@@ -311,7 +325,7 @@ export const fClasses = () => call<{ classes: PublicClass[] }>("GET", "/facilita
 export const fCreateClass = (name: string) => call<{ class: PublicClass }>("POST", "/facilitator/classes", { name });
 export type ClassDetail = { class: PublicClass; children: ChildSummary[]; requests: StudioRequest[]; approvals: ArtifactMeta[]; doors?: Record<string, number> };
 export const fClass = (id: number) => call<ClassDetail>("GET", `/facilitator/classes/${id}`);
-export const fPatchClass = (id: number, patch: Partial<{ name: string; modes: ModeId[]; ticketLimit: number; chatTurnLimit: number; paused: boolean; locked: boolean; soundEnabled: boolean; advancedEnabled: boolean; hubAllClasses: boolean }>) =>
+export const fPatchClass = (id: number, patch: Partial<{ name: string; modes: ModeId[]; ticketLimit: number; chatTurnLimit: number; paused: boolean; locked: boolean; soundEnabled: boolean; advancedEnabled: boolean; hubAllClasses: boolean; micEnabled: boolean }>) =>
   call<{ class: PublicClass }>("PATCH", `/facilitator/classes/${id}`, patch);
 export const fNewSession = (id: number) => call<{ class: PublicClass }>("POST", `/facilitator/classes/${id}/new-session`);
 export const fRotateCode = (id: number) => call<{ class: PublicClass }>("POST", `/facilitator/classes/${id}/rotate-code`);

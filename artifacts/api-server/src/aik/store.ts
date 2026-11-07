@@ -99,6 +99,8 @@ export type ClassRow = {
   advanced_enabled: boolean;
   /** The class Hub also shows approved, shared work from the facilitator's other classes. */
   hub_all_classes: boolean;
+  /** Microphone buttons in the Studio (browser speech-to-text; nothing is recorded). */
+  mic_enabled: boolean;
   session_started_at: string;
   created_at: string;
 };
@@ -215,6 +217,10 @@ export function ensureTables(): Promise<void> {
       // facilitator set by hand afterwards is left alone.
       await db.execute(sql`
         ALTER TABLE aik_classes ADD COLUMN IF NOT EXISTS limits_v integer NOT NULL DEFAULT 0`);
+      // Speak-instead-of-type (Nov 2026 club feedback). On by default; a
+      // facilitator turns it off per class.
+      await db.execute(sql`
+        ALTER TABLE aik_classes ADD COLUMN IF NOT EXISTS mic_enabled boolean NOT NULL DEFAULT true`);
       await db.execute(sql`
         UPDATE aik_classes SET ticket_limit = 12, limits_v = 1 WHERE limits_v = 0 AND ticket_limit < 12`);
       await db.execute(sql`
@@ -234,6 +240,18 @@ export function ensureTables(): Promise<void> {
           pin_locked boolean NOT NULL DEFAULT false,
           created_at timestamptz NOT NULL DEFAULT now(),
           UNIQUE (class_id, nickname)
+        )`);
+      // Emoji Playground avatars: one row per picture a child made, claimed by
+      // the child who joins with it. See avatars.ts.
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS aik_avatars (
+          id serial PRIMARY KEY,
+          class_id integer NOT NULL REFERENCES aik_classes(id) ON DELETE CASCADE,
+          child_id integer REFERENCES aik_children(id) ON DELETE SET NULL,
+          token text NOT NULL,
+          media_ref text NOT NULL DEFAULT '',
+          prompt text NOT NULL DEFAULT '',
+          created_at timestamptz NOT NULL DEFAULT now()
         )`);
       await db.execute(sql`
         CREATE TABLE IF NOT EXISTS aik_artifacts (
@@ -556,7 +574,7 @@ export async function getClassByCode(code: string): Promise<ClassRow | null> {
 
 export async function updateClass(
   id: number,
-  patch: Partial<Pick<ClassRow, "name" | "modes" | "ticket_limit" | "chat_turn_limit" | "paused" | "locked" | "sound_enabled" | "advanced_enabled" | "hub_all_classes">>,
+  patch: Partial<Pick<ClassRow, "name" | "modes" | "ticket_limit" | "chat_turn_limit" | "paused" | "locked" | "sound_enabled" | "advanced_enabled" | "hub_all_classes" | "mic_enabled">>,
 ): Promise<ClassRow | null> {
   await ensureTables();
   const current = await getClass(id);
@@ -573,7 +591,8 @@ export async function updateClass(
         locked = ${next.locked},
         sound_enabled = ${next.sound_enabled},
         advanced_enabled = ${next.advanced_enabled},
-        hub_all_classes = ${next.hub_all_classes}
+        hub_all_classes = ${next.hub_all_classes},
+        mic_enabled = ${next.mic_enabled}
       WHERE id = ${id}
       RETURNING *`),
   );
@@ -1242,4 +1261,42 @@ export async function removeLounge(id: number, facilitatorId: number): Promise<b
   await ensureTables();
   const r = rows(await db.execute(sql`DELETE FROM aik_lounge WHERE id = ${id} AND facilitator_id = ${facilitatorId} RETURNING id`));
   return r.length > 0;
+}
+
+/* ------------------------------------------------------------------ *
+ * Emoji Playground avatars (avatars.ts)
+ * ------------------------------------------------------------------ */
+export type AvatarRow = { id: number; class_id: number; child_id: number | null; token: string; media_ref: string; prompt: string; created_at: string };
+
+export async function createAvatar(classId: number, token: string, prompt: string, childId: number | null = null): Promise<AvatarRow> {
+  await ensureTables();
+  return one<AvatarRow>(
+    await db.execute(sql`INSERT INTO aik_avatars (class_id, child_id, token, prompt) VALUES (${classId}, ${childId}, ${token}, ${prompt}) RETURNING *`),
+  )!;
+}
+
+export async function setAvatarMedia(id: number, mediaRef: string): Promise<void> {
+  await db.execute(sql`UPDATE aik_avatars SET media_ref = ${mediaRef} WHERE id = ${id}`);
+}
+
+export async function getAvatar(id: number): Promise<AvatarRow | null> {
+  await ensureTables();
+  return one<AvatarRow>(await db.execute(sql`SELECT * FROM aik_avatars WHERE id = ${id}`));
+}
+
+/** Tie a made avatar to the child now using it; a picture made but never used stays unclaimed. */
+export async function claimAvatar(id: number, childId: number): Promise<void> {
+  await db.execute(sql`UPDATE aik_avatars SET child_id = ${childId} WHERE id = ${id}`);
+}
+
+export async function countAvatarsSince(classId: number, minutes: number): Promise<number> {
+  await ensureTables();
+  const r = one<{ n: number | string }>(await db.execute(sql`SELECT count(*)::int AS n FROM aik_avatars WHERE class_id = ${classId} AND created_at > now() - make_interval(mins => ${minutes})`));
+  return Number(r?.n ?? 0);
+}
+
+/** Avatars a class made, newest first, for the facilitator's view. */
+export async function listAvatars(classId: number, limit = 50): Promise<AvatarRow[]> {
+  await ensureTables();
+  return rows<AvatarRow>(await db.execute(sql`SELECT * FROM aik_avatars WHERE class_id = ${classId} AND media_ref <> '' ORDER BY id DESC LIMIT ${limit}`));
 }
