@@ -17,7 +17,6 @@ import { sendVerification, sendReset, sendProjectEmail, type ProjectPiece, type 
 import { speak, generateImage, ContentFilteredError } from "./ai";
 import { AVATARS, PLAYGROUND, MAX_AVATAR_TEXT, MAX_AVATAR_VALUE, avatarPrompt, describePick, newAvatarToken, customRef, parseCustomRef, isEmojiAvatar, type PlaygroundPick } from "./avatars";
 import { putAvatarMedia } from "./media";
-import { screenInput } from "./safety";
 import * as store from "./store";
 import { hashPassword, verifyPassword } from "../auth";
 import { logger } from "../lib/logger";
