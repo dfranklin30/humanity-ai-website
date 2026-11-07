@@ -897,8 +897,9 @@ function QuestView({ data, title, compact }: { data: { title?: string; items?: {
   );
 }
 
-export function ChangeBox({ hint, maxChars, onSubmit, busy, quick }: { hint: string; maxChars: number; onSubmit: (change: string) => void; busy?: boolean; quick?: { label: string; change: string }[] }) {
+export function ChangeBox({ hint, maxChars, onSubmit, busy, quick, mic = true }: { hint: string; maxChars: number; onSubmit: (change: string) => void; busy?: boolean; quick?: { label: string; change: string }[]; mic?: boolean }) {
   const [change, setChange] = useState("");
+  const [interim, setInterim] = useState<string | null>(null);
   return (
     <form
       className="flex flex-col gap-3 sm:flex-row sm:items-end sm:flex-wrap"
@@ -928,15 +929,32 @@ export function ChangeBox({ hint, maxChars, onSubmit, busy, quick }: { hint: str
         <label htmlFor="change" className="block text-base font-bold text-slate-800">
           Director's Order: make one change
         </label>
-        <input
-          id="change"
-          value={change}
-          maxLength={maxChars}
-          onChange={(e) => setChange(e.target.value)}
-          placeholder={hint}
-          autoComplete="off"
-          className="mt-1 w-full rounded-2xl border-2 border-slate-200 px-4 py-3 text-lg text-slate-900 placeholder:text-slate-400 focus:border-violet-500 focus:outline-none"
-        />
+        <div className="mt-1 flex items-center gap-2">
+          <input
+            id="change"
+            value={interim ?? change}
+            maxLength={maxChars}
+            onChange={(e) => {
+              setInterim(null);
+              setChange(e.target.value);
+            }}
+            placeholder={hint}
+            autoComplete="off"
+            className={cx(
+              "w-full rounded-2xl border-2 px-4 py-3 text-lg text-slate-900 placeholder:text-slate-400 focus:border-violet-500 focus:outline-none",
+              interim !== null ? "border-rose-300 bg-rose-50" : "border-slate-200",
+            )}
+          />
+          <MicButton
+            allowed={mic}
+            disabled={busy}
+            onInterim={setInterim}
+            onText={(t) => {
+              setInterim(null);
+              setChange(t.slice(0, maxChars));
+            }}
+          />
+        </div>
       </div>
       <BigButton type="submit" disabled={change.trim().length < 3 || busy}>
         {busy ? "Working…" : "🎬 Change it"}

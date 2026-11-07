@@ -493,6 +493,7 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
                           hint={mode.changeHint}
                           maxChars={config.maxFieldChars}
                           busy={busy}
+                          mic={me.class.micEnabled !== false}
                           quick={mode.id === "music" ? REMIXES : undefined}
                           onSubmit={(change) => submit("change", { change }, project.id)}
                         />
