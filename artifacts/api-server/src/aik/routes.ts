@@ -14,7 +14,10 @@ import { z } from "zod";
 import { randomBytes, createHash } from "node:crypto";
 import { aikConfig, isAiConfigured, isContentSafetyConfigured, isImageConfigured, isTtsConfigured, isGoogleConfigured, capabilitySummary } from "./config";
 import { sendVerification, sendReset, sendProjectEmail, type ProjectPiece, type ProjectAttachment } from "./mail";
-import { speak } from "./ai";
+import { speak, generateImage, ContentFilteredError } from "./ai";
+import { AVATARS, PLAYGROUND, MAX_AVATAR_TEXT, MAX_AVATAR_VALUE, avatarPrompt, describePick, newAvatarToken, customRef, parseCustomRef, isEmojiAvatar, type PlaygroundPick } from "./avatars";
+import { putAvatarMedia } from "./media";
+import { screenInput } from "./safety";
 import * as store from "./store";
 import { hashPassword, verifyPassword } from "../auth";
 import { logger } from "../lib/logger";
@@ -38,12 +41,6 @@ declare module "express-session" {
   }
 }
 
-const AVATARS = [
-  "🦊", "🐼", "🐸", "🦄", "🐙", "🦖", "🐧", "🦋", "🐯", "🐢", "🦜", "🐨", "🦁", "🐰", "🐳", "🦔", "🐝", "🦩", "🐲", "🤖",
-  "🐱", "🐶", "🐵", "🐮", "🐷", "🐭", "🐹", "🐻", "🐨", "🦓", "🦒", "🦘", "🦥", "🦦", "🦉", "🦅", "🦚", "🦢", "🐬", "🦈",
-  "🐠", "🐡", "🦀", "🐌", "🐞", "🦋", "🌵", "🌻", "🍄", "🍕", "🍩", "🧁", "🚀", "🛸", "🪐", "⭐", "🌈", "🎸", "🎮", "🧩",
-  "👾", "🦸", "🧙", "🧜", "🧚", "🥷", "🏀", "⚽", "🎨", "🎲",
-].filter((a, i, arr) => arr.indexOf(a) === i);
 
 /* ------------------------------------------------------------------ *
  * Tiny in-memory rate limiter (per key, sliding minute)
@@ -72,6 +69,88 @@ setInterval(() => {
 function ip(req: Request): string {
   return (req.ip || req.socket.remoteAddress || "unknown").toString();
 }
+
+/**
+ * Is this avatar value one this class may use? An emoji from the list always;
+ * a Playground picture only if it was made in this class and is not already
+ * some other child's. (A child remaking theirs gets a fresh row each time.)
+ */
+async function avatarAllowed(value: string, classId: number, childId: number | null): Promise<boolean> {
+  if (isEmojiAvatar(value)) return true;
+  const ref = parseCustomRef(value);
+  if (!ref) return false;
+  const row = await store.getAvatar(ref.id);
+  return !!row && row.token === ref.token && row.class_id === classId && row.media_ref !== "" && (row.child_id === null || row.child_id === childId);
+}
+
+/** Shrink a 1024px model picture to a 256px sticker; the join screen may show thirty of them. */
+async function stickerize(png: Buffer): Promise<{ bytes: Buffer; mime: string }> {
+  try {
+    const sharp = (await import("sharp")).default;
+    const bytes = await sharp(png).resize(256, 256, { fit: "cover" }).webp({ quality: 88 }).toBuffer();
+    return { bytes, mime: "image/webp" };
+  } catch (err) {
+    logger.warn({ err: String((err as Error)?.message ?? err).slice(0, 200) }, "[aik] sharp unavailable; keeping the avatar full size");
+    return { bytes: png, mime: "image/png" };
+  }
+}
+
+/**
+ * Draw one Playground avatar for a class: screen the words, draw, screen the
+ * picture, store, return the reference. Shared by the join screen (class code
+ * only) and the signed-in "change my emoji" button.
+ */
+async function makeAvatar(klass: store.ClassRow, childId: number | null, pick: PlaygroundPick): Promise<{ ok: true; avatar: string; description: string } | { ok: false; status: number; error: string }> {
+  if (!aikConfig.customAvatars) return { ok: false, status: 404, error: "The Emoji Playground is closed right now." };
+  if (!isImageConfigured()) return { ok: false, status: 503, error: "The picture helper is taking a break. Pick an emoji for now!" };
+  const recent = await store.countAvatarsSince(klass.id, 60);
+  if (recent >= aikConfig.avatarMakesPerClassHour) return { ok: false, status: 429, error: "Your class has made lots of emoji this hour! Pick one from the list for now." };
+
+  const text = (pick.text ?? "").trim().slice(0, MAX_AVATAR_TEXT);
+  if (text) {
+    const screened = await screenInput(text);
+    if (!screened.ok) {
+      await store.audit(klass.id, childId ? "child" : "system", childId, "avatar_blocked", { flags: screened.flags });
+      return { ok: false, status: 422, error: screened.kidMessage };
+    }
+  }
+  const prompt = avatarPrompt({ ...pick, text });
+  const description = describePick({ ...pick, text });
+  let picture: { base64: string };
+  try {
+    picture = await generateImage(prompt, { size: "1024x1024" });
+  } catch (err) {
+    if (err instanceof ContentFilteredError) {
+      await store.audit(klass.id, childId ? "child" : "system", childId, "avatar_blocked", { reason: "provider_filter" });
+      return { ok: false, status: 422, error: KID_MESSAGES.unsafe };
+    }
+    logger.error({ err: String((err as Error)?.message ?? err).slice(0, 300) }, "[aik] avatar generation failed");
+    return { ok: false, status: 502, error: "That one didn't come out. Try again, or pick an emoji from the list." };
+  }
+  if (isContentSafetyConfigured()) {
+    const flags = await contentSafetyImage(picture.base64).catch(() => [{ layer: "system" as const, category: "content_safety_unavailable" }]);
+    if (flags.length) {
+      await store.audit(klass.id, childId ? "child" : "system", childId, "avatar_blocked", { flags });
+      return { ok: false, status: 422, error: KID_MESSAGES.unsafe };
+    }
+  } else if (aikConfig.contentSafety.required) {
+    return { ok: false, status: 503, error: KID_MESSAGES.unavailable };
+  }
+  const row = await store.createAvatar(klass.id, newAvatarToken(), description, childId);
+  const sticker = await stickerize(Buffer.from(picture.base64, "base64"));
+  const ref = await putAvatarMedia(row.id, sticker.bytes, sticker.mime);
+  await store.setAvatarMedia(row.id, ref);
+  await store.audit(klass.id, childId ? "child" : "system", childId, "avatar_made", { avatarId: row.id, description });
+  return { ok: true, avatar: customRef(row.id, row.token), description };
+}
+
+const pickSchema = z.object({
+  who: z.string().max(24).optional(),
+  look: z.string().max(24).optional(),
+  extra: z.string().max(24).optional(),
+  mood: z.string().max(24).optional(),
+  text: z.string().max(MAX_AVATAR_TEXT).optional(),
+});
 
 /* ------------------------------------------------------------------ *
  * Auth middleware
@@ -211,6 +290,8 @@ export function registerAikRoutes(app: Express): void {
       screeningReady: isContentSafetyConfigured() || !aikConfig.contentSafety.required,
       modes: publicModes(),
       avatars: AVATARS,
+      customAvatars: aikConfig.customAvatars && isImageConfigured(),
+      playground: PLAYGROUND,
       googleReady: isGoogleConfigured(),
       signupsOpen: aikConfig.signupsOpen,
       maxFieldChars: aikConfig.maxFieldChars,
@@ -650,17 +731,19 @@ export function registerAikRoutes(app: Express): void {
       const body = z
         .object({
           nickname: z.string().min(2).max(20).regex(/^[A-Za-z0-9 _-]+$/, "Letters and numbers only"),
-          avatar: z.string().min(1).max(4),
+          avatar: z.string().min(1).max(MAX_AVATAR_VALUE),
           pin: z.string().regex(/^\d{4}$/, "4 digits").optional(),
           consentRecorded: z.boolean().optional(),
         })
         .safeParse(req.body);
       if (!body.success) return void res.status(400).json({ error: "A nickname (letters/numbers) and an avatar are required." });
-      if (!AVATARS.includes(body.data.avatar)) return void res.status(400).json({ error: "Pick an avatar from the list." });
+      if (!(await avatarAllowed(body.data.avatar, klass.id, null))) return void res.status(400).json({ error: "Pick an avatar from the list." });
       const existing = await store.listChildren(klass.id);
       if (existing.some((c) => c.nickname.toLowerCase() === body.data.nickname.trim().toLowerCase())) return void res.status(409).json({ error: "That nickname is already in this class." });
       let child = await store.createChild(klass.id, body.data.nickname.trim(), body.data.avatar, await hashPassword(body.data.pin ?? randomBytes(16).toString("hex")));
       if (body.data.consentRecorded) child = (await store.updateChild(child.id, { consent_recorded: true, consent_recorded_by: (req as FReq).facilitator.id })) ?? child;
+      const made = parseCustomRef(child.avatar);
+      if (made) await store.claimAvatar(made.id, child.id);
       await store.audit(klass.id, "facilitator", (req as FReq).facilitator.id, "child_created", { childId: child.id, consent: child.consent_recorded });
       res.json({ child: publicChild(child, 0) });
     }),
@@ -677,7 +760,7 @@ export function registerAikRoutes(app: Express): void {
       const body = z
         .object({
           nickname: z.string().min(2).max(20).regex(/^[A-Za-z0-9 _-]+$/).optional(),
-          avatar: z.string().min(1).max(4).optional(),
+          avatar: z.string().min(1).max(MAX_AVATAR_VALUE).optional(),
           pin: z.string().regex(/^\d{4}$/).optional(),
           consentRecorded: z.boolean().optional(),
           muted: z.boolean().optional(),
@@ -688,8 +771,10 @@ export function registerAikRoutes(app: Express): void {
       const patch: any = {};
       if (body.data.nickname) patch.nickname = body.data.nickname.trim();
       if (body.data.avatar) {
-        if (!AVATARS.includes(body.data.avatar)) return void res.status(400).json({ error: "Pick an avatar from the list." });
+        if (!(await avatarAllowed(body.data.avatar, klass.id, child.id))) return void res.status(400).json({ error: "Pick an avatar from the list." });
         patch.avatar = body.data.avatar;
+        const made = parseCustomRef(body.data.avatar);
+        if (made) await store.claimAvatar(made.id, child.id);
       }
       if (body.data.pin) {
         patch.pin_hash = await hashPassword(body.data.pin);
@@ -925,7 +1010,7 @@ export function registerAikRoutes(app: Express): void {
           code: z.string(),
           childId: z.number().int().optional(),
           nickname: z.string().min(2).max(20).regex(/^[A-Za-z0-9 _-]+$/).optional(),
-          avatar: z.string().min(1).max(4).optional(),
+          avatar: z.string().min(1).max(MAX_AVATAR_VALUE).optional(),
         })
         .safeParse(req.body);
       if (!body.success) return void res.status(400).json({ error: "Pick a nickname with letters and numbers (2–20)." });
@@ -940,7 +1025,7 @@ export function registerAikRoutes(app: Express): void {
       } else {
         const nickname = (body.data.nickname ?? "").trim();
         if (nickname.length < 2) return void res.status(400).json({ error: "Pick a nickname with letters and numbers (2–20)." });
-        const avatar = body.data.avatar && AVATARS.includes(body.data.avatar) ? body.data.avatar : AVATARS[Math.floor(Math.random() * AVATARS.length)];
+        const avatar = body.data.avatar && (await avatarAllowed(body.data.avatar, klass.id, null)) ? body.data.avatar : AVATARS[Math.floor(Math.random() * AVATARS.length)];
         const existing = (await store.listChildren(klass.id)).find((c) => c.nickname.toLowerCase() === nickname.toLowerCase());
         if (existing) {
           child = existing;
@@ -948,6 +1033,8 @@ export function registerAikRoutes(app: Express): void {
           // No PIN is used any more; store an unguessable hash so the column stays non-null.
           child = await store.createChild(klass.id, nickname, avatar, await hashPassword(randomBytes(16).toString("hex")));
           child = (await store.updateChild(child.id, { consent_recorded: true })) ?? child;
+          const made = parseCustomRef(child.avatar);
+          if (made) await store.claimAvatar(made.id, child.id);
           await store.audit(klass.id, "child", child.id, "child_joined", { nickname });
         }
       }
@@ -990,6 +1077,70 @@ export function registerAikRoutes(app: Express): void {
   });
 
   /* ---------------- Child: workspace ---------------- */
+
+  /* ---------------- Emoji Playground ---------------- */
+
+  // Before joining: the class code is the key, as it is for /child/join.
+  app.post(
+    `${base}/child/avatar/make`,
+    wrap(async (req, res) => {
+      if (!allow(`cavatar:${ip(req)}`, 4)) return void res.status(429).json({ error: "Slow down a little — one emoji at a time!" });
+      const body = z.object({ code: z.string() }).merge(pickSchema).safeParse(req.body);
+      if (!body.success) return void res.status(400).json({ error: "Pick something from each row." });
+      const klass = await store.getClassByCode(body.data.code);
+      if (!klass || klass.kind === "workspace") return void res.status(404).json({ error: "That class code isn't right. Check the board!" });
+      if (klass.paused) return void res.status(423).json({ error: KID_MESSAGES.closed });
+      const { code: _code, ...pick } = body.data;
+      const r = await makeAvatar(klass, null, pick);
+      if (!r.ok) return void res.status(r.status).json({ error: r.error });
+      res.json({ avatar: r.avatar, description: r.description });
+    }),
+  );
+
+  // Signed in: draw a new one and wear it straight away.
+  app.post(
+    `${base}/child/avatar`,
+    requireChild,
+    wrap(async (req, res) => {
+      const { child, klass } = req as CReq;
+      if (!allow(`cavatar:${child.id}`, 4)) return void res.status(429).json({ error: "Slow down a little — one emoji at a time!" });
+      const body = z.object({ avatar: z.string().min(1).max(MAX_AVATAR_VALUE).optional() }).merge(pickSchema).safeParse(req.body);
+      if (!body.success) return void res.status(400).json({ error: "Pick something from each row." });
+      let avatar = body.data.avatar;
+      let description: string | undefined;
+      if (!avatar) {
+        const { avatar: _a, ...pick } = body.data;
+        const r = await makeAvatar(klass, child.id, pick);
+        if (!r.ok) return void res.status(r.status).json({ error: r.error });
+        avatar = r.avatar;
+        description = r.description;
+      } else if (!(await avatarAllowed(avatar, klass.id, child.id))) {
+        return void res.status(400).json({ error: "Pick an avatar from the list." });
+      }
+      const made = parseCustomRef(avatar);
+      if (made) await store.claimAvatar(made.id, child.id);
+      await store.updateChild(child.id, { avatar });
+      await store.audit(klass.id, "child", child.id, "avatar_changed", { avatar: made ? `img:${made.id}` : avatar });
+      res.json({ avatar, description });
+    }),
+  );
+
+  // The picture behind an `img:<id>-<token>` avatar. The token is the only
+  // key: the picture is a sticker a child designed, never a photo, and every
+  // classmate's browser needs it on the join screen before anyone signs in.
+  app.get(
+    `${base}/avatars/:id/:token`,
+    wrap(async (req, res) => {
+      const id = Number(req.params.id);
+      const row = Number.isInteger(id) ? await store.getAvatar(id) : null;
+      if (!row || row.token !== req.params.token || !row.media_ref) return void res.status(404).end();
+      const media = await getMedia(row.media_ref);
+      if (!media) return void res.status(404).end();
+      res.setHeader("content-type", media.mime);
+      res.setHeader("cache-control", "public, max-age=31536000, immutable");
+      res.send(media.bytes);
+    }),
+  );
 
   app.get(
     `${base}/child/me`,

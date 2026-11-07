@@ -7,6 +7,7 @@
  * related videos off); everything else opens in a new tab.
  */
 import { useEffect, useState } from "react";
+import { Avatar } from "./Avatar";
 import { childLounge, type ArtifactMeta, type LoungeItem } from "./api";
 import { ArtifactLoader, BigButton, Card, Spinner, kindEmoji } from "./components";
 import { RoomIcon, ROOM_THEME } from "./icons";
@@ -28,7 +29,7 @@ export function Lounge() {
       <Card>
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-xl font-black">
-            {kindEmoji(open.kind)} {open.title} <span className="text-sm font-semibold text-slate-500">by {open.avatar} {open.nickname ?? "the facilitator"}</span>
+            {kindEmoji(open.kind)} {open.title} <span className="text-sm font-semibold text-slate-500">by <Avatar value={open.avatar} size="sm" /> {open.nickname ?? "the facilitator"}</span>
           </h3>
           <BigButton variant="ghost" onClick={() => setOpen(null)}>
             ← Back to the Lounge
@@ -82,7 +83,7 @@ export function Lounge() {
                 <p className="text-3xl">{kindEmoji(a.kind)}</p>
                 <p className="mt-1 text-lg font-black">{a.title}</p>
                 <p className="text-sm font-semibold text-slate-500">
-                  by {a.avatar} {a.nickname ?? "the facilitator"}
+                  by <Avatar value={a.avatar} size="sm" /> {a.nickname ?? "the facilitator"}
                 </p>
               </button>
             ))}

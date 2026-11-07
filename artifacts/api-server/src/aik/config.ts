@@ -70,6 +70,11 @@
  *                                     managed identity (Storage Blob Data Contributor)
  *   AIK_MEDIA_CONNECTION_STRING       alternative to the account + identity
  *   AIK_MEDIA_CONTAINER               default "aik-media" (private; served through the API)
+ *
+ * ── Emoji Playground (children draw their own avatar) ─────────────────
+ *   AIK_CUSTOM_AVATARS                "false" hides the playground everywhere (default on,
+ *                                     and off by itself when no image provider is set)
+ *   AIK_AVATAR_MAKES_PER_CLASS_HOUR   cap per class, default 40
  *   Unset: media stays inline in Postgres as before (fine for local work, slow at scale).
  *
  * ── Finished products ───────────────────────────────────────────────────
@@ -263,6 +268,13 @@ export const aikConfig = {
   chatHistoryTurns: 8,
   /** Hard cap on characters in any free-text field of a Director's Order or chat message. */
   maxFieldChars: 160,
+  /**
+   * Emoji Playground: children draw their own avatar with the image model.
+   * AIK_CUSTOM_AVATARS=false turns the playground off everywhere; the per-class
+   * cap keeps one class from spending the picture budget on stickers.
+   */
+  customAvatars: env.AIK_CUSTOM_AVATARS !== "false",
+  avatarMakesPerClassHour: Number(env.AIK_AVATAR_MAKES_PER_CLASS_HOUR || 40),
   maxChatChars: 300,
   /** Adults working in the Hub are not writing kid-sized orders. */
   staffFieldChars: 1_200,

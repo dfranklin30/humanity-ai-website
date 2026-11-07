@@ -16,6 +16,8 @@ import {
   childJoin,
   childLogout,
   childLookupClass,
+  childMakeAvatar,
+  childSetAvatar,
   childMe,
   childPublish,
   childRequest,
@@ -35,6 +37,8 @@ import {
   type VoiceOption, childExportZipUrl } from "./api";
 import { ArtifactLoader, BigButton, Card, ChangeBox, ChatPanel, ModeForm, Notice, RequestStatus, Spinner, kindEmoji, type ChatMsg } from "./components";
 import { KidsRemixTab, type KidStart } from "./KidsRemix";
+import { Avatar } from "./Avatar";
+import { AvatarPlayground } from "./AvatarPlayground";
 import { RoomIcon, ROOM_THEME, roomIdFor } from "./icons";
 import { Lounge } from "./Lounge";
 import { childLounge, DESK_TOOLS, DESK_SUBJECTS, type DeskTool, type DeskSubject, type LoungeItem } from "./api";
@@ -105,6 +109,7 @@ function SignIn({ config, stage, setStage }: { config: StudioConfig; stage: Stag
   const [code, setCode] = useState("");
   const [nickname, setNickname] = useState("");
   const [avatar, setAvatar] = useState(config.avatars[0] ?? "🦊");
+  const [playground, setPlayground] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -180,7 +185,7 @@ function SignIn({ config, stage, setStage }: { config: StudioConfig; stage: Stag
               onClick={() => join({ childId: c.id })}
               className="flex flex-col items-center gap-1 rounded-3xl bg-white p-4 ring-2 ring-violet-100 transition hover:-translate-y-0.5 hover:ring-violet-400 focus:outline-none focus-visible:ring-4 focus-visible:ring-amber-300 disabled:opacity-60"
             >
-              <span className="text-5xl">{c.avatar}</span>
+              <Avatar value={c.avatar} size="xl" />
               <span className="text-lg font-bold text-slate-800">{c.nickname}</span>
             </button>
           ))}
@@ -202,16 +207,38 @@ function SignIn({ config, stage, setStage }: { config: StudioConfig; stage: Stag
           className="mt-3 w-full rounded-2xl border-4 border-violet-200 bg-white px-4 py-3 text-center text-2xl font-extrabold text-violet-900 focus:border-violet-500 focus:outline-none"
           placeholder="Pick a nickname (not your real name)"
         />
-        <div className="mt-3 flex flex-wrap justify-center gap-2">
+        <div className="mt-3 flex items-center justify-center gap-3">
+          <Avatar value={avatar} size="xl" title="Your emoji" />
+          {config.customAvatars && !playground && (
+            <BigButton type="button" variant="secondary" className="!px-4 !py-2 !text-base" onClick={() => setPlayground(true)}>
+              ✨ Make your own emoji
+            </BigButton>
+          )}
+        </div>
+        {playground && config.customAvatars && (
+          <div className="mt-3">
+            <AvatarPlayground
+              playground={config.playground}
+              make={(pick) => childMakeAvatar(stage.code, pick)}
+              onKeep={(a) => {
+                setAvatar(a);
+                setPlayground(false);
+              }}
+              onClose={() => setPlayground(false)}
+            />
+          </div>
+        )}
+        <div className="mt-3 flex flex-wrap justify-center gap-1.5">
           {config.avatars.map((a) => (
             <button
               key={a}
               type="button"
               onClick={() => setAvatar(a)}
               aria-label={`Avatar ${a}`}
-              className={cx("rounded-2xl p-2 text-3xl ring-2 transition", avatar === a ? "bg-white ring-violet-500" : "ring-transparent hover:bg-white/60")}
+              aria-pressed={avatar === a}
+              className={cx("rounded-2xl p-1.5 ring-2 transition", avatar === a ? "bg-white ring-violet-500" : "ring-transparent hover:bg-white/60")}
             >
-              {a}
+              <Avatar value={a} size="md" />
             </button>
           ))}
         </div>
@@ -238,6 +265,7 @@ type Tab = "make" | "remix" | "portfolio" | "arcade" | "lounge";
 
 function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut: () => void }) {
   const [me, setMe] = useState<ChildMe | null>(null);
+  const [emojiOpen, setEmojiOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("remix");
   const [modeId, setModeId] = useState<ModeId | null>(null); // null = Studio hall
@@ -388,7 +416,15 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
       {/* Top bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl bg-white/80 px-5 py-3 ring-1 ring-violet-100">
         <div className="flex items-center gap-3">
-          <span className="text-4xl">{me.child.avatar}</span>
+          <button
+            type="button"
+            onClick={() => config.customAvatars && setEmojiOpen((v) => !v)}
+            title={config.customAvatars ? "Change my emoji" : undefined}
+            className={cx("rounded-full ring-2 ring-transparent transition", config.customAvatars && "hover:ring-fuchsia-300")}
+            aria-label="Change my emoji"
+          >
+            <Avatar value={me.child.avatar} size="lg" />
+          </button>
           <div>
             <p className="text-lg font-extrabold">{me.child.nickname}</p>
             <p className="text-xs font-semibold text-slate-500">{me.class.name}</p>
@@ -418,6 +454,17 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
           })}
         </nav>
       </div>
+      {emojiOpen && config.customAvatars && (
+        <AvatarPlayground
+          playground={config.playground}
+          make={(pick) => childSetAvatar(pick)}
+          onKeep={(a) => {
+            setMe((m) => (m ? { ...m, child: { ...m.child, avatar: a } } : m));
+            setEmojiOpen(false);
+          }}
+          onClose={() => setEmojiOpen(false)}
+        />
+      )}
 
       {me.class.paused && <Notice>⏸️ Your facilitator paused the Studio. Look up front!</Notice>}
       {me.class.locked && <Notice tone="info">🔒 Your portfolio is locked for the Expo: no new orders or chats today, but everything you made is ready to show in My stuff and the Arcade!</Notice>}
@@ -821,7 +868,7 @@ function Arcade() {
       <Card>
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-xl font-extrabold">
-            {kindEmoji(open.kind)} {open.title} <span className="text-sm font-semibold text-slate-500">by {open.avatar} {open.nickname ?? "the facilitator"}</span>
+            {kindEmoji(open.kind)} {open.title} <span className="text-sm font-semibold text-slate-500">by <Avatar value={open.avatar} size="sm" /> {open.nickname ?? "the facilitator"}</span>
           </h3>
           <BigButton variant="ghost" onClick={() => setOpen(null)}>
             ← Back
@@ -839,7 +886,7 @@ function Arcade() {
           <p className="text-3xl">{kindEmoji(a.kind)}</p>
           <p className="mt-1 text-lg font-extrabold">{a.title}</p>
           <p className="text-sm text-slate-600">
-            by {a.avatar} {a.nickname ?? "the facilitator"}
+            by <Avatar value={a.avatar} size="sm" /> {a.nickname ?? "the facilitator"}
           </p>
         </button>
       ))}

@@ -18,6 +18,13 @@ Status marks: ✅ shipped · 🔧 in progress · ⬜ not started · ⛔ blocked.
 | 1.3 | **Remix first**: the Remix tab is the first button and the landing tab; Rooms is one tap away. | ✅ |
 | 1.4 | **Go play while it cooks**: while an order runs, the child sees "Hang out in the Lounge" / "Play in the Arcade"; the order keeps going and lands in My stuff. | ✅ |
 
+## 1b. Avatars (7 Nov, from the join-screen feedback)
+| | Item | Status |
+|---|---|---|
+| 1b.1 | **High-fidelity emoji**: the 68 avatars are drawn from Microsoft's 3D Fluent Emoji set (MIT), served from `/aiforkids/avatars`, so every device shows the same glossy picture. | ✅ |
+| 1b.2 | **Emoji Playground** ("make your own", in the spirit of Apple's Image Playground): who / colours / extra / mood chips (12–26 each), "Surprise me", a typed line, drawn by the image model, screened as words and as a picture, shrunk to a 256px sticker, kept in the media store. On the join screen and from the top-bar avatar. Facilitator sees every make in the activity log; `AIK_CUSTOM_AVATARS` and a per-class hourly cap. | ✅ |
+| 1b.3 | Transparent-background stickers (background removal) and a facilitator gallery of the class's emoji. | ⬜ |
+
 ## 2. Prompts: choices first, typing always available
 Every field in every room (Studio and Hub) gets a tap-to-choose menu of many
 options *and* a free-text box. Choices are curated per field (who / what

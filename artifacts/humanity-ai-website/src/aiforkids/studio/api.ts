@@ -33,9 +33,17 @@ export type StudioConfig = {
   capabilities: { text: Capability; ossText: Capability; image: Capability; video: Capability; music: Capability; tts: Capability; screening: { configured: boolean; required: boolean }; mock: boolean };
   modes: ModeDef[];
   avatars: string[];
+  /** Emoji Playground on? (off when the image model is not configured). */
+  customAvatars: boolean;
+  playground: Playground;
   maxFieldChars: number;
   maxChatChars: number;
 };
+
+export type PlaygroundField = "who" | "look" | "extra" | "mood";
+export type PlaygroundOption = { id: string; label: string; emoji: string; prompt: string };
+export type Playground = Record<PlaygroundField, { label: string; options: PlaygroundOption[] }>;
+export type PlaygroundPick = Partial<Record<PlaygroundField, string>> & { text?: string };
 
 export type Flag = { layer: string; category: string; detail?: string; severity?: number };
 
@@ -223,6 +231,10 @@ export const childLogin = (code: string, childId: number, pin: string) => call<{
 /** Sign in with just the class key: tap an existing name, or join with a new nickname + avatar. */
 export const childJoin = (code: string, who: { childId: number } | { nickname: string; avatar: string }) => call<{ ok: true }>("POST", "/child/join", { code, ...who });
 export const childLogout = () => call<{ ok: true }>("POST", "/child/logout");
+/** Emoji Playground before joining: the class code is the key. Resolves to an `img:…` avatar value. */
+export const childMakeAvatar = (code: string, pick: PlaygroundPick) => call<{ avatar: string; description: string }>("POST", "/child/avatar/make", { code, ...pick });
+/** Signed in: draw a new one (pick) or put on an existing value (avatar); either way it is worn at once. */
+export const childSetAvatar = (body: PlaygroundPick | { avatar: string }) => call<{ avatar: string; description?: string }>("POST", "/child/avatar", body);
 export type ChildMe = {
   child: { id: number; nickname: string; avatar: string; muted: boolean };
   class: { id: number; name: string; modes: ModeId[]; paused: boolean; locked: boolean; ticketLimit: number; chatTurnLimit: number };
