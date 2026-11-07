@@ -13,15 +13,19 @@ person running the steps below.
 
 ## Android (Google Play)
 
-> **Status, 6 Nov 2026.** v1.1.0 (13) — Studio tab + padded adaptive icon —
-> is **live on the Internal testing track** ("Available to internal testers",
-> published 6 Nov 8:33 PM). The upload key reset (new key from the
-> `dfranklin30s-team` Expo keystore) was approved on 4 Nov. Testers join at
-> https://play.google.com/apps/internaltest/4701749917874965167 — install,
-> open the Studio tab, sign in with a class code, make something, open a
-> robot, press back inside the Studio. Then promote the same release to
-> Production from Play Console (Release → Production → Create new release →
-> Add from library).
+> **Status, 7 Nov 2026.** v1.2.0 (14) — the **Kids AI** tab now holds all
+> three AI for Kids pages behind a Studio · Hub · Facilitator switcher,
+> opens https://aiforkids.humanityplusai.org/aiforkids/… links straight into
+> the right panel, and offers the camera for Homework Help photos. Built on
+> EAS, **not yet uploaded**: the next person uploads the `.aab` to Internal
+> testing, installs it from
+> https://play.google.com/apps/internaltest/4701749917874965167 and checks:
+> sign in with a class code → make something → switch to Hub (still signed
+> in) → Facilitator (email + password) → tap a flyer link → press back
+> inside a panel. Then promote to Production.
+>
+> v1.1.0 (13) — Studio tab only — has been on Internal testing since 6 Nov.
+> Production is still the 19 Aug build without any Studio.
 
 1. **Version.** In `app.json`, raise `expo.android.versionCode` above the
    highest code Play has ever seen for this app (Play Console → Release →
@@ -48,8 +52,17 @@ person running the steps below.
   listing's target audience is currently *not* children; if that is ever
   changed to include kids, Google's Families Policy applies (target-audience
   declaration, Data safety form review, no ads — the app has none).
-- The app asks for no camera, microphone or location permission; the
-  manifest blocks them explicitly (`app.json → android.blockedPermissions`).
+- **Camera (new in 1.2.0).** Homework Help lets a child photograph a
+  worksheet; the page's file picker offers the camera, and Android asks for
+  permission the first time. Update the Data safety form: photos are sent
+  to the AI helper for the answer and are not stored by the app. Microphone
+  and location stay blocked (`app.json → android.blockedPermissions`); the
+  Studio's mic buttons use the browser's speech API, which Android's
+  WebView does not have, so in the app children use the keyboard's own
+  voice-typing key instead.
+- **Links.** The app registers for https://aiforkids.humanityplusai.org/aiforkids/…
+  (no auto-verify, so Android shows an "open with" choice the first time).
+  `app/+native-intent.ts` maps the link to the right panel.
 
 ## iOS (App Store)
 
