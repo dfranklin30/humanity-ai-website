@@ -261,6 +261,31 @@ export const childSubmit = (body: { mode: ModeId; kind: "create" | "change" | "c
 export const childSpeak = (artifactId: number, voice?: VoiceChoice | null) =>
   call<{ audio: string; mime: string }>("POST", `/child/artifacts/${artifactId}/speak`, voice ? { voice } : undefined);
 export const childVoices = () => call<{ voices: VoiceOption[] }>("GET", "/child/voices");
+
+/* The Hero Guide */
+export type GuideGo = "remix" | "make" | "hub" | "arcade" | "gallery" | "lounge";
+export type GuideStep = {
+  id: "hello" | "remix" | "changes" | "hub" | "front";
+  where: "remix" | "make" | "hub";
+  title: string;
+  say: string;
+  action?: { label: string; go: GuideGo };
+  listen?: { word: string; label: string; go: "arcade" | "gallery" | "lounge" }[];
+};
+export type GuideHero = { artifactId: number; name: string; portrait: string | null; voice: VoiceChoice | null };
+export type GuideInfo = {
+  steps: GuideStep[];
+  heroes: GuideHero[];
+  tune: { artifactId: number; title: string; src: string } | null;
+  voices: VoiceOption[];
+  ttsReady: boolean;
+  micAllowed: boolean;
+};
+export type GuideLine = { kind: "step"; id: GuideStep["id"] } | { kind: "reply"; id: "arcade" | "lounge" | "gallery" | "unsure" } | { kind: "preview" };
+export const childGuide = () => call<GuideInfo>("GET", "/child/guide");
+export const childGuideSay = (body: { line: GuideLine; heroId?: number; heroName?: string; voice?: VoiceChoice | null }) =>
+  call<{ text: string; audio: string | null; mime: string | null }>("POST", "/child/guide/say", body);
+export const childGuideHear = (text: string) => call<{ room: "arcade" | "lounge" | "gallery" | null }>("POST", "/child/guide/hear", { text });
 export const childRequest = (id: number) => call<{ request: StudioRequest }>("GET", `/child/requests/${id}`);
 export const childArcade = () => call<{ items: ArtifactMeta[] }>("GET", "/child/arcade");
 /** The Hub: games on the Arcade shelf, everything else in the Gallery; across the club's classes when the facilitator allows it. */

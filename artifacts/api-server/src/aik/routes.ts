@@ -14,7 +14,8 @@ import { z } from "zod";
 import { randomBytes, createHash } from "node:crypto";
 import { aikConfig, isAiConfigured, isContentSafetyConfigured, isImageConfigured, isTtsConfigured, isGoogleConfigured, capabilitySummary } from "./config";
 import { sendVerification, sendReset, sendProjectEmail, type ProjectPiece, type ProjectAttachment } from "./mail";
-import { speak, generateImage, ContentFilteredError } from "./ai";
+import { speak, generateImage, ContentFilteredError, usableVoice } from "./ai";
+import { GUIDE_STEPS, lineText, hearRoom, sayCached, sayable, type GuideLine } from "./guide";
 import { AVATARS, PLAYGROUND, MAX_AVATAR_TEXT, MAX_AVATAR_VALUE, avatarPrompt, describePick, newAvatarToken, customRef, parseCustomRef, isEmojiAvatar, type PlaygroundPick } from "./avatars";
 import { putAvatarMedia } from "./media";
 import * as store from "./store";
@@ -1491,6 +1492,115 @@ export function registerAikRoutes(app: Express): void {
     const found = await findVoice(String(v.provider), String(v.id));
     return found ? { provider: found.provider, id: found.id, name: found.name } : null;
   }
+
+  /* ------------------------------------------------------------------ *
+   * The Hero Guide: the child's own hero walks them through the Studio.
+   * Every line is server-authored (guide.ts); the child's nickname and the
+   * hero's name are the only words dropped in. See GuideBar on the client.
+   * ------------------------------------------------------------------ */
+
+  /** A media ref as something the browser can load: a data URI as is, a blob through the artifact media route. */
+  function guideMedia(artifactId: number, ref: unknown): string | null {
+    if (typeof ref !== "string") return null;
+    if (ref.startsWith("data:")) return ref;
+    const m = /^aik:\/\/(r\d+)\/([a-z0-9_-]+\.[a-z0-9]+)$/i.exec(ref);
+    return m ? `${base}/artifacts/${artifactId}/media/${m[1]}/${m[2]}` : null;
+  }
+
+  /** The child's heroes (approved, latest version each), with portrait links and voices. */
+  async function guideHeroes(childId: number) {
+    const rows = (await store.listPortfolio(childId)).filter((a) => a.kind === "hero" && a.approved);
+    const out: { artifactId: number; name: string; portrait: string | null; voice: { provider: "elevenlabs" | "azure"; id: string; name?: string } | null }[] = [];
+    for (const r of rows.slice(0, 12)) {
+      const a = await store.getArtifact(r.id);
+      const h = a ? parseHero(a.content) : null;
+      if (!h) continue;
+      out.push({ artifactId: r.id, name: h.name, portrait: guideMedia(r.id, h.portrait), voice: usableVoice(h.voice ?? null) });
+    }
+    return out;
+  }
+
+  app.get(
+    `${base}/child/guide`,
+    requireChild,
+    wrap(async (req, res) => {
+      const { child, klass } = req as CReq;
+      const heroes = await guideHeroes(child.id);
+      const songs = (await store.listPortfolio(child.id)).filter((a) => a.kind === "audio" && a.approved && a.mime === "audio/mpeg");
+      let tune: { artifactId: number; title: string; src: string } | null = null;
+      for (const sRow of songs.slice(0, 3)) {
+        const a = await store.getArtifact(sRow.id);
+        const src = a ? guideMedia(a.id, a.content) : null;
+        if (src) {
+          tune = { artifactId: sRow.id, title: a!.title, src };
+          break;
+        }
+      }
+      const voices = isTtsConfigured() ? (await listVoices()).voices : [];
+      res.json({
+        steps: GUIDE_STEPS,
+        heroes,
+        tune,
+        voices,
+        ttsReady: isTtsConfigured(),
+        micAllowed: klass.mic_enabled !== false,
+      });
+    }),
+  );
+
+  const guideLineSchema = z.union([
+    z.object({ kind: z.literal("step"), id: z.enum(["hello", "remix", "changes", "hub", "front"]) }),
+    z.object({ kind: z.literal("reply"), id: z.enum(["arcade", "lounge", "gallery", "unsure"]) }),
+    z.object({ kind: z.literal("preview") }),
+  ]);
+
+  /** One spoken line, in the hero's voice or a picked one. Returns the words too, for the caption. */
+  app.post(
+    `${base}/child/guide/say`,
+    requireChild,
+    wrap(async (req, res) => {
+      const { child } = req as CReq;
+      const body = z
+        .object({ line: guideLineSchema, heroId: z.number().int().positive().optional(), heroName: z.string().max(40).optional(), voice: z.any().optional() })
+        .safeParse(req.body);
+      if (!body.success) return void res.status(400).json({ error: "That's not a line I know." });
+      if (!allow(`guide:${child.id}`, 12)) return void res.status(429).json({ error: "Give your guide a second to catch its breath!" });
+
+      // The hero's name comes from the hero itself when one is named; a plain name only for the Studio Buddy.
+      let heroName = sayable(body.data.heroName ?? "", "Buddy");
+      let heroVoice: { provider: "elevenlabs" | "azure"; id: string; name?: string } | null = null;
+      if (body.data.heroId) {
+        const a = await store.getArtifact(body.data.heroId);
+        const h = a && a.child_id === child.id && a.approved ? parseHero(a.content) : null;
+        if (!h) return void res.status(404).json({ error: "That hero isn't yours to borrow." });
+        heroName = sayable(h.name, "Buddy");
+        heroVoice = usableVoice(h.voice ?? null);
+      }
+      const text = lineText(body.data.line as GuideLine, child.nickname, heroName);
+      if (!text) return void res.status(400).json({ error: "That's not a line I know." });
+      if (!isTtsConfigured()) return void res.json({ text, audio: null, mime: null });
+
+      const voice = (await pickedVoice(body.data.voice)) ?? heroVoice;
+      const audio = await sayCached(text, voice);
+      if (body.data.line.kind === "step" && body.data.line.id === "hello") {
+        await store.audit(child.class_id, "child", child.id, "guide_started", { heroId: body.data.heroId ?? null, voice: voice?.id ?? "house" });
+      }
+      res.json({ text, audio: audio.base64, mime: audio.mime });
+    }),
+  );
+
+  /** What the child said at the Hub front: which room did they ask for? */
+  app.post(
+    `${base}/child/guide/hear`,
+    requireChild,
+    wrap(async (req, res) => {
+      const { child } = req as CReq;
+      const text = String(req.body?.text ?? "").slice(0, 200);
+      const room = hearRoom(text);
+      await store.audit(child.class_id, "child", child.id, "guide_room", { room, heard: text.length > 0 });
+      res.json({ room });
+    }),
+  );
 
   /** Voices a child can pick for "Read it to me". Names and descriptions only. */
   app.get(
