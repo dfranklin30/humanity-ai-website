@@ -41,6 +41,10 @@ function useTalkingHead() {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const [talking, setTalking] = useState(false);
   const [progress, setProgress] = useState(0);
+  // When the browser can't tell how long a clip is (tiny mock clips, or
+  // before metadata loads), the caption paces itself on the words instead.
+  const startedAt = useRef(0);
+  const expectMs = useRef(2000);
 
   const wire = useCallback(() => {
     if (ctxRef.current) return;
@@ -84,7 +88,8 @@ function useTalkingHead() {
             t += 0.18;
             level = 0.35 + 0.35 * Math.abs(Math.sin(t)) * Math.abs(Math.sin(t * 0.37));
           }
-          if (audio.duration > 0) setProgress(audio.currentTime / audio.duration);
+          const known = Number.isFinite(audio.duration) && audio.duration > 0;
+          setProgress(Math.min(1, known ? audio.currentTime / audio.duration : (performance.now() - startedAt.current) / expectMs.current));
         }
         el.style.setProperty("--talk", level.toFixed(3));
         el.style.setProperty("--tilt", (Math.sin(audio.currentTime * 6) * level * 4).toFixed(2));
@@ -111,18 +116,30 @@ function useTalkingHead() {
 
   /** Plays one line; resolves when it has finished (or at once with no audio). */
   const say = useCallback(
-    (b64: string | null, mime: string | null) =>
+    (b64: string | null, mime: string | null, text: string) =>
       new Promise<void>((resolve) => {
         wire();
         void ctxRef.current?.resume();
+        startedAt.current = performance.now();
+        expectMs.current = Math.max(1500, text.length * 65);
         if (!b64) {
+          // No voice: show the words at a reading pace, then move on.
+          setTalking(true);
           setProgress(0);
-          resolve();
+          window.setTimeout(() => {
+            setTalking(false);
+            setProgress(1);
+            resolve();
+          }, expectMs.current);
           return;
         }
+        let settled = false;
         const done = () => {
+          if (settled) return;
+          settled = true;
           audio.removeEventListener("ended", done);
           audio.removeEventListener("error", done);
+          if (!audio.paused) audio.pause();
           resolve();
         };
         audio.addEventListener("ended", done);
@@ -130,6 +147,13 @@ function useTalkingHead() {
         audio.src = `data:${mime ?? "audio/mpeg"};base64,${b64}`;
         setProgress(0);
         audio.play().catch(done);
+        // A clip with no known length (a silent mock frame, say) ends on the word clock.
+        const check = () => {
+          if (settled) return;
+          if (Number.isFinite(audio.duration) && audio.duration > 0 && !audio.ended) return void window.setTimeout(check, 250);
+          done();
+        };
+        window.setTimeout(check, expectMs.current + 300);
       }),
     [audio, wire],
   );
@@ -232,7 +256,7 @@ export function HeroGuide({
       const r = await childGuideSay({ line, heroId: face.heroId, heroName: face.heroId ? undefined : face.name, voice: pickedVoice });
       setCaption(r.text);
       tune.volume = 0.05;
-      await head.say(r.audio, r.mime);
+      await head.say(r.audio, r.mime, r.text);
       tune.volume = 0.12;
       return r.text;
     },
@@ -447,9 +471,11 @@ export function HeroGuide({
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-2">
               <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-amber-300">{face.name}</p>
-              <button type="button" onClick={() => setMore((m) => !m)} className="text-sm font-bold text-white/80 hover:text-white" aria-expanded={more} data-testid="guide-more">
-                {more ? "Less ∧" : "More ∨"}
-              </button>
+              {phase !== "done" && (
+                <button type="button" onClick={() => setMore((m) => !m)} className="text-sm font-bold text-white/80 hover:text-white" aria-expanded={more} data-testid="guide-more">
+                  {more ? "Less ∧" : "More ∨"}
+                </button>
+              )}
             </div>
             <p className={cx("text-[15px] font-semibold leading-snug", !more && "line-clamp-2")} data-testid="guide-caption">
               {phase === "done" ? "That's the tour! Come find me any time. 🎉" : typed || (busy ? "…" : "")}
@@ -470,7 +496,8 @@ export function HeroGuide({
           )}
         </div>
 
-        {phase !== "done" && (more || isFront) && step && (
+        {/* The step's buttons show on their own once the line is said; More also shows the step title. */}
+        {phase !== "done" && (more || isFront || (!head.talking && !busy)) && step && (
           <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/10 pt-3">
             {more && <p className="mr-auto text-xs font-bold uppercase tracking-wide text-white/60">{step.title} · {stepIx + 1} of {steps.length}</p>}
             {isFront
@@ -490,7 +517,7 @@ export function HeroGuide({
                 {listening && heard && <span className="text-xs text-white/70">“{heard}”</span>}
               </span>
             )}
-            {!isFront && !last && (
+            {!isFront && !last && !step.action && (
               <button type="button" disabled={busy} onClick={next} className="rounded-full bg-white/10 px-4 py-1.5 text-sm font-bold text-white ring-1 ring-white/30 hover:bg-white/20 disabled:opacity-50" data-testid="guide-next">
                 Next ›
               </button>
