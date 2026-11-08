@@ -19,8 +19,10 @@ import { db } from "../db";
  * Types
  * ------------------------------------------------------------------ */
 
-export type ModeId = "game" | "story" | "prompt" | "music" | "quest" | "video" | "robot" | "homework" | "language";
+export type ModeId = "game" | "story" | "prompt" | "music" | "quest" | "video" | "robot" | "homework" | "language" | "advanced";
 export const ALL_MODES: ModeId[] = ["game", "story", "prompt", "music", "quest", "video", "robot", "homework", "language"];
+/** Advanced Special Training is opt-in per class (advanced_enabled), so it is never in ALL_MODES. */
+export const ADVANCED_MODE: ModeId = "advanced";
 
 /**
  * Accounts.
@@ -93,6 +95,10 @@ export type ClassRow = {
   paused: boolean;
   locked: boolean;
   sound_enabled: boolean;
+  /** Advanced Special Training (website builder, choose-your-own-adventure) is open to this class. */
+  advanced_enabled: boolean;
+  /** The class Hub also shows approved, shared work from the facilitator's other classes. */
+  hub_all_classes: boolean;
   /** Microphone buttons in the Studio (browser speech-to-text; nothing is recorded). */
   mic_enabled: boolean;
   session_started_at: string;
@@ -146,7 +152,12 @@ export type RequestRow = {
   completed_at: string | null;
 };
 
-export type ArtifactKind = "game" | "story" | "image" | "quest" | "video" | "robot" | "chat" | "audio" | "hero";
+export type ArtifactKind = "game" | "story" | "image" | "quest" | "video" | "robot" | "chat" | "audio" | "hero" | "site" | "adventure";
+
+/** Where a shared piece shows in the Hub: a game is always a game, everything else is Gallery. */
+export function hubShelf(kind: ArtifactKind | string): "arcade" | "gallery" {
+  return kind === "game" ? "arcade" : "gallery";
+}
 
 export type ArtifactRow = {
   id: number;
@@ -158,7 +169,7 @@ export type ArtifactRow = {
   mime: string;
   summary: string | null;
   approved: boolean; // images only: facilitator approval gate
-  published: boolean; // visible in class Arcade
+  published: boolean; // put in the Hub (Arcade for games, Gallery for everything else)
   version: number;
   parent_artifact_id: number | null;
   project_id?: number | null;
@@ -363,6 +374,12 @@ export function ensureTables(): Promise<void> {
         ALTER TABLE aik_projects ADD COLUMN IF NOT EXISTS participant_email text`);
       await db.execute(sql`
         ALTER TABLE aik_projects ADD COLUMN IF NOT EXISTS sent_at timestamptz`);
+      /* Hub hierarchy and guardrail doors (roadmap 4 and 6): both switches
+       * are per class and off by default. */
+      await db.execute(sql`
+        ALTER TABLE aik_classes ADD COLUMN IF NOT EXISTS advanced_enabled boolean NOT NULL DEFAULT false`);
+      await db.execute(sql`
+        ALTER TABLE aik_classes ADD COLUMN IF NOT EXISTS hub_all_classes boolean NOT NULL DEFAULT false`);
       /* The Screen Time Lounge: videos a facilitator picked for a class.
        * A null class_id is a video for every class of that facilitator. */
       await db.execute(sql`
@@ -557,7 +574,7 @@ export async function getClassByCode(code: string): Promise<ClassRow | null> {
 
 export async function updateClass(
   id: number,
-  patch: Partial<Pick<ClassRow, "name" | "modes" | "ticket_limit" | "chat_turn_limit" | "paused" | "locked" | "sound_enabled" | "mic_enabled">>,
+  patch: Partial<Pick<ClassRow, "name" | "modes" | "ticket_limit" | "chat_turn_limit" | "paused" | "locked" | "sound_enabled" | "advanced_enabled" | "hub_all_classes" | "mic_enabled">>,
 ): Promise<ClassRow | null> {
   await ensureTables();
   const current = await getClass(id);
@@ -573,6 +590,8 @@ export async function updateClass(
         paused = ${next.paused},
         locked = ${next.locked},
         sound_enabled = ${next.sound_enabled},
+        advanced_enabled = ${next.advanced_enabled},
+        hub_all_classes = ${next.hub_all_classes},
         mic_enabled = ${next.mic_enabled}
       WHERE id = ${id}
       RETURNING *`),
@@ -889,6 +908,48 @@ export async function listArcade(classId: number): Promise<(Omit<ArtifactRow, "c
        WHERE a.class_id = ${classId} AND a.published = true AND a.approved = true
        ORDER BY a.created_at DESC`),
   );
+}
+
+/** The class ids whose shared work a child in this class may see in the Hub. */
+export async function hubClassIds(klass: ClassRow): Promise<number[]> {
+  if (!klass.hub_all_classes) return [klass.id];
+  await ensureTables();
+  const r = rows<{ id: number }>(await db.execute(sql`SELECT id FROM aik_classes WHERE facilitator_id = ${klass.facilitator_id} AND kind = 'class'`));
+  const ids = r.map((x) => Number(x.id));
+  return ids.includes(klass.id) ? ids : [klass.id, ...ids];
+}
+
+export type HubItem = Omit<ArtifactRow, "content"> & { nickname: string | null; avatar: string | null; class_name: string };
+
+/** Everything put in the Hub and approved, across the given classes, newest first. */
+export async function listHub(classIds: number[]): Promise<HubItem[]> {
+  if (!classIds.length) return [];
+  await ensureTables();
+  return rows(
+    await db.execute(sql`
+      SELECT a.id, a.class_id, a.child_id, a.kind, a.title, a.mime, a.summary, a.approved, a.published, a.version, a.parent_artifact_id, a.created_at,
+             c.nickname, c.avatar, k.name AS class_name
+        FROM aik_artifacts a
+        JOIN aik_classes k ON k.id = a.class_id
+        LEFT JOIN aik_children c ON c.id = a.child_id
+       WHERE a.class_id IN (${sql.join(classIds.map((id) => sql`${id}`), sql`, `)}) AND a.published = true AND a.approved = true
+       ORDER BY a.created_at DESC`),
+  );
+}
+
+/** Which guardrail doors the class took this session, for tuning the themes. */
+export async function countDoors(classId: number, since: string): Promise<Record<string, number>> {
+  await ensureTables();
+  const r = rows<{ door: string; n: number | string }>(
+    await db.execute(sql`
+      SELECT detail->>'door' AS door, count(*) AS n
+        FROM aik_audit
+       WHERE class_id = ${classId} AND action = 'door_taken' AND created_at >= ${since}::timestamptz
+       GROUP BY 1`),
+  );
+  const out: Record<string, number> = {};
+  for (const x of r) if (x.door) out[x.door] = Number(x.n);
+  return out;
 }
 
 export async function setArtifactPublished(id: number, published: boolean): Promise<void> {

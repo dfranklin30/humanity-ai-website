@@ -893,6 +893,7 @@ function projectStateForModel(a: ArtifactRow): string {
   if (a.kind === "image") return JSON.stringify({ prompt: a.summary ?? "" });
   // Games: the painted art is hundreds of kilobytes of base64 the model must never see.
   if (a.kind === "game") return stripArt(a.content);
+  if (a.kind === "site") return a.content;
   if (a.kind === "audio") {
     try {
       const j = JSON.parse(a.summary ?? "{}");
@@ -1105,6 +1106,48 @@ async function buildArtifact(
       ok: true,
       artifact: { kind: "game", title: gameTitle(html, fallbackTitle), content: hardenGameHtml(html), mime: "text/html", summary: gameSummary(html), approved: true },
     };
+  }
+
+  /* ---- Advanced Special Training --------------------------------------
+   * A website is HTML and gets exactly the game's treatment: the code scan
+   * (no network, no escape, no sound), the visible words screened, then the
+   * sandbox wrapper. An adventure is JSON like a quest: shape-checked, every
+   * page's words screened, links between pages verified.                 */
+  if (modeId === "advanced") {
+    const wantsSite = input.kind === "create" ? input.values.make === "one-page website" : current?.kind === "site";
+    if (wantsSite) {
+      const html = extractHtml(raw);
+      if (!html) return { ok: false, retryable: true, blocked: false, message: KID_MESSAGES.failed, flags: [{ layer: "system", category: "no_html" }] };
+      const codeFlags = scanGameCode(html, false).filter((f) => f.category !== "too_large" || html.length > 24_000);
+      if (codeFlags.length) {
+        const retryable = codeFlags.every((f) => f.category === "sound" || f.category === "code:dialogs" || f.category === "too_large");
+        return { ok: false, retryable, blocked: false, message: KID_MESSAGES.failed, flags: codeFlags };
+      }
+      const visible = html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ");
+      const out = await screenOutputText(visible.slice(0, 5000));
+      if (!out.ok) return { ok: false, retryable: false, blocked: true, message: out.kidMessage, flags: out.flags };
+      return {
+        ok: true,
+        artifact: { kind: "site", title: gameTitle(html, fallbackTitle), content: hardenGameHtml(html), mime: "text/html", summary: gameSummary(html) ?? "A one-page website", approved: true },
+      };
+    }
+    const j = extractJson<{ title?: string; start?: string; pages?: { id?: string; text?: string; choices?: { text?: string; go?: string }[] }[] }>(raw);
+    if (!j || !Array.isArray(j.pages) || j.pages.length < 3) return { ok: false, retryable: true, blocked: false, message: KID_MESSAGES.failed, flags: [{ layer: "system", category: "bad_json" }] };
+    const pages = j.pages.slice(0, 16).map((p, i) => ({
+      id: String(p.id ?? `p${i + 1}`).slice(0, 12),
+      text: stripLinks(String(p.text ?? "").slice(0, 900)),
+      choices: (Array.isArray(p.choices) ? p.choices : []).slice(0, 4).map((c) => ({ text: stripLinks(String(c.text ?? "").slice(0, 120)), go: String(c.go ?? "").slice(0, 12) })),
+    }));
+    const ids = new Set(pages.map((p) => p.id));
+    const start = ids.has(String(j.start)) ? String(j.start) : pages[0].id;
+    for (const p of pages) p.choices = p.choices.filter((c) => c.text && ids.has(c.go));
+    if (!pages.some((p) => p.choices.length === 0)) return { ok: false, retryable: true, blocked: false, message: KID_MESSAGES.failed, flags: [{ layer: "system", category: "no_ending" }] };
+    const out = await screenOutputText(pages.map((p) => [p.text, ...p.choices.map((c) => c.text)].join(" ")).join("\n"));
+    if (!out.ok) return { ok: false, retryable: false, blocked: true, message: out.kidMessage, flags: out.flags };
+    const title = stripLinks(String(j.title ?? fallbackTitle).slice(0, 60));
+    const content = JSON.stringify({ format: "adventure", title, start, pages });
+    const endings = pages.filter((p) => p.choices.length === 0).length;
+    return { ok: true, artifact: { kind: "adventure", title, content, mime: "application/json", summary: `${pages.length} pages, ${endings} ending${endings === 1 ? "" : "s"}`, approved: true } };
   }
 
   if (modeId === "quest") {

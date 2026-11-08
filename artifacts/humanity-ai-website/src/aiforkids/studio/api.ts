@@ -5,7 +5,7 @@
 
 /** `choices`: pick one (enforced). `ideas`: tappable suggestions for a free-text box; typing anything is still fine. */
 export type FieldDef = { key: string; label: string; hint: string; required?: boolean; choices?: string[]; ideas?: string[]; maxChars?: number };
-export type ModeId = "game" | "story" | "prompt" | "music" | "quest" | "video" | "robot" | "homework" | "language";
+export type ModeId = "game" | "story" | "prompt" | "music" | "quest" | "video" | "robot" | "homework" | "language" | "advanced";
 export type ModeDef = {
   id: ModeId;
   name: string;
@@ -80,7 +80,7 @@ export type ArtifactMeta = {
   id: number;
   classId: number;
   childId: number | null;
-  kind: "game" | "story" | "image" | "quest" | "video" | "robot" | "chat" | "audio" | "hero";
+  kind: "game" | "story" | "image" | "quest" | "video" | "robot" | "chat" | "audio" | "hero" | "site" | "adventure";
   title: string;
   mime: string;
   summary: string | null;
@@ -91,8 +91,15 @@ export type ArtifactMeta = {
   createdAt: string;
   nickname?: string | null;
   avatar?: string | null;
+  /** Hub only: which class a shared piece came from (set when the Hub spans the club's classes). */
+  class_name?: string;
 };
 export type Artifact = ArtifactMeta & { content: string };
+
+/** Where a shared piece shows in the Hub: a game is always a game, everything else is Gallery. */
+export function hubShelf(kind: ArtifactMeta["kind"] | string): "arcade" | "gallery" {
+  return kind === "game" ? "arcade" : "gallery";
+}
 
 /**
  * Media references inside an artifact come in three shapes: a stored file
@@ -160,6 +167,8 @@ export type PublicClass = {
   paused: boolean;
   locked: boolean;
   soundEnabled: boolean;
+  advancedEnabled?: boolean;
+  hubAllClasses?: boolean;
   micEnabled: boolean;
   sessionStartedAt: string;
   createdAt: string;
@@ -239,7 +248,7 @@ export const childMakeAvatar = (code: string, pick: PlaygroundPick) => call<{ av
 export const childSetAvatar = (body: PlaygroundPick | { avatar: string }) => call<{ avatar: string; description?: string }>("POST", "/child/avatar", body);
 export type ChildMe = {
   child: { id: number; nickname: string; avatar: string; muted: boolean };
-  class: { id: number; name: string; modes: ModeId[]; paused: boolean; locked: boolean; ticketLimit: number; chatTurnLimit: number; micEnabled?: boolean };
+  class: { id: number; name: string; modes: ModeId[]; paused: boolean; locked: boolean; ticketLimit: number; chatTurnLimit: number; advancedEnabled?: boolean; hubAllClasses?: boolean; micEnabled?: boolean };
   ticketsUsed: number;
   chatTurnsUsed: number;
   requests: StudioRequest[];
@@ -254,6 +263,12 @@ export const childSpeak = (artifactId: number, voice?: VoiceChoice | null) =>
 export const childVoices = () => call<{ voices: VoiceOption[] }>("GET", "/child/voices");
 export const childRequest = (id: number) => call<{ request: StudioRequest }>("GET", `/child/requests/${id}`);
 export const childArcade = () => call<{ items: ArtifactMeta[] }>("GET", "/child/arcade");
+/** The Hub: games on the Arcade shelf, everything else in the Gallery; across the club's classes when the facilitator allows it. */
+export const childHub = () => call<{ arcade: ArtifactMeta[]; gallery: ArtifactMeta[]; acrossClasses: boolean }>("GET", "/child/hub");
+/** A guardrail door after a held or blocked order. "reword" may bring back a screened, kid-safe rewording of the order to start from. */
+export type Door = "reword" | "lounge" | "advanced";
+export const childDoor = (requestId: number, door: Door) =>
+  call<{ ok: true; door: Door; suggestion: { values: Record<string, string>; changes: string[] } | null }>("POST", `/child/requests/${requestId}/door`, { door });
 /* Child: the Remix workflow (hero → put them in → remix → ideas) */
 export const childRemixInfo = () => call<{ styles: string[]; tools: ModeId[] }>("GET", "/child/remix");
 export const childSaveHero = (body: { name: string; look: string; personality?: string; style: string; voice?: { provider: string; id: string } | null; heroId?: number }) =>
@@ -308,9 +323,9 @@ export const fChangePassword = (current: string, next: string) => call<{ ok: tru
 export const fAddFacilitator = (body: { email: string; password: string; displayName: string; isAdmin?: boolean }) => call<{ facilitator: Facilitator }>("POST", "/facilitator/facilitators", body);
 export const fClasses = () => call<{ classes: PublicClass[] }>("GET", "/facilitator/classes");
 export const fCreateClass = (name: string) => call<{ class: PublicClass }>("POST", "/facilitator/classes", { name });
-export type ClassDetail = { class: PublicClass; children: ChildSummary[]; requests: StudioRequest[]; approvals: ArtifactMeta[] };
+export type ClassDetail = { class: PublicClass; children: ChildSummary[]; requests: StudioRequest[]; approvals: ArtifactMeta[]; doors?: Record<string, number> };
 export const fClass = (id: number) => call<ClassDetail>("GET", `/facilitator/classes/${id}`);
-export const fPatchClass = (id: number, patch: Partial<{ name: string; modes: ModeId[]; ticketLimit: number; chatTurnLimit: number; paused: boolean; locked: boolean; soundEnabled: boolean; micEnabled: boolean }>) =>
+export const fPatchClass = (id: number, patch: Partial<{ name: string; modes: ModeId[]; ticketLimit: number; chatTurnLimit: number; paused: boolean; locked: boolean; soundEnabled: boolean; advancedEnabled: boolean; hubAllClasses: boolean; micEnabled: boolean }>) =>
   call<{ class: PublicClass }>("PATCH", `/facilitator/classes/${id}`, patch);
 export const fNewSession = (id: number) => call<{ class: PublicClass }>("POST", `/facilitator/classes/${id}/new-session`);
 export const fRotateCode = (id: number) => call<{ class: PublicClass }>("POST", `/facilitator/classes/${id}/rotate-code`);

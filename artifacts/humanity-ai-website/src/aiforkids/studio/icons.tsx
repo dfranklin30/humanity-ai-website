@@ -8,7 +8,7 @@ import type { ReactElement } from "react";
  * so a child learns "green is the game room" without reading anything.
  */
 
-export type RoomId = "game" | "story" | "prompt" | "music" | "quest" | "video" | "robot" | "homework" | "language" | "lounge" | "arcade" | "portfolio";
+export type RoomId = "game" | "story" | "prompt" | "music" | "quest" | "video" | "robot" | "homework" | "language" | "lounge" | "arcade" | "portfolio" | "hub" | "gallery" | "advanced";
 
 export const ROOM_THEME: Record<RoomId, { accent: string; tile: string; ring: string; name: string }> = {
   game: { accent: "#16a34a", tile: "#dcfce7", ring: "ring-green-200", name: "Game Maker" },
@@ -23,6 +23,9 @@ export const ROOM_THEME: Record<RoomId, { accent: string; tile: string; ring: st
   lounge: { accent: "#0d9488", tile: "#ccfbf1", ring: "ring-teal-200", name: "Screen Time Lounge" },
   arcade: { accent: "#ca8a04", tile: "#fef9c3", ring: "ring-yellow-200", name: "Arcade" },
   portfolio: { accent: "#9333ea", tile: "#f3e8ff", ring: "ring-purple-200", name: "My stuff" },
+  hub: { accent: "#0284c7", tile: "#e0f2fe", ring: "ring-sky-200", name: "Hub" },
+  gallery: { accent: "#be185d", tile: "#fce7f3", ring: "ring-pink-200", name: "Gallery" },
+  advanced: { accent: "#4338ca", tile: "#e0e7ff", ring: "ring-indigo-200", name: "Advanced Special Training" },
 };
 
 const S = { fill: "none", stroke: "currentColor", strokeWidth: 4, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
@@ -158,7 +161,44 @@ function Language() {
   );
 }
 
-const DRAW: Record<RoomId, () => ReactElement> = { game: Game, story: Story, prompt: Prompt, music: Music, quest: Quest, video: Video, robot: Robot, homework: Homework, language: Language, lounge: Lounge, arcade: Arcade, portfolio: Portfolio };
+/** The Hub: three shelves under one roof. */
+function Hub() {
+  return (
+    <g>
+      <path d="M8 28L32 10l24 18v26H8z" fill="currentColor" opacity=".18" />
+      <path {...S} d="M8 28L32 10l24 18v26H8z" />
+      <rect {...S} x="16" y="34" width="10" height="10" rx="2" />
+      <rect {...S} x="27" y="34" width="10" height="10" rx="2" />
+      <rect {...S} x="38" y="34" width="10" height="10" rx="2" />
+    </g>
+  );
+}
+/** The Gallery: a framed picture on a wall. */
+function Gallery() {
+  return (
+    <g>
+      <rect x="10" y="12" width="44" height="36" rx="4" fill="currentColor" opacity=".18" />
+      <rect {...S} x="10" y="12" width="44" height="36" rx="4" />
+      <path {...S} d="M16 42l10-12 8 9 6-6 8 9" />
+      <circle cx="42" cy="22" r="3.5" fill="currentColor" />
+      <path {...S} d="M22 56h20" opacity=".6" />
+    </g>
+  );
+}
+/** Advanced Special Training: a lab flask. */
+function Advanced() {
+  return (
+    <g>
+      <path d="M26 8h12v16l12 22a4 4 0 0 1-3.5 6h-29A4 4 0 0 1 14 46l12-22z" fill="currentColor" opacity=".18" />
+      <path {...S} d="M26 8h12v16l12 22a4 4 0 0 1-3.5 6h-29A4 4 0 0 1 14 46l12-22z" />
+      <path {...S} d="M22 8h20" />
+      <circle cx="30" cy="40" r="2.5" fill="currentColor" />
+      <circle cx="38" cy="44" r="2" fill="currentColor" />
+    </g>
+  );
+}
+
+const DRAW: Record<RoomId, () => ReactElement> = { game: Game, story: Story, prompt: Prompt, music: Music, quest: Quest, video: Video, robot: Robot, homework: Homework, language: Language, lounge: Lounge, arcade: Arcade, portfolio: Portfolio, hub: Hub, gallery: Gallery, advanced: Advanced };
 
 /** A sticker: the icon on its pastel tile, in the room's colour. */
 export function RoomIcon({ id, size = 56, tile = true, className = "" }: { id: RoomId; size?: number; tile?: boolean; className?: string }) {

@@ -17,7 +17,6 @@ import { sendVerification, sendReset, sendProjectEmail, type ProjectPiece, type 
 import { speak, generateImage, ContentFilteredError } from "./ai";
 import { AVATARS, PLAYGROUND, MAX_AVATAR_TEXT, MAX_AVATAR_VALUE, avatarPrompt, describePick, newAvatarToken, customRef, parseCustomRef, isEmojiAvatar, type PlaygroundPick } from "./avatars";
 import { putAvatarMedia } from "./media";
-import { screenInput } from "./safety";
 import * as store from "./store";
 import { hashPassword, verifyPassword } from "../auth";
 import { logger } from "../lib/logger";
@@ -25,7 +24,8 @@ import { publicModes, getMode } from "./modes";
 import { runRequest, stashPhoto, subscribe, publish, toPublicRequest, toChildRequest, toPublicClass, REMIX_FROM_KEY, PROJECT_KEY } from "./pipeline";
 import { filesOf, representation, kindName, suggestValues, generateIdeas, runHeroJob, validateHero, parseHero, REMIX_TOOLS, HERO_STYLES } from "./remix";
 import { listVoices, findVoice } from "./voices";
-import { KID_MESSAGES, contentSafetyImage } from "./safety";
+import { KID_MESSAGES, contentSafetyImage, screenInput } from "./safety";
+import { rewriteOrder } from "./autofix";
 import { getMedia, referencedNames } from "./media";
 import { bookNarrationText, type Book } from "./book";
 import { LOUNGE_STARTERS, youtubeIdOf, validateLoungeUrl } from "./lounge";
@@ -630,6 +630,8 @@ export function registerAikRoutes(app: Express): void {
         children: children.map((c) => publicChild(c, ticketCounts[c.id] ?? 0, chatCounts[c.id] ?? 0)),
         requests: requests.map(toPublicRequest),
         approvals,
+        // Roadmap 6.3: which doors children took after a held or blocked order, so the themes can be tuned.
+        doors: await store.countDoors(klass.id, klass.session_started_at),
       });
     }),
   );
@@ -643,12 +645,14 @@ export function registerAikRoutes(app: Express): void {
       const body = z
         .object({
           name: z.string().min(1).max(80).optional(),
-          modes: z.array(z.enum(["game", "story", "prompt", "music", "quest", "video", "robot", "homework", "language"])).optional(),
+          modes: z.array(z.enum(["game", "story", "prompt", "music", "quest", "video", "robot", "homework", "language", "advanced"])).optional(),
           ticketLimit: z.number().int().min(0).max(50).optional(),
           chatTurnLimit: z.number().int().min(0).max(60).optional(),
           paused: z.boolean().optional(),
           locked: z.boolean().optional(),
           soundEnabled: z.boolean().optional(),
+          advancedEnabled: z.boolean().optional(),
+          hubAllClasses: z.boolean().optional(),
           micEnabled: z.boolean().optional(),
         })
         .safeParse(req.body);
@@ -661,6 +665,8 @@ export function registerAikRoutes(app: Express): void {
       if (body.data.paused !== undefined) patch.paused = body.data.paused;
       if (body.data.locked !== undefined) patch.locked = body.data.locked;
       if (body.data.soundEnabled !== undefined) patch.sound_enabled = body.data.soundEnabled;
+      if (body.data.advancedEnabled !== undefined) patch.advanced_enabled = body.data.advancedEnabled;
+      if (body.data.hubAllClasses !== undefined) patch.hub_all_classes = body.data.hubAllClasses;
       if (body.data.micEnabled !== undefined) patch.mic_enabled = body.data.micEnabled;
       const updated = await store.updateClass(klass.id, patch);
       if (!updated) return void res.status(404).json({ error: "Class not found." });
@@ -964,7 +970,7 @@ export function registerAikRoutes(app: Express): void {
     wrap(async (req, res) => {
       const klass = await ownedClass(req, res);
       if (!klass) return;
-      const body = z.object({ mode: z.enum(["game", "story", "prompt", "music", "quest", "video", "robot", "homework", "language"]), kind: z.enum(["create", "change", "chat"]), projectArtifactId: z.number().int().optional(), input: z.record(z.any()) }).safeParse(req.body);
+      const body = z.object({ mode: z.enum(["game", "story", "prompt", "music", "quest", "video", "robot", "homework", "language", "advanced"]), kind: z.enum(["create", "change", "chat"]), projectArtifactId: z.number().int().optional(), input: z.record(z.any()) }).safeParse(req.body);
       if (!body.success) return void res.status(400).json({ error: "Invalid order." });
       const request = await store.createRequest({ classId: klass.id, childId: null, mode: body.data.mode, kind: body.data.kind, projectArtifactId: body.data.projectArtifactId ?? null, input: body.data.input });
       publish(klass.id, { type: "request", request: toPublicRequest(request) });
@@ -1157,7 +1163,18 @@ export function registerAikRoutes(app: Express): void {
       ]);
       res.json({
         child: { id: child.id, nickname: child.nickname, avatar: child.avatar, muted: child.muted },
-        class: { id: klass.id, name: klass.name, modes: store.ALL_MODES, paused: klass.paused, locked: klass.locked, ticketLimit: klass.ticket_limit, chatTurnLimit: klass.chat_turn_limit, micEnabled: klass.mic_enabled },
+        class: {
+          id: klass.id,
+          name: klass.name,
+          modes: klass.advanced_enabled ? [...store.ALL_MODES, store.ADVANCED_MODE] : store.ALL_MODES,
+          paused: klass.paused,
+          locked: klass.locked,
+          ticketLimit: klass.ticket_limit,
+          chatTurnLimit: klass.chat_turn_limit,
+          advancedEnabled: klass.advanced_enabled,
+          hubAllClasses: klass.hub_all_classes,
+          micEnabled: klass.mic_enabled,
+        },
         ticketsUsed: tickets,
         chatTurnsUsed: chatTurns,
         requests: requests.map(toChildRequest),
@@ -1173,13 +1190,14 @@ export function registerAikRoutes(app: Express): void {
     wrap(async (req, res) => {
       const { child, klass } = req as CReq;
       if (!allow(`creq:${child.id}`, aikConfig.childRequestsPerMinute)) return void res.status(429).json({ error: "Whoa, fast fingers! Wait a moment and try again." });
-      const body = z.object({ mode: z.enum(["game", "story", "prompt", "music", "quest", "video", "robot", "homework", "language"]), kind: z.enum(["create", "change", "chat"]), projectArtifactId: z.number().int().optional(), remixFrom: z.number().int().optional(), input: z.record(z.any()) }).safeParse(req.body);
+      const body = z.object({ mode: z.enum(["game", "story", "prompt", "music", "quest", "video", "robot", "homework", "language", "advanced"]), kind: z.enum(["create", "change", "chat"]), projectArtifactId: z.number().int().optional(), remixFrom: z.number().int().optional(), input: z.record(z.any()) }).safeParse(req.body);
       if (!body.success) return void res.status(400).json({ error: "That order didn't look right." });
 
       if (klass.paused) return void res.status(423).json({ error: KID_MESSAGES.paused });
       if (klass.locked) return void res.status(423).json({ error: "Your portfolio is locked for the Expo. Nice work!" });
       if (child.muted) return void res.status(423).json({ error: "Your facilitator paused your orders. Look up front!" });
       if (!getMode(body.data.mode)) return void res.status(404).json({ error: "That studio doesn't exist." });
+      if (body.data.mode === "advanced" && !klass.advanced_enabled) return void res.status(403).json({ error: "Advanced Special Training isn't open for your class yet. Ask your facilitator!" });
       const mode = getMode(body.data.mode)!;
       let used: number;
       if (body.data.kind === "chat") {
@@ -1204,8 +1222,9 @@ export function registerAikRoutes(app: Express): void {
       // Remix: a child may start from their own piece, or from one a classmate put in the Arcade.
       if (body.data.kind === "create" && body.data.remixFrom) {
         const src = await store.getArtifact(body.data.remixFrom);
-        const ok = src && src.class_id === klass.id && src.approved && (src.child_id === child.id || src.published) && src.kind !== "chat";
-        if (!ok) return void res.status(404).json({ error: "Pick something you made, or something from the Arcade, to remix." });
+        const hubIds = src ? await store.hubClassIds(klass) : [];
+        const ok = src && src.approved && src.kind !== "chat" && ((src.class_id === klass.id && src.child_id === child.id) || (src.published && hubIds.includes(src.class_id)));
+        if (!ok) return void res.status(404).json({ error: "Pick something you made, or something from the Hub, to remix." });
         input[REMIX_FROM_KEY] = String(src!.id);
       }
 
@@ -1285,11 +1304,13 @@ export function registerAikRoutes(app: Express): void {
    * other room, or ask for ideas. Everything stays in the child's own portfolio
    * and runs through the same screening as every other order. */
 
-  /** A piece a child may remix: their own, or a classmate's from the Arcade. */
+  /** A piece a child may remix: their own, or one a classmate put in the Hub (across the club's classes when the facilitator allows it). */
   async function childVisible(child: store.ChildRow, klass: store.ClassRow, id: number): Promise<store.ArtifactRow | null> {
     const a = Number.isInteger(id) ? await store.getArtifact(id) : null;
-    if (!a || a.class_id !== klass.id || a.kind === "chat") return null;
-    return a.child_id === child.id || (a.published && a.approved) ? a : null;
+    if (!a || a.kind === "chat") return null;
+    if (a.class_id === klass.id && a.child_id === child.id) return a;
+    if (!(a.published && a.approved)) return null;
+    return (await store.hubClassIds(klass)).includes(a.class_id) ? a : null;
   }
 
   app.get(
@@ -1349,7 +1370,7 @@ export function registerAikRoutes(app: Express): void {
       const body = z.object({ artifactId: z.number().int(), mode: z.enum(["game", "story", "language", "prompt", "music", "quest", "video", "robot"]) }).safeParse(req.body);
       if (!body.success) return void res.status(400).json({ error: "Pick a piece and a room." });
       const src = await childVisible(child, klass, body.data.artifactId);
-      if (!src || !src.approved) return void res.status(404).json({ error: "Pick something you made, or something from the Arcade, to remix." });
+      if (!src || !src.approved) return void res.status(404).json({ error: "Pick something you made, or something from the Hub, to remix." });
       const mode = getMode(body.data.mode)!;
       const { values, ai } = await suggestValues(src, mode, { staff: false });
       res.json({ source: { id: src.id, title: src.title, kind: src.kind }, mode: mode.id, values, ai });
@@ -1381,6 +1402,69 @@ export function registerAikRoutes(app: Express): void {
     wrap(async (req, res) => {
       const { klass } = req as CReq;
       res.json({ items: await store.listArcade(klass.id) });
+    }),
+  );
+
+  /* ---------------- The Hub (roadmap 4) ----------------
+   * One shared place. A piece's kind decides its shelf: a game is always a
+   * game (Arcade); books, movies, songs, pictures, quests, robots, websites
+   * and adventures go to the Gallery. With the facilitator's switch on, the
+   * Hub also shows approved, shared work from the club's other classes. */
+  app.get(
+    `${base}/child/hub`,
+    requireChild,
+    wrap(async (req, res) => {
+      const { klass } = req as CReq;
+      const ids = await store.hubClassIds(klass);
+      const items = (await store.listHub(ids)).filter((a) => a.kind !== "chat" && a.kind !== "hero");
+      res.json({
+        arcade: items.filter((a) => store.hubShelf(a.kind) === "arcade"),
+        gallery: items.filter((a) => store.hubShelf(a.kind) === "gallery"),
+        acrossClasses: ids.length > 1,
+      });
+    }),
+  );
+
+  /* ---------------- Guardrail doors (roadmap 6) ----------------
+   * When an order ends held or blocked, the child picks a door. Every pick is
+   * audited so the facilitator can see which doors the class takes. The
+   * "reword" door asks the text model for a kid-safe rewording of the order
+   * (the same rewrite the autofix uses) and screens the result like any other
+   * text before the child sees it; a suggestion that fails the screen is
+   * simply not offered. Nothing here weakens the screening of the order
+   * itself: the suggestion is only a filled-in form the child can send. */
+  app.post(
+    `${base}/child/requests/:rid/door`,
+    requireChild,
+    wrap(async (req, res) => {
+      const { child, klass } = req as CReq;
+      const body = z.object({ door: z.enum(["reword", "lounge", "advanced"]) }).safeParse(req.body);
+      if (!body.success) return void res.status(400).json({ error: "That door doesn't exist." });
+      const r = await store.getRequest(Number(req.params.rid));
+      if (!r || r.child_id !== child.id) return void res.status(404).json({ error: "Not found." });
+      if (r.status !== "held" && r.status !== "blocked") return void res.status(409).json({ error: "That order isn't waiting on a door." });
+      if (!allow(`door:${child.id}`, aikConfig.childRequestsPerMinute)) return void res.status(429).json({ error: "Whoa, fast fingers! Wait a moment and try again." });
+      const door = body.data.door;
+      if (door === "advanced" && !klass.advanced_enabled) return void res.status(403).json({ error: "Advanced Special Training isn't open for your class yet." });
+
+      let suggestion: { values: Record<string, string>; changes: string[] } | null = null;
+      if (door === "reword") {
+        const mode = getMode(r.mode);
+        const flags = Array.isArray(r.flags) ? r.flags : [];
+        if (mode && r.kind !== "chat") {
+          const fields = r.kind === "create" ? mode : { name: mode.name, createFields: [{ key: "change", label: "Change", hint: "", required: true, maxChars: aikConfig.maxFieldChars }] };
+          const values: Record<string, string> = {};
+          for (const f of fields.createFields) if (typeof r.input?.[f.key] === "string" && r.input[f.key]) values[f.key] = String(r.input[f.key]);
+          const rewritten = (await rewriteOrder(fields, values, flags, "gentle")) ?? (await rewriteOrder(fields, values, flags, "safe"));
+          if (rewritten) {
+            const text = fields.createFields.map((f) => rewritten.values[f.key] ?? "").filter(Boolean).join("\n");
+            const screen = text.trim() ? await screenInput(text) : null;
+            if (screen?.ok) suggestion = rewritten;
+          }
+        }
+      }
+      await store.audit(klass.id, "child", child.id, "door_taken", { requestId: r.id, door, mode: r.mode, status: r.status, suggested: door === "reword" ? Boolean(suggestion) : undefined });
+      res.json({ ok: true, door, suggestion });
     }),
   );
 
@@ -1596,7 +1680,7 @@ export function registerAikRoutes(app: Express): void {
       if (!allow(`hreq:${f.id}`, 30)) return void res.status(429).json({ error: "Slow down a moment and try again." });
       const body = z
         .object({
-          mode: z.enum(["game", "story", "prompt", "music", "quest", "video", "robot", "homework", "language"]),
+          mode: z.enum(["game", "story", "prompt", "music", "quest", "video", "robot", "homework", "language", "advanced"]),
           kind: z.enum(["create", "change", "chat"]),
           projectArtifactId: z.number().int().optional(),
           projectId: z.number().int().nullable().optional(),
@@ -1874,10 +1958,10 @@ export function registerAikRoutes(app: Express): void {
       const byId = new Map(items.map((a) => [a.id, a.title]));
       for (const a of items) {
         const piece: ProjectPiece = { title: a.title, kind: kindName(a.kind), description: representation(a, 400).replace(/\n/g, " · "), madeFrom: a.remix_title ?? (a.remix_of ? byId.get(a.remix_of) ?? null : null), attached: [], tooBig: [] };
-        const full = a.kind === "game" ? await store.getArtifact(a.id) : a;
+        const full = a.kind === "game" || a.kind === "site" ? await store.getArtifact(a.id) : a;
         const files: { name: string; bytes: Buffer; type: string } [] = [];
         try {
-          if (a.kind === "game" && full) files.push({ name: `${safe(a.title)}.html`, bytes: Buffer.from(full.content), type: "text/html" });
+          if ((a.kind === "game" || a.kind === "site") && full) files.push({ name: `${safe(a.title)}.html`, bytes: Buffer.from(full.content), type: "text/html" });
           else if (a.kind === "story") {
             const book = JSON.parse(a.content);
             if (book?.format === "book") files.push({ name: `${safe(a.title)}.pdf`, bytes: Buffer.from(await renderBookPdf(book)), type: "application/pdf" });
@@ -1898,7 +1982,7 @@ export function registerAikRoutes(app: Express): void {
         } catch (err) {
           logger.warn({ err: String((err as Error)?.message ?? err).slice(0, 160), artifactId: a.id }, "[aik] project file could not be read");
         }
-        if (a.kind !== "game") files.push({ name: `${safe(a.title)}-words.txt`, bytes: Buffer.from(representation(a)), type: "text/plain" });
+        if (a.kind !== "game" && a.kind !== "site") files.push({ name: `${safe(a.title)}-words.txt`, bytes: Buffer.from(representation(a)), type: "text/plain" });
         for (const file of files) {
           if (file.bytes.length <= budget) {
             attachments.push({ filename: file.name, content: file.bytes, contentType: file.type });
@@ -2006,15 +2090,15 @@ export function registerAikRoutes(app: Express): void {
       const a = await artifactAccess(req, res);
       if (!a) return;
       const safeName = a.title.replace(/[^a-z0-9 _-]/gi, "").trim().slice(0, 60) || "my-project";
-      // A game is its own file: one HTML document that runs anywhere.
-      if (a.kind === "game") {
+      // A game or a website is its own file: one HTML document that runs anywhere.
+      if (a.kind === "game" || a.kind === "site") {
         res.setHeader("Content-Type", "text/html; charset=utf-8");
         res.setHeader("Content-Disposition", `attachment; filename="${safeName}.html"`);
         res.setHeader("Cache-Control", "private, no-store");
         return void res.end(a.content);
       }
       if (a.kind === "story") return void res.redirect(302, `${base}/artifacts/${a.id}/book.pdf`);
-      if (a.kind === "quest" || a.kind === "robot" || a.kind === "hero") {
+      if (a.kind === "quest" || a.kind === "robot" || a.kind === "hero" || a.kind === "adventure") {
         res.setHeader("Content-Type", "application/json; charset=utf-8");
         res.setHeader("Content-Disposition", `attachment; filename="${safeName}.json"`);
         res.setHeader("Cache-Control", "private, no-store");

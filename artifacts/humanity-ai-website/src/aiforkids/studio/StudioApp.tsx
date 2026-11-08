@@ -6,13 +6,12 @@
  * facilitator can close the Studio for the class from the dashboard.
  * The workspace shows all studios, a
  * Director's Order form (never a chat box), the result in a locked sandbox,
- * the child's portfolio, and the class Arcade.
+ * the child's portfolio, and the Hub (Arcade, Lounge, Gallery).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cx } from "../components/ui";
 import {
   ApiError,
-  childArcade,
   childJoin,
   childLogout,
   childLookupClass,
@@ -40,8 +39,9 @@ import { KidsRemixTab, type KidStart } from "./KidsRemix";
 import { Avatar } from "./Avatar";
 import { AvatarPlayground } from "./AvatarPlayground";
 import { RoomIcon, ROOM_THEME, roomIdFor } from "./icons";
-import { Lounge } from "./Lounge";
-import { childLounge, DESK_TOOLS, DESK_SUBJECTS, type DeskTool, type DeskSubject, type LoungeItem } from "./api";
+import { Hub, type HubShelf } from "./Hub";
+import { GuardrailDoors } from "./Doors";
+import { DESK_TOOLS, DESK_SUBJECTS, type DeskTool, type DeskSubject } from "./api";
 
 type Stage = { step: "code" } | { step: "pick"; code: string; className: string; children: { id: number; nickname: string; avatar: string }[] } | { step: "in" };
 
@@ -261,13 +261,20 @@ function SignIn({ config, stage, setStage }: { config: StudioConfig; stage: Stag
  * Workspace
  * ------------------------------------------------------------------ */
 
-type Tab = "make" | "remix" | "portfolio" | "arcade" | "lounge";
+type Tab = "make" | "remix" | "portfolio" | "hub";
 
 function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut: () => void }) {
   const [me, setMe] = useState<ChildMe | null>(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("remix");
+  const [hubShelf, setHubShelf] = useState<HubShelf>("arcade");
+  /* A door's rewording fills the form; the child still reads it and presses Make. */
+  const [prefill, setPrefill] = useState<{ values: Record<string, string>; changes: string[]; n: number } | null>(null);
+  const goHub = (shelf: HubShelf) => {
+    setHubShelf(shelf);
+    setTab("hub");
+  };
   const [modeId, setModeId] = useState<ModeId | null>(null); // null = Studio hall
   const [active, setActive] = useState<StudioRequest | null>(null); // the order being watched
   const [project, setProject] = useState<ArtifactMeta | null>(null); // the artifact being worked on
@@ -309,6 +316,7 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
     setProject(null);
     setActive(null);
     setStart(from ?? null);
+    setPrefill(null);
     setChat({ convoId: null, messages: [], busy: false });
     const m = config.modes.find((x) => x.id === id);
     setShowChat(m?.interaction === "chat");
@@ -437,21 +445,33 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
           </span>
         </div>
         <nav className="flex flex-wrap gap-2">
-          {/* Remix first: the class starts from something that already exists and makes it their own. The rooms are one tap away. */}
-          {(["remix", "make", "portfolio", "arcade", "lounge"] as Tab[]).map((t) => {
-            const room = t === "make" ? "video" : t === "remix" ? "story" : t === "portfolio" ? "portfolio" : t === "arcade" ? "arcade" : "lounge";
-            const label = t === "make" ? "Rooms" : t === "remix" ? "Remix" : t === "portfolio" ? "My stuff" : t === "arcade" ? "Arcade" : "Lounge";
+          {/* Remix first: the class starts from something that already exists and makes it their own. The rooms are one tap away.
+              The Hub is the shared place: Arcade, Lounge and Gallery live under it. */}
+          {(["remix", "make", "portfolio", "hub"] as Tab[]).map((t) => {
+            const room = t === "make" ? "video" : t === "remix" ? "story" : t === "portfolio" ? "portfolio" : "hub";
+            const label = t === "make" ? "Rooms" : t === "remix" ? "Remix" : t === "portfolio" ? "My stuff" : "Hub";
             return (
               <button
                 key={t}
                 onClick={() => setTab(t)}
                 className={cx("flex items-center gap-2 rounded-full py-1.5 pl-1.5 pr-4 text-base font-extrabold transition", tab === t ? "bg-slate-900 text-white" : "bg-white/80 text-slate-800 ring-1 ring-slate-200 hover:bg-white")}
+                data-testid={`tab-${t}`}
               >
                 <RoomIcon id={room} size={18} tile={tab !== t} />
                 {label}
               </button>
             );
           })}
+          {/* Roadmap 4.3: the Lounge is one tap away at all times. */}
+          <button
+            type="button"
+            onClick={() => goHub("lounge")}
+            className={cx("flex items-center gap-2 rounded-full py-1.5 pl-1.5 pr-4 text-base font-extrabold transition", tab === "hub" && hubShelf === "lounge" ? "bg-teal-700 text-white" : "bg-white/80 text-teal-800 ring-1 ring-teal-200 hover:bg-white")}
+            data-testid="tab-lounge"
+          >
+            <RoomIcon id="lounge" size={18} tile={!(tab === "hub" && hubShelf === "lounge")} />
+            Lounge
+          </button>
         </nav>
       </div>
       {emojiOpen && config.customAvatars && (
@@ -467,7 +487,7 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
       )}
 
       {me.class.paused && <Notice>⏸️ Your facilitator paused the Studio. Look up front!</Notice>}
-      {me.class.locked && <Notice tone="info">🔒 Your portfolio is locked for the Expo: no new orders or chats today, but everything you made is ready to show in My stuff and the Arcade!</Notice>}
+      {me.class.locked && <Notice tone="info">🔒 Your portfolio is locked for the Expo: no new orders or chats today, but everything you made is ready to show in My stuff and the Hub!</Notice>}
       {me.child.muted && <Notice>Your facilitator paused your orders for now.</Notice>}
       {error && (
         <div ref={errorRef}>
@@ -562,7 +582,13 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
                             <button type="button" onClick={() => setStart(null)} className="text-xs font-bold text-emerald-700 underline">Start blank instead</button>
                           </div>
                         )}
-                        <ModeForm key={start ? `remix-${start.remixFrom}` : "blank"} mode={mode} maxChars={config.maxFieldChars} busy={busy} initialValues={start?.values} mic={me.class.micEnabled !== false} onSubmit={(values) => submit("create", values)} submitLabel={start ? "Remix it! 🔁" : undefined} />
+                        {prefill && !start && (
+                          <div className="rounded-2xl bg-violet-50 px-3 py-2 text-sm font-bold text-violet-900 ring-1 ring-violet-200" data-testid="reword-note">
+                            💡 Here's your idea said a different way. Read it, change anything, then press Make it!
+                            {prefill.changes.length > 0 && <span className="block text-xs font-semibold text-violet-700">{prefill.changes.join(" ")}</span>}
+                          </div>
+                        )}
+                        <ModeForm key={start ? `remix-${start.remixFrom}` : prefill ? `reword-${prefill.n}` : "blank"} mode={mode} maxChars={config.maxFieldChars} busy={busy} initialValues={start?.values ?? prefill?.values} mic={me.class.micEnabled !== false} onSubmit={(values) => submit("create", values)} submitLabel={start ? "Remix it! 🔁" : undefined} />
                       </div>
                     )}
                   </div>
@@ -584,7 +610,36 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
               </div>
 
               <div className="space-y-3">
-                {active && <RequestStatus request={active} onWait={(t) => setTab(t)} />}
+                {active && (
+                  <RequestStatus
+                    request={active}
+                    onWait={goHub}
+                    doors={
+                      (active.status === "held" || active.status === "blocked") && (
+                        <GuardrailDoors
+                          request={active}
+                          advancedEnabled={me.class.advancedEnabled === true}
+                          onLounge={() => goHub("lounge")}
+                          onAdvanced={() => {
+                            openModule("advanced");
+                            setTab("make");
+                          }}
+                          onReword={(values, changes) => {
+                            if (active.kind === "change" && project) {
+                              // A rewording of a change: show it as the next thing to type.
+                              setPrefill({ values, changes, n: Date.now() });
+                              return;
+                            }
+                            setProject(null);
+                            setActive(null);
+                            setStart(null);
+                            setPrefill({ values, changes, n: Date.now() });
+                          }}
+                        />
+                      )
+                    }
+                  />
+                )}
                 {project && project.approved !== false ? (
                   <Card>
                     <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -607,12 +662,17 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
                               setProject((p) => (p ? { ...p, published: !p.published } : p));
                             }}
                           >
-                            {project.published ? "Remove from Arcade" : "🕹️ Put in the Arcade"}
+                            {project.published ? "Remove from the Hub" : "🏠 Put in the Hub"}
                           </BigButton>
                         )}
                       </div>
                     </div>
                     <ArtifactLoader id={project.id} />
+                    {project.published && (
+                      <p className="mt-2 text-xs font-semibold text-slate-500">
+                        {project.kind === "game" ? "🕹️ It's on the Arcade shelf in the Hub." : "🖼️ It's on the Gallery shelf in the Hub."}
+                      </p>
+                    )}
                   </Card>
                 ) : project ? (
                   <Card tone="warn">{mode.artifactKind === "video" ? "🎬 Your clip" : "🖼️ Your picture"} is waiting for your facilitator to take a look. Check “My stuff” in a minute.</Card>
@@ -652,7 +712,7 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
               setTab("remix");
               return;
             }
-            const m = config.modes.find((x) => x.artifactKind === a.kind);
+            const m = a.kind === "site" || a.kind === "adventure" ? config.modes.find((x) => x.id === "advanced") : config.modes.find((x) => x.artifactKind === a.kind);
             if (m && me.class.modes.includes(m.id)) {
               openModule(m.id);
               setProject(a);
@@ -662,8 +722,7 @@ function Workspace({ config, onSignedOut }: { config: StudioConfig; onSignedOut:
         />
       )}
 
-      {tab === "arcade" && <Arcade />}
-      {tab === "lounge" && <Lounge />}
+      {tab === "hub" && <Hub shelf={hubShelf} onShelf={setHubShelf} />}
     </div>
   );
 }
@@ -847,7 +906,7 @@ function Portfolio({ items, onOpen }: { items: ArtifactMeta[]; onOpen: (a: Artif
           <p className="mt-1 text-lg font-extrabold">{a.title}</p>
           <p className="text-sm text-slate-600">{a.summary ?? ""}</p>
           <p className="mt-2 text-xs font-semibold text-slate-500">
-            v{a.version} · {a.published ? "In the Arcade" : "Just mine"}
+            v{a.version} · {a.published ? (a.kind === "game" ? "In the Hub Arcade" : "In the Hub Gallery") : "Just mine"}
           </p>
         </button>
       ))}
@@ -856,42 +915,3 @@ function Portfolio({ items, onOpen }: { items: ArtifactMeta[]; onOpen: (a: Artif
   );
 }
 
-function Arcade() {
-  const [items, setItems] = useState<ArtifactMeta[] | null>(null);
-  const [open, setOpen] = useState<ArtifactMeta | null>(null);
-  useEffect(() => {
-    childArcade()
-      .then((r) => setItems(r.items))
-      .catch(() => setItems([]));
-  }, []);
-  if (!items) return <Spinner label="Opening the Arcade…" />;
-  if (open) {
-    return (
-      <Card>
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-xl font-extrabold">
-            {kindEmoji(open.kind)} {open.title} <span className="text-sm font-semibold text-slate-500">by <Avatar value={open.avatar} size="sm" /> {open.nickname ?? "the facilitator"}</span>
-          </h3>
-          <BigButton variant="ghost" onClick={() => setOpen(null)}>
-            ← Back
-          </BigButton>
-        </div>
-        <ArtifactLoader id={open.id} />
-      </Card>
-    );
-  }
-  if (!items.length) return <Card tone="tint">The Arcade is empty. Be the first to put something in!</Card>;
-  return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {items.map((a) => (
-        <button key={a.id} onClick={() => setOpen(a)} className="rounded-3xl bg-white p-4 text-left ring-2 ring-violet-100 transition hover:-translate-y-0.5 hover:ring-violet-400">
-          <p className="text-3xl">{kindEmoji(a.kind)}</p>
-          <p className="mt-1 text-lg font-extrabold">{a.title}</p>
-          <p className="text-sm text-slate-600">
-            by <Avatar value={a.avatar} size="sm" /> {a.nickname ?? "the facilitator"}
-          </p>
-        </button>
-      ))}
-    </div>
-  );
-}
