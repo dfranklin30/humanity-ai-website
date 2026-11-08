@@ -1,0 +1,83 @@
+# See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
+
+# compiled output
+dist
+tmp
+out-tsc
+*.tsbuildinfo
+.expo
+.expo-shared
+
+# dependencies
+node_modules
+
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# misc
+/.sass-cache
+/connect.lock
+/coverage
+/libpeerconnection.log
+npm-debug.log
+yarn-error.log
+testem.log
+/typings
+
+# System Files
+.DS_Store
+Thumbs.db
+
+.cursor/rules/nx-rules.mdc
+.github/instructions/nx.instructions.md
+
+# Replit
+.cache/
+.local/
+deploy/env.deploy
+*.dump
+node_modules/
+dist/
+.cache/
+
+# --- secrets and local backups (never commit) ---
+deploy/env.deploy.*
+!deploy/env.deploy.example
+*.bak
+*.bak.*
+.env.local
+.env.*.local
+
+# Cowork/Claude session output folder (local only)
+Claude outputs/
+
+# ---------------------------------------------------------------------------
+# EAS Build only (this file replaces .gitignore for `eas build`).
+# The Android/iOS app needs the mobile package, the shared lib/ packages and
+# the workspace manifests. Everything heavy that the app never uses stays
+# home, which keeps the upload small enough not to drop (build 15 tried to
+# send 686 MB). Each other workspace keeps its package.json so the install
+# still matches pnpm-lock.yaml.
+# ---------------------------------------------------------------------------
+/media/
+/attached_assets/
+/Claude outputs/
+/artifacts/humanity-ai-website/*
+!/artifacts/humanity-ai-website/package.json
+/artifacts/api-server/*
+!/artifacts/api-server/package.json
+/artifacts/mockup-sandbox/*
+!/artifacts/mockup-sandbox/package.json
