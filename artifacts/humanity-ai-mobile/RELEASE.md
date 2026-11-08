@@ -52,6 +52,11 @@ person running the steps below.
   listing's target audience is currently *not* children; if that is ever
   changed to include kids, Google's Families Policy applies (target-audience
   declaration, Data safety form review, no ads — the app has none).
+- **Camera is optional (build 15).** Build 14 asked for CAMERA without saying
+  the camera was optional, so Play dropped 438 devices, 67 of 77 Chromebooks
+  among them. `plugins/withOptionalCamera.js` declares the camera features
+  `required="false"`; check "Changes to your supported devices" shows no
+  drop before publishing any future build.
 - **Camera (new in 1.2.0).** Homework Help lets a child photograph a
   worksheet; the page's file picker offers the camera, and Android asks for
   permission the first time. Update the Data safety form: photos are sent
