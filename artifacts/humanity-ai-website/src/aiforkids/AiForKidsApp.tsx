@@ -1,4 +1,4 @@
-import { Route, Switch } from "wouter";
+import { Route, Switch, useLocation } from "wouter";
 import KidsLayout from "./components/KidsLayout";
 import Home from "./pages/Home";
 import Program from "./pages/Program";
@@ -18,6 +18,7 @@ import FacilitatorApp from "./studio/FacilitatorApp";
 import HubApp from "./studio/HubApp";
 import { BASE } from "./content/program";
 import { Button, Section } from "./components/ui";
+import { InstallAppBar, useKidsAppManifest } from "./components/InstallApp";
 
 function KidsNotFound() {
   return (
@@ -50,7 +51,15 @@ function KidsNotFound() {
  * API calls at the same endpoints.
  */
 export default function AiForKidsApp() {
+  // Studio, Hub and Facilitator install as the "Kids AI" app on Windows,
+  // Chromebooks and Macs (see components/InstallApp.tsx).
+  useKidsAppManifest();
+  const [location] = useLocation();
+  const appPage = /^\/aiforkids\/(studio|hub|facilitator|week)(\/|$)/.test(location);
+
   return (
+    <>
+    {appPage && <InstallAppBar />}
     <Switch>
       {/* Print-only brochure routes render without the site chrome. */}
       <Route path={`${BASE}/brochure/schools`}>
@@ -97,5 +106,6 @@ export default function AiForKidsApp() {
         </KidsLayout>
       </Route>
     </Switch>
+    </>
   );
 }
