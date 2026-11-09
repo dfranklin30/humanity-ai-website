@@ -67,7 +67,7 @@ export const PLAYGROUND: Record<PlaygroundField, { label: string; options: { id:
     ],
   },
   look: {
-    label: "What colours?",
+    label: "What colors?",
     options: [
       { id: "rainbow", label: "Rainbow", emoji: "🌈", prompt: "rainbow colours" },
       { id: "gold", label: "Gold", emoji: "✨", prompt: "shiny gold" },

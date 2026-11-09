@@ -157,7 +157,7 @@ export const MODES: Record<ModeId, ModeDef> = {
       { key: "place", label: "Place", hint: "a busy market, a snowy mountain, a school garden", required: false },
       { key: "detail", label: "One surprising detail", hint: "the otter collects shiny spoons", required: false },
     ],
-    changeHint: "Add a word about colours, make page 2 funnier, use fewer new words, change the hero's name…",
+    changeHint: "Add a word about colors, make page 2 funnier, use fewer new words, change the hero's name…",
     maxTokens: 5000,
     temperature: 0.7,
     starters: [

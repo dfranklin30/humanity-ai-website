@@ -106,7 +106,7 @@ export const PROVIDERS: Provider[] = [
     contextTokens: 10_000,
     strengths: ["screening"],
     costPerMTokOut: 0,
-    freeTierCaveat: "5,000 text + 5,000 image records a month free; enough for this programme.",
+    freeTierCaveat: "5,000 text + 5,000 image records a month free; enough for this program.",
     envPrefix: "AIK_CONTENT_SAFETY",
     termsVerified: "2026-09-19",
   },
