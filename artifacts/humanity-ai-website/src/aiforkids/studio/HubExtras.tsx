@@ -49,7 +49,7 @@ const LANES: { title: string; blurb: string; tint: string; ring: string; nodes: 
   },
   {
     title: "Keep",
-    blurb: "Find and organise",
+    blurb: "Find and organize",
     tint: "bg-sky-50",
     ring: "ring-sky-200",
     nodes: [
@@ -227,8 +227,8 @@ const STARTERS: Record<MenuId, string[]> = {
   library: ["How do I find last week's storybooks?", "How do I send a piece home?"],
   claude: ["Draft a parent note about this week's session", "Plan a 40-minute session on prompts"],
   tools: ["Which tool should I use for a Week 3 example?", "Write a Game Maker brief about recycling"],
-  projects: ["How should I organise a fall cohort?", "What happens to pieces if I delete a project?"],
-  program: ["Summarise Week 2 for a new volunteer", "Give me a backup activity for Week 4"],
+  projects: ["How should I organize a fall cohort?", "What happens to pieces if I delete a project?"],
+  program: ["Summarize Week 2 for a new volunteer", "Give me a backup activity for Week 4"],
   classes: ["How do I unlock a studio for my class?", "How do I add a child with consent?"],
   review: ["What should I check before approving a movie?", "How do I read the audit trail?"],
   lounge: ["Suggest topics for a rainy-day Lounge", "What makes a video OK for the Lounge?"],

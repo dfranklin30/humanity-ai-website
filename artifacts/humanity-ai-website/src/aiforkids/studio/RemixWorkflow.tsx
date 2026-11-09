@@ -230,7 +230,7 @@ function HeroBuilder({ projectId, existing, onSaved, onCancel }: { projectId: nu
         <label className="block">
           <span className="text-sm font-bold">What they look like *</span>
           <textarea value={look} maxLength={400} rows={3} onChange={(e) => setLook(e.target.value)} placeholder="a small round dragon with mint-green scales, a lemon-yellow belly, tiny wings, big curious eyes and a striped scarf" className="mt-1 w-full rounded-xl border-2 border-slate-200 px-3 py-2 focus:border-violet-500 focus:outline-none" />
-          <span className="text-xs text-slate-500">Shape, colours, clothes and one special detail. This exact description is used for every picture and shot.</span>
+          <span className="text-xs text-slate-500">Shape, colors, clothes and one special detail. This exact description is used for every picture and shot.</span>
         </label>
         <label className="block">
           <span className="text-sm font-bold">Personality</span>

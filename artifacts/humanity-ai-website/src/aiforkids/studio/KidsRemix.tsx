@@ -338,7 +338,7 @@ function HeroMaker({ styles, ttsReady, disabled, onDone, onCancel }: { styles: s
       <label className="block">
         <span className="text-sm font-bold text-slate-700">What they look like</span>
         <textarea value={look} onChange={(e) => setLook(e.target.value.slice(0, 160))} rows={2} className={input} placeholder="a small green dragon with a yellow scarf, big round glasses and tiny wings" />
-        <span className="text-xs font-semibold text-slate-500">Shape, colours, clothes, one special detail. {look.length}/160</span>
+        <span className="text-xs font-semibold text-slate-500">Shape, colors, clothes, one special detail. {look.length}/160</span>
       </label>
       <div>
         <span className="text-sm font-bold text-slate-700">Art style</span>
