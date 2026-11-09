@@ -36,6 +36,7 @@ import { AINewsTicker, ArxivFeed } from "@/components/ai-news";
 import { FeaturedResearch } from "@/components/featured-research";
 import { VoicesShowcase } from "@/components/voices-showcase";
 import { SlackCommunity } from "@/components/slack-community";
+import { NirmalBooksAnnouncement } from "@/components/nirmal-books-announcement";
 import { SLACK_INVITE_URL } from "@/lib/community";
 import { VideoClipCard } from "@/components/video-clip";
 import { claudeHacksClips, featuredClip } from "@/data/claude-hacks";
@@ -457,6 +458,9 @@ export default function Home() {
             </div>
           ))}
         </div>
+
+        {/* Announcement: Nirmal Jingar's two new books in the Library */}
+        <NirmalBooksAnnouncement />
 
         {/* Live Slack Community */}
         <SlackCommunity className="border-b border-foreground/10" />
