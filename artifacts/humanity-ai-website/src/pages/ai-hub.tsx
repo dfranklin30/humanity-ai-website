@@ -34,6 +34,27 @@ const suggestedQuestions = [
   { icon: Heart, question: "How can I support your work?" },
 ];
 
+const MY_CONVERSATIONS_KEY = "hai.aiHub.myConversations";
+
+// The API has no per-visitor ownership, so this browser remembers which
+// conversations it started and only asks the server for those.
+function readMyConversationIds(): number[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(MY_CONVERSATIONS_KEY) || "[]");
+    return Array.isArray(raw) ? raw.filter((n) => Number.isInteger(n) && n > 0) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeMyConversationIds(ids: number[]) {
+  try {
+    localStorage.setItem(MY_CONVERSATIONS_KEY, JSON.stringify(ids));
+  } catch {
+    /* storage unavailable: list simply won't persist */
+  }
+}
+
 export default function AiHub() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -42,7 +63,29 @@ export default function AiHub() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
-  const { data: conversationsList } = useQuery<Conversation[]>({ queryKey: ["/api/conversations"] });
+  const [myIds, setMyIds] = useState<number[]>(readMyConversationIds);
+  const { data: conversationsList } = useQuery<Conversation[]>({
+    queryKey: ["/api/conversations", myIds.join(",")],
+    queryFn: async () => {
+      if (myIds.length === 0) return [];
+      const res = await fetch(`/api/conversations?ids=${myIds.join(",")}`);
+      return res.ok ? res.json() : [];
+    },
+  });
+  const rememberConversation = (id: number) => {
+    setMyIds((prev) => {
+      const next = [id, ...prev.filter((x) => x !== id)].slice(0, 50);
+      writeMyConversationIds(next);
+      return next;
+    });
+  };
+  const forgetConversation = (id: number) => {
+    setMyIds((prev) => {
+      const next = prev.filter((x) => x !== id);
+      writeMyConversationIds(next);
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -70,8 +113,8 @@ export default function AiHub() {
     mutationFn: async (id: number) => {
       await apiRequest("DELETE", `/api/conversations/${id}`);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+    onSuccess: (_data, id) => {
+      forgetConversation(id);
       if (conversationId) {
         newConversation();
       }
@@ -93,7 +136,7 @@ export default function AiHub() {
         const conv = await res.json();
         convId = conv.id;
         setConversationId(convId);
-        queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+        rememberConversation(conv.id);
       }
 
       const response = await fetch(`/api/conversations/${convId}/messages`, {
@@ -168,8 +211,8 @@ export default function AiHub() {
 
       <section className="py-8">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-4 gap-6" style={{ height: "calc(100vh - 320px)", minHeight: "500px" }}>
-            <div className="hidden lg:flex flex-col border rounded-lg bg-card">
+          <div className="grid lg:grid-cols-4 grid-rows-[minmax(0,1fr)] gap-6" style={{ height: "calc(100vh - 320px)", minHeight: "500px" }}>
+            <div className="hidden lg:flex flex-col min-h-0 border rounded-lg bg-card">
               <div className="p-3 border-b flex items-center justify-between">
                 <h3 className="text-sm font-semibold">Conversations</h3>
                 <Button size="icon" variant="ghost" onClick={newConversation} data-testid="button-new-chat">
