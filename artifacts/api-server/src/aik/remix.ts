@@ -75,7 +75,7 @@ export function validateHero(raw: any): { ok: true; hero: HeroInput } | { ok: fa
   const personality = clean(raw?.personality, 240);
   const style = HERO_STYLES.includes(raw?.style) ? String(raw.style) : HERO_STYLES[0];
   if (!name) return { ok: false, error: "Give your hero a name." };
-  if (look.length < 8) return { ok: false, error: "Describe what your hero looks like: shape, colours, clothes, one special detail." };
+  if (look.length < 8) return { ok: false, error: "Describe what your hero looks like: shape, colors, clothes, one special detail." };
   return { ok: true, hero: { name, look, personality, style } };
 }
 

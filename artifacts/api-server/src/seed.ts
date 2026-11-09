@@ -86,11 +86,11 @@ A comprehensive, forward-looking guide to integrating AI across modern supply ch
 
 What the Book Covers
 
-- Foundations: the evolution of supply chain decision-making, traditional optimisation vs. AI-based methods, and descriptive, predictive, and prescriptive decision layers
+- Foundations: the evolution of supply chain decision-making, traditional optimization vs. AI-based methods, and descriptive, predictive, and prescriptive decision layers
 - AI adoption frameworks, maturity models, and strategies for navigating uncertainty, latency, and risk
 - Supply chain data and digital infrastructure: data types, collection, integration, modeling, cloud platforms, and governance
 - Machine learning techniques — supervised, unsupervised, reinforcement, and deep learning — plus generative AI and large language models
-- Practical applications in demand forecasting, inventory optimisation, procurement, production planning, and logistics
+- Practical applications in demand forecasting, inventory optimization, procurement, production planning, and logistics
 
 About the Author
 
@@ -117,7 +117,7 @@ What the Book Covers
 - Industry 4.0 and Industry 5.0, and the role of AI, machine learning, and generative AI in smarter decision-making
 - Technical foundations of LLMs: natural language processing, transformer architectures, training, and enterprise deployment
 - Supply chain data integration, knowledge architectures, and reasoning mechanisms
-- LLMs for planning, forecasting, procurement, inventory, production scheduling, logistics optimisation, and real-time control tower operations
+- LLMs for planning, forecasting, procurement, inventory, production scheduling, logistics optimization, and real-time control tower operations
 
 About the Author
 
@@ -1005,6 +1005,20 @@ Read the full piece on JourneyBytes.`,
       recordingUrl: null,
       speakerName: "Vasu Raj Jain",
       speakerProfileUrl: "/about/board/vasu-raj-jain",
+    },
+    {
+      title: "Humanity + AI Podcasts: Running an AI Startup from Orlando — feat. Doug Loyo, CEO of Developers.Net",
+      description: "Danielle A. Franklin sits down with Doug Loyo, CEO and co-founder of Developers.Net, for a conversation about building an AI company from Orlando, Florida.\n\nAbout Doug\n\nDoug is an entrepreneur who still ships code. He co-founded Developers.Net in 2017 after struggling to hire the engineers he needed locally, and built it into a nearshore software development firm that connects U.S. companies with vetted engineering talent across Latin America, working in the same time zones as their clients. He is also co-founder of Patients Eye and spent three years as a senior solutions architect with the Michael & Susan Dell Foundation.\n\nWhat we'll cover\n\n→ What it actually takes to start and run an AI startup outside the usual tech hubs\n\n→ How AI is changing the way small teams design, build, and ship software\n\n→ Hiring and leading distributed engineering teams, and why sharing a time zone still beats working around the clock\n\n→ A live demo and open Q&A with Doug\n\nJoin us live on Riverside.",
+      date: "2026-11-16",
+      time: "5:00 PM - 6:00 PM ET",
+      location: "Online — Join Virtually",
+      type: "Podcast",
+      imageUrl: "/uploads/doug-loyo-tlcast.png",
+      secondaryImageUrl: null,
+      link: "https://riverside.com/studio/danielle-franklins-studio-dy1Ck/dolv-famf",
+      recordingUrl: null,
+      speakerName: "Doug Loyo",
+      speakerProfileUrl: "https://www.linkedin.com/in/douglasloyo",
     },
     {
       title: "Humanity + AI Quick Hacks Ep. 13 — AI and Animals: Reading Emotion From Signals",

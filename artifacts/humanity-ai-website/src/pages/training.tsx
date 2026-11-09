@@ -65,7 +65,7 @@ const journeyPhases: JourneyPhase[] = [
     icon: Lightbulb,
     color: "from-sky-500/10 to-blue-500/10 dark:from-sky-500/20 dark:to-blue-500/20",
     iconBg: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
-    description: "Your organization is curious about AI, but has not taken any tangible steps towards planning or implementation.",
+    description: "Your organization is curious about AI, but has not taken any tangible steps toward planning or implementation.",
     questions: [
       "What is AI and how can it help my organization?",
       "How do we build executive and cultural buy-in for AI?",
@@ -1544,7 +1544,7 @@ export default function Training() {
                   The <a href="https://www.mcgovern.org/" target="_blank" rel="noopener noreferrer" className="text-emerald-700 hover:underline">Patrick J. McGovern Foundation</a> believes that all civil society organizations will benefit from deep knowledge sharing and skill building. The pace of AI and digital transformation is accelerating, and no organization should have to figure it all out on their own.
                 </p>
                 <p className="text-sm text-[#4B5F55] leading-relaxed mt-3">
-                  Through their Hub, PJMF makes resources and learning experiences available to all nonprofits wherever they are in their journey towards becoming a data and AI-enabled organization — by vetting and curating the strongest resources from across the web and creating hands-on learning opportunities.
+                  Through their Hub, PJMF makes resources and learning experiences available to all nonprofits wherever they are in their journey toward becoming a data and AI-enabled organization — by vetting and curating the strongest resources from across the web and creating hands-on learning opportunities.
                 </p>
               </motion.div>
               <div className="flex justify-center">

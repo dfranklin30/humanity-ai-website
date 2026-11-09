@@ -885,9 +885,20 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/conversations", async (_req, res) => {
+  // Conversations have no owner column, so never list everyone's chats.
+  // The browser keeps the ids it created and asks only for those (?ids=1,2,3).
+  app.get("/api/conversations", async (req, res) => {
     try {
-      const convs = await storage.getAllConversations();
+      const ids = new Set(
+        String(req.query.ids || "")
+          .split(",")
+          .map((v) => parseInt(v, 10))
+          .filter((n) => Number.isInteger(n) && n > 0)
+          .slice(0, 100),
+      );
+      const convs = ids.size === 0
+        ? []
+        : (await storage.getAllConversations()).filter((c) => ids.has(c.id));
       res.json(convs);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch conversations" });
