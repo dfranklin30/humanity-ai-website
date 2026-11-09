@@ -73,6 +73,70 @@ Read the full piece in Forbes Tech Council to see Nirmal's framework in his own 
     });
   }
 
+  // Board author books — Nirmal Kumar Jingar (shared with Humanity + AI, Nov 2026)
+  const nirmalBooks = [
+    {
+      title: "Artificial Intelligence for Supply Chain Optimization and Decision-Making",
+      slug: "nirmal-jingar-ai-supply-chain-optimization",
+      excerpt: "Board director Nirmal Kumar Jingar's guide to integrating AI across modern supply chains — from decision foundations and data infrastructure to forecasting, inventory, procurement, and logistics.",
+      content: `Artificial Intelligence for Supply Chain Optimization and Decision-Making
+By Nirmal Kumar Jingar · First Edition, 2026 · AGPH Books · ISBN 978-93-7640-748-4
+
+A comprehensive, forward-looking guide to integrating AI across modern supply chains, written by Humanity + AI board director Nirmal Kumar Jingar.
+
+What the Book Covers
+
+- Foundations: the evolution of supply chain decision-making, traditional optimisation vs. AI-based methods, and descriptive, predictive, and prescriptive decision layers
+- AI adoption frameworks, maturity models, and strategies for navigating uncertainty, latency, and risk
+- Supply chain data and digital infrastructure: data types, collection, integration, modeling, cloud platforms, and governance
+- Machine learning techniques — supervised, unsupervised, reinforcement, and deep learning — plus generative AI and large language models
+- Practical applications in demand forecasting, inventory optimisation, procurement, production planning, and logistics
+
+About the Author
+
+Nirmal Kumar Jingar directs enterprise AI, platforms, and modernization at Wayfair. He is an IEEE Senior Member, a Forbes Technology Council member, and holds multiple patents in agentic AI and supply chain orchestration. He serves on the Humanity + AI, Inc. Board of Directors.
+
+Shared with the Humanity + AI community library by the author.`,
+      author: "Nirmal Kumar Jingar",
+      category: "Board Author",
+      imageUrl: "/uploads/book_nirmal_ai_supply_chain.png",
+      downloadUrl: "https://drive.google.com/file/d/1zMl9m9Ms-jIxEq2UOt46iLe1W1aqCigQ/view",
+    },
+    {
+      title: "Large Language Models for Intelligent Supply Chain Systems",
+      slug: "nirmal-jingar-llms-intelligent-supply-chain",
+      excerpt: "Nirmal Kumar Jingar on how large language models are reshaping the design, management, and governance of supply chains — from transformer foundations to real-time control towers.",
+      content: `Large Language Models for Intelligent Supply Chain Systems
+By Nirmal Kumar Jingar · First Edition, 2026 · AGPH Books · ISBN 978-93-7640-605-0
+
+An exploration of how advanced AI — particularly large language models — is reshaping the design, management, and governance of modern supply chains, written by Humanity + AI board director Nirmal Kumar Jingar.
+
+What the Book Covers
+
+- The shift from rigid supply chain structures to data-driven, adaptive systems capable of autonomous reasoning and decision orchestration
+- Industry 4.0 and Industry 5.0, and the role of AI, machine learning, and generative AI in smarter decision-making
+- Technical foundations of LLMs: natural language processing, transformer architectures, training, and enterprise deployment
+- Supply chain data integration, knowledge architectures, and reasoning mechanisms
+- LLMs for planning, forecasting, procurement, inventory, production scheduling, logistics optimisation, and real-time control tower operations
+
+About the Author
+
+Nirmal Kumar Jingar directs enterprise AI, platforms, and modernization at Wayfair. He is an IEEE Senior Member, a Forbes Technology Council member, and holds multiple patents in agentic AI and supply chain orchestration. He serves on the Humanity + AI, Inc. Board of Directors.
+
+Shared with the Humanity + AI community library by the author.`,
+      author: "Nirmal Kumar Jingar",
+      category: "Board Author",
+      imageUrl: "/uploads/book_nirmal_llm_supply_chain.png",
+      downloadUrl: "https://drive.google.com/file/d/1yEDkFZU0FFRgy2THYrCTv6_qL_RYzOhF/view",
+    },
+  ];
+  for (const book of nirmalBooks) {
+    const existing = await db.select().from(blogPosts).where(eq(blogPosts.slug, book.slug)).limit(1);
+    if (existing.length === 0) {
+      await db.insert(blogPosts).values({ ...book, contentType: "book", published: true });
+    }
+  }
+
   const forbesSlug = "nirmal-jingar-forbes-spotlight";
   const existingForbes = await db.select().from(blogPosts).where(eq(blogPosts.slug, forbesSlug)).limit(1);
   if (existingForbes.length === 0) {
