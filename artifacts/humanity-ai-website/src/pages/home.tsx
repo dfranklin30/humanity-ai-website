@@ -35,6 +35,7 @@ import { AmbientBackground } from "@/components/ambient-bg";
 import { AINewsTicker, ArxivFeed } from "@/components/ai-news";
 import { FeaturedResearch } from "@/components/featured-research";
 import { VoicesShowcase } from "@/components/voices-showcase";
+import { OverviewFilm } from "@/components/overview-film";
 import { SlackCommunity } from "@/components/slack-community";
 import { NirmalBooksAnnouncement } from "@/components/nirmal-books-announcement";
 import { SLACK_INVITE_URL } from "@/lib/community";
@@ -378,6 +379,8 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <OverviewFilm />
 
       <VoicesShowcase />
 
