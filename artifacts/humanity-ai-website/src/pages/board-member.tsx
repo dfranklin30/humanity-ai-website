@@ -380,7 +380,7 @@ const boardMembers: Record<string, {
     name: "Alexis Ramsey-Tobienne, PhD",
     slug: "alexis-ramsey-tobienne",
     title: "Director, AI Literacy & Academic Integrity",
-    seat: "Seat 9",
+    seat: "Seat 8",
     seatLabel: "AI Literacy & Academic Integrity",
     photo: alexisPhoto,
     badgeColor: "bg-amber-500/5 text-amber-300 border-amber-500/20",

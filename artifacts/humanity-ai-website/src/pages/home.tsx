@@ -137,7 +137,7 @@ const board: Array<{
   {
     name: "Alexis Ramsey-Tobienne, PhD",
     title: "Director, AI Literacy & Academic Integrity",
-    seat: "Seat 9",
+    seat: "Seat 8",
     slug: "alexis-ramsey-tobienne",
     photo: alexisPhoto,
     highlight: "Eckerd College · Assistant Dean for AI",
