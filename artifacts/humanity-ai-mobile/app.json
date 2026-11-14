@@ -17,14 +17,14 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "org.humanityplusai.app",
-      "buildNumber": "4",
+      "buildNumber": "5",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "org.humanityplusai.app",
-      "versionCode": 14,
+      "versionCode": 15,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#0b0b0b"
@@ -61,7 +61,8 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "expo-notifications"
+      "expo-notifications",
+      "./plugins/withOptionalCamera"
     ],
     "experiments": {
       "typedRoutes": true,
