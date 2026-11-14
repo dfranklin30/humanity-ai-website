@@ -19,7 +19,7 @@ import {
   Sparkles,
   Video,
 } from "lucide-react";
-import { SiLinkedin, SiSlack } from "react-icons/si";
+import { SiSlack } from "react-icons/si";
 import { useQuery } from "@tanstack/react-query";
 import type { BlogPost, Event } from "@workspace/db";
 import daniellePhoto from "@assets/image_1775903656206.png";
@@ -28,7 +28,6 @@ import williamPhoto from "@assets/william_portrait_opt.webp";
 import davidWoodPhoto from "@assets/David_Wood212_-_edit_may_2026_1779893283704.jpg";
 import vasuPhoto from "@assets/headshot_Vasu_AI_Advertisting_1779900210920.jpeg";
 import vinaPhoto from "@assets/image_1780429062430.png";
-import williamZhuPhoto from "@assets/william_zhu_portrait_opt.webp";
 import alexisPhoto from "@assets/alexis_portrait_opt.webp";
 import teamCoverPhoto from "@assets/team_cover_opt.webp";
 import { AmbientBackground } from "@/components/ambient-bg";
@@ -134,15 +133,6 @@ const board: Array<{
     photo: vinaPhoto,
     highlight: "Northern Bank VP · TEDx Speaker",
     bio: "VP & Cash Management Relationship Leader at Northern Bank with 20+ years in global transaction banking, treasury strategy, and trade finance — stewarding a $200M+ portfolio. Founder of leadership consultancy Karaka, TEDx speaker, and international keynote presenter fluent in English, Armenian, and French.",
-  },
-  {
-    name: "William Zhu",
-    title: "Board Director, Applied AI & Community Strategy",
-    seat: "Seat 8",
-    slug: "william-zhu",
-    photo: williamZhuPhoto,
-    highlight: "Choice Hotels · AI Discussion Club DC",
-    bio: "Senior Data Scientist & Applied AI Engineer at Choice Hotels International, shipping ML and AI products across thousands of properties. Founding organizer of Washington, DC's AI Discussion Club (900+ builders) and a 2026 Technical.ly RealLIST Connector. M.A. Computational Social Science, University of Chicago.",
   },
   {
     name: "Alexis Ramsey-Tobienne, PhD",
@@ -692,98 +682,6 @@ export default function Home() {
                   </p>
                 </div>
               ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Welcome new board member: William Zhu */}
-        <div
-          className="py-12 border-b border-foreground/10"
-          data-testid="block-welcome-william-zhu"
-        >
-          <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-8 md:gap-12 items-center">
-            <div className="relative aspect-[3/4] overflow-hidden bg-muted w-full max-w-[300px] mx-auto md:mx-0">
-              <img
-                src={williamZhuPhoto}
-                alt="William Zhu"
-                className="w-full h-full object-cover object-top grayscale hover:grayscale-0 transition-all duration-500"
-                data-testid="img-welcome-william-zhu"
-              />
-            </div>
-            <div>
-              <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary mb-4 flex items-center gap-2">
-                <Sparkles className="h-3 w-3" />
-                Board of Directors · Seat 8
-              </div>
-              <h3
-                className="font-serif text-3xl md:text-4xl font-bold leading-tight mb-3"
-                data-testid="text-welcome-william-zhu-name"
-              >
-                Meet{" "}
-                <span className="italic font-light text-primary">William Zhu</span>
-              </h3>
-              <p className="text-[11px] font-bold uppercase tracking-wide text-foreground/60 mb-4">
-                Board Director, Applied AI & Community Strategy
-              </p>
-              <p className="text-base text-muted-foreground leading-relaxed font-serif mb-6 max-w-2xl">
-                William Zhu serves on the Humanity + AI, Inc.
-                Board of Directors. An applied AI builder, data scientist, and
-                community organizer, William is a Senior Data Scientist & Applied
-                AI Engineer at Choice Hotels International and the founding
-                organizer of Washington, DC's AI Discussion Club — convening 900+
-                AI builders and innovators. He holds an M.A. in Computational
-                Social Science from the University of Chicago and was named a 2026
-                RealLIST Connector by Technical.ly.
-              </p>
-              <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
-                <Link href="/about/board/william-zhu">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="rounded-none font-serif italic border-foreground/20"
-                    data-testid="link-welcome-william-zhu-profile"
-                  >
-                    Read William's Profile
-                    <ArrowRight className="h-3.5 w-3.5 ml-2" />
-                  </Button>
-                </Link>
-                <a
-                  href="https://williamzhu.ai/stories"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs font-serif italic font-medium text-primary hover:text-primary/80"
-                  data-testid="link-welcome-william-zhu-stories"
-                >
-                  Stories <ExternalLink className="h-3 w-3" />
-                </a>
-                <a
-                  href="https://williamzhu.ai/projects"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs font-serif italic font-medium text-primary hover:text-primary/80"
-                  data-testid="link-welcome-william-zhu-projects"
-                >
-                  Projects <ExternalLink className="h-3 w-3" />
-                </a>
-                <a
-                  href="https://williamzhu.ai/books"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs font-serif italic font-medium text-primary hover:text-primary/80"
-                  data-testid="link-welcome-william-zhu-books"
-                >
-                  Books <ExternalLink className="h-3 w-3" />
-                </a>
-                <a
-                  href="https://www.linkedin.com/in/william-wei-zhu"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs font-serif italic font-medium text-primary hover:text-primary/80"
-                  data-testid="link-welcome-william-zhu-linkedin"
-                >
-                  LinkedIn <SiLinkedin className="h-3 w-3" />
-                </a>
-              </div>
             </div>
           </div>
         </div>

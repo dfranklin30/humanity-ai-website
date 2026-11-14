@@ -718,32 +718,6 @@ const learningModules: LearningModule[] = [
     videos: podcastClips,
     icon: Video,
   },
-  {
-    slug: "build-your-first-website",
-    title: "Build Your First Website",
-    subtitle: "From idea to a live, secure web app with Claude",
-    provider: "Feedback Lab · guide by William Zhu",
-    description:
-      "A beginner-friendly, step-by-step guide for non-coders who want to turn an idea into a working website using AI. You describe the features you want, Claude generates the code, and by the end you have a real app at a public web address with a secure backup. No coding experience required.",
-    format: "Self-paced interactive guide",
-    duration: "~45 min",
-    level: "Beginner",
-    steps: 21,
-    price: "Free",
-    url: "https://feedbacklab.app/workshop",
-    tags: ["No-Code", "Claude", "Deploy to the Web", "Hands-On"],
-    outcomes: [
-      "Set up Claude and build a working web app from a plain-English idea",
-      "Deploy it to a live, shareable web address",
-      "Secure it and keep a backup of your code",
-    ],
-    requirements: "A laptop and an idea. Accounts on Claude and Vercel are recommended.",
-    relatedEvent: {
-      label: "Join the in-person workshop",
-      date: "Sep 17",
-      url: "/events",
-    },
-  },
 ];
 
 export default function Training() {

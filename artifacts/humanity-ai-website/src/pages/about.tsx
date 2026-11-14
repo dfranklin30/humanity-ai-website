@@ -6,7 +6,7 @@ import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import {
   Award, Target, Eye, Heart, Rocket, Shield,
-  Users, BookOpen, ArrowRight, Globe, Star, ExternalLink, PlayCircle
+  Users, BookOpen, ArrowRight, Globe, Star, PlayCircle
 } from "lucide-react";
 import { SiLinkedin } from "react-icons/si";
 import { EditorialMasthead } from "@/components/editorial-masthead";
@@ -14,7 +14,6 @@ import daniellePhoto from "@assets/image_1775903656206.png";
 import jofiaPhoto from "@assets/image_1775903668936.png";
 import williamPhoto from "@assets/william_portrait_opt.webp";
 import nirmalPhoto from "@assets/1profile-pic_1776517679611.jpg";
-import williamZhuPhoto from "@assets/william_zhu_portrait_opt.webp";
 import davidWoodPhoto from "@assets/David_Wood212_-_edit_may_2026_1779893283704.jpg";
 import vasuPhoto from "@assets/headshot_Vasu_AI_Advertisting_1779900210920.jpeg";
 import vinaPhoto from "@assets/image_1780429062430.png";
@@ -375,51 +374,6 @@ export default function About() {
                   <p className="text-xs text-muted-foreground italic mb-4">
                     Treasury Strategy · Capital & Liquidity · Institutional Partnerships · Leadership
                   </p>
-                  <div className="flex items-center gap-2 text-primary text-xs font-medium">
-                    <ArrowRight className="h-3.5 w-3.5" />
-                    View Full Profile
-                  </div>
-                </div>
-              </BoardCard>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 1.4, duration: 0.5 }}
-            >
-              <BoardCard slug="william-zhu" testId="card-board-william-zhu">
-                <div className="h-64 overflow-hidden relative">
-                  <img
-                    src={williamZhuPhoto}
-                    alt="William Zhu"
-                    className="w-full h-full object-cover object-top"
-                    loading="lazy"
-                    decoding="async"
-                  />
-                </div>
-                <div className="p-6">
-                  <Badge variant="outline" className="text-[10px] mb-3 bg-sky-500/5 text-sky-700 dark:text-sky-400 border-sky-500/20">Seat 8 — Applied AI & Community Strategy</Badge>
-                  <h3 className="font-semibold text-lg" data-testid="text-board-william-zhu">William Zhu</h3>
-                  <p className="text-sm text-primary font-medium mb-3">Board Director, Applied AI & Community Strategy</p>
-                  <p className="text-sm text-muted-foreground leading-relaxed mb-3">
-                    Applied AI builder, data scientist, and community organizer. Senior Data Scientist & Applied AI Engineer at Choice Hotels International — shipping ML and AI products across thousands of properties — and founding organizer of Washington, DC's AI Discussion Club, convening 900+ AI builders. Named a 2026 RealLIST Connector by Technical.ly.
-                  </p>
-                  <p className="text-xs text-muted-foreground italic mb-4">
-                    Applied AI Products · Community & Ecosystem Growth · Responsible AI Adoption · M.A. Computational Social Science, UChicago
-                  </p>
-                  <a
-                    href="https://williamzhu.ai/projects"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="inline-flex items-center gap-1.5 text-xs font-medium text-primary mb-3 hover:underline"
-                    data-testid="link-portfolio-william-zhu"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                    williamzhu.ai
-                  </a>
                   <div className="flex items-center gap-2 text-primary text-xs font-medium">
                     <ArrowRight className="h-3.5 w-3.5" />
                     View Full Profile

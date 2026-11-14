@@ -146,7 +146,6 @@ export async function registerRoutes(
     "david-wood",
     "vasu-raj-jain",
     "vina-torossian",
-    "william-zhu",
     "alexis-ramsey-tobienne",
   ];
 
