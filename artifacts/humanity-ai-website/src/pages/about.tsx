@@ -402,7 +402,7 @@ export default function About() {
                   </div>
                 </div>
                 <div className="p-6">
-                  <Badge variant="outline" className="text-[10px] mb-3 bg-amber-500/5 text-amber-700 dark:text-amber-400 border-amber-500/20">Seat 9 — AI Literacy &amp; Academic Integrity</Badge>
+                  <Badge variant="outline" className="text-[10px] mb-3 bg-amber-500/5 text-amber-700 dark:text-amber-400 border-amber-500/20">Seat 8 — AI Literacy &amp; Academic Integrity</Badge>
                   <h3 className="font-semibold text-lg" data-testid="text-board-alexis">Alexis Ramsey-Tobienne, PhD</h3>
                   <p className="text-sm text-primary font-medium mb-3">Director, AI Literacy &amp; Academic Integrity</p>
                   <p className="text-sm text-muted-foreground leading-relaxed mb-3">
