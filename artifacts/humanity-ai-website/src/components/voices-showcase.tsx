@@ -10,6 +10,11 @@ type Voice = {
 };
 
 const voices: Voice[] = [
+  // Quick Hacks Ep. 14 (13 Nov 2026) — Danielle Franklin with AnnMarie Arntzen
+  { src: "/videos/gamers-and-cheats.mp4", poster: "/videos/gamers-and-cheats.jpg", title: "Gamers and Cheats: Problem Solving in Action", topic: "Guardrails" },
+  { src: "/videos/ai-emotional-blind-spot.mp4", poster: "/videos/ai-emotional-blind-spot.jpg", title: "AI's Emotional Blind Spot", topic: "Human Judgment" },
+  { src: "/videos/teaching-kids-to-question-sources.mp4", poster: "/videos/teaching-kids-to-question-sources.jpg", title: "Teaching Kids to Question Sources", topic: "AI for Kids" },
+  { src: "/videos/ai-impact-on-human-intelligence.mp4", poster: "/videos/ai-impact-on-human-intelligence.jpg", title: "AI's Impact on Human Intelligence", topic: "Human Intelligence" },
   { src: "/videos/bridging-the-gap.mp4", poster: "/videos/bridging-the-gap.jpg", title: "Humanity + AI: Bridging the Gap", topic: "The Mission" },
   { src: "/videos/elevating-humanity.mp4", poster: "/videos/elevating-humanity.jpg", title: "Elevating Humanity, Not Replacing It", topic: "The Vision" },
   { src: "/videos/people-first.mp4", poster: "/videos/people-first.jpg", title: "AI: People First, Always", topic: "Our Values" },
@@ -162,9 +167,11 @@ export function VoicesShowcase() {
           <span className="italic font-light text-[#6ee7b7]">hearing.</span>
         </h2>
         <p className="text-base md:text-lg text-[#FAF9F6]/70 leading-relaxed max-w-2xl mx-auto mt-5 font-serif">
-          Short, candid reflections from founder Danielle A. Franklin on the
-          questions shaping our future — from keeping people first to giving a
-          voice to those who can't speak for themselves. Tap any clip to listen.
+          Short, candid reflections from founder Danielle A. Franklin and her
+          guests on the questions shaping our future — from guardrails and
+          human judgment to teaching kids to question what AI tells them, and
+          giving a voice to those who can't speak for themselves. Tap any clip
+          to listen.
         </p>
       </div>
 

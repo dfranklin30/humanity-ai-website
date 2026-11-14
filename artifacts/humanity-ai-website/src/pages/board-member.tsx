@@ -13,7 +13,6 @@ import daniellePhoto from "@assets/image_1775903656206.png";
 import jofiaPhoto from "@assets/image_1775903668936.png";
 import williamPhoto from "@assets/william_portrait_opt.webp";
 import nirmalPhoto from "@assets/1profile-pic_1776517679611.jpg";
-import williamZhuPhoto from "@assets/william_zhu_portrait_opt.webp";
 import davidWoodPhoto from "@assets/David_Wood212_-_edit_may_2026_1779893283704.jpg";
 import vasuPhoto from "@assets/headshot_Vasu_AI_Advertisting_1779900210920.jpeg";
 import vinaPhoto from "@assets/image_1780429062430.png";
@@ -376,60 +375,6 @@ const boardMembers: Record<string, {
       source: "TEDxBryantU",
       description: "Drawing on the alphabet, the human body, and a simple key ring, Vina reveals how every individual part holds meaning within a greater whole — a meditation on significance, contribution, and the value each of us brings."
     }
-  },
-  "william-zhu": {
-    name: "William Zhu",
-    slug: "william-zhu",
-    title: "Board Director, Applied AI & Community Strategy",
-    seat: "Seat 8",
-    seatLabel: "Applied AI & Community Strategy",
-    photo: williamZhuPhoto,
-    badgeColor: "bg-sky-500/5 text-sky-300 border-sky-500/20",
-    linkedin: "https://www.linkedin.com/in/william-wei-zhu",
-    tagline: "Applied AI Builder · Data Scientist · Community Organizer",
-    subtitle: "Building applied AI products and convening the people who shape them — at the intersection of technology, community, and human judgment.",
-    stats: [
-      { value: "900+", label: "AI Builders Convened" },
-      { value: "12K+", label: "LinkedIn Followers" },
-      { value: "2026", label: "RealLIST Connector" }
-    ],
-    shortBio: "Applied AI builder, data scientist, and community organizer. Senior Data Scientist & Applied AI Engineer at Choice Hotels International and founding organizer of DC's AI Discussion Club (900+ builders). M.A. Computational Social Science, University of Chicago.",
-    fullBio: [
-      "William Zhu is an applied AI builder, data scientist, and community organizer working at the intersection of AI products, growth, and human connection. Across his professional and independent work, the throughline is the same: use AI to help people make better decisions, build stronger organizations, and connect more meaningfully.",
-      "As Board Director for Applied AI & Community Strategy at Humanity + AI, Inc., William advises the board on how to design AI programs that genuinely serve people and how to grow the community and ecosystem around the organization's mission. He brings a practitioner's perspective on what it takes to ship AI products responsibly and to convene the builders and innovators who move a field forward.",
-      "William is a Senior Data Scientist and Applied AI Engineer at Choice Hotels International, where he ships machine learning and AI products that drive growth and loyalty across thousands of properties. His work spans event-driven pricing lift models, personalized recommendation systems, and the company's first production-grade retrieval-augmented AI pipeline (RAG), and he has led enterprise-wide AI workshops for hundreds of associates to support responsible adoption. He was named a 2025 Choice Innovation Award Finalist.",
-      "Beyond his day-to-day work, William is the founding organizer of Washington, DC's AI Discussion Club, hosting in-person events for 900+ AI builders and innovators across the DC area, and was named one of 20 DC 2026 RealLIST Connectors by Technical.ly.",
-      "He holds a master's in Computational Social Science from the University of Chicago, with a concentration in Quantitative Marketing at Chicago Booth, and a bachelor's in Sociology from Haverford College. A data scientist by training and a social scientist at heart, William is drawn to how technology shapes human behavior, organizations, and collective decision-making."
-    ],
-    credentials: [
-      "Senior Data Scientist, Applied AI Engineering — Choice Hotels International",
-      "Founding Organizer — AI Discussion Club (Washington, DC)",
-      "2026 RealLIST Connector — Technical.ly",
-      "2025 Choice Innovation Award Finalist",
-      "AWS Certified Machine Learning Engineer Associate & AI Practitioner",
-      "M.A. Computational Social Science — University of Chicago",
-      "Quantitative Marketing Concentration — Chicago Booth School of Business",
-      "B.A. Sociology, Minor in Statistics — Haverford College"
-    ],
-    focus: [
-      "Applied AI Products & Deployment",
-      "Community Building & Ecosystem Growth",
-      "Responsible AI Adoption & Governance",
-      "Data Science, Machine Learning & Growth",
-      "Consumer & Product Strategy"
-    ],
-    links: [
-      { label: "LinkedIn", url: "https://www.linkedin.com/in/william-wei-zhu", icon: "linkedin" },
-      { label: "Stories", url: "https://williamzhu.ai/stories", icon: "external" },
-      { label: "Projects", url: "https://williamzhu.ai/projects", icon: "external" },
-      { label: "Books", url: "https://williamzhu.ai/books", icon: "external" },
-      { label: "Email", url: "mailto:williamzhu@humanityplusai.org", icon: "mail" }
-    ],
-    perspectives: [
-      "The point of AI is to help people make better decisions, build stronger organizations, and connect more meaningfully — not to replace the human judgment at the center of it all.",
-      "Communities aren't an afterthought to technology; convening the builders and innovators who move a field forward is how responsible AI actually gets built.",
-      "A data scientist by training and a social scientist at heart — what matters most is how technology shapes human behavior, organizations, and collective decision-making."
-    ]
   },
   "alexis-ramsey-tobienne": {
     name: "Alexis Ramsey-Tobienne, PhD",

@@ -179,12 +179,6 @@ const BOARD_MEMBERS: Record<string, { name: string; title: string; shortBio: str
     shortBio:
       "Senior technology leader directing enterprise AI, platforms, and modernization at Wayfair. IEEE Senior Member, Forbes Technology Council, and recognized voice on responsible AI at production scale.",
   },
-  "william-zhu": {
-    name: "William Zhu",
-    title: "Board Director, Applied AI & Community Strategy",
-    shortBio:
-      "Applied AI builder, data scientist, and community organizer. Senior Data Scientist & Applied AI Engineer at Choice Hotels International and founding organizer of Washington, DC's AI Discussion Club (900+ builders). M.A. Computational Social Science, University of Chicago.",
-  },
   "alexis-ramsey-tobienne": {
     name: "Alexis Ramsey-Tobienne, PhD",
     title: "Director, AI Literacy & Academic Integrity",

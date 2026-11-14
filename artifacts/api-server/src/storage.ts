@@ -23,8 +23,44 @@ const CANCELLED_EVENTS: { titlePrefix: string; date: string }[] = [
   { titlePrefix: "Humanity + AI Podcasts: Running an AI Startup from Orlando", date: "2026-10-23" },
 ];
 
+// Retired listings, matched the same way. These AI Discussion Club events were
+// cross-listed while William Zhu served on the board (through November 2026);
+// they stay in the database but are no longer shown.
+const RETIRED_EVENTS: { titlePrefix: string; date: string }[] = [
+  { titlePrefix: "Podcast Discussion: Risks of AI becoming smarter than humans - web inventor Sir Tim Berners-Lee", date: "2025-11-08" },
+  { titlePrefix: "Podcast Discussion: The Experimentation Machine: How AI is Creating 10x Founders | Jeffrey Bussgang", date: "2025-12-06" },
+  { titlePrefix: "Discussion: The Optimist: Sam Altman, Y Combinator, and OpenAI", date: "2026-01-17" },
+  { titlePrefix: "Podcast Discussion: Spatial Intelligence is the Next Frontier in AI | Dr. Fei-Fei Li", date: "2026-02-21" },
+  { titlePrefix: "Podcast Discussion: Dario Amodei “We are near the end of the exponential”", date: "2026-03-07" },
+  { titlePrefix: "Podcast Discussion: Google: The AI Company", date: "2026-03-14" },
+  { titlePrefix: "Outdoor Discussion Walk: The Secrets of Claude Code", date: "2026-03-28" },
+  { titlePrefix: "Outdoor Discussion Walk: AI and the Future of Work / Jobs", date: "2026-04-18" },
+  { titlePrefix: "Outdoor Discussion Walk: Jensen Huang and Nvidia", date: "2026-05-02" },
+  { titlePrefix: "Outdoor Discussion Walk: OpenClaw and Autonomous Agents", date: "2026-05-24" },
+  { titlePrefix: "AI in Marketing: AR Filters are the New Billboard", date: "2026-05-30" },
+  { titlePrefix: "Outdoor Discussion Walk: WALL-E and the Future of AI", date: "2026-06-06" },
+  { titlePrefix: "Mall Discussion Walk: How Anthropic, Costco, and Patagonia Build Incorruptible Companies", date: "2026-06-21" },
+  { titlePrefix: "Museum Discussion Walk: Perfect Search for an Agentic Internet | Exa", date: "2026-07-11" },
+  { titlePrefix: "Builder Nights: Show your AI Projects, Learn from the Best Minds in AI", date: "2026-07-16" },
+  { titlePrefix: "Museum Discussion: What happens after coding is solved? | Fiona Fung", date: "2026-07-26" },
+  { titlePrefix: "Build with Claude 101: From Idea to Working Prototype (No Coding Experience Needed)", date: "2026-08-08" },
+  { titlePrefix: "Museum Discussion: Product Management in the Age of AI", date: "2026-08-29" },
+  { titlePrefix: "Build your first website in 2 Hours with Claude & Vercel (Beginner friendly)", date: "2026-09-17" },
+  { titlePrefix: "Author Book Talk: Who is in Charge? Why AI Must Remain Under Human Control", date: "2026-09-19" },
+  { titlePrefix: "Picnic Discussion: The rise of AI teammates | Tara Seshan", date: "2026-09-27" },
+  { titlePrefix: "Outdoor Discussion Walk: AI for Scientific Research | Terence Tao", date: "2026-10-10" },
+  { titlePrefix: "AI-Powered Growth Workshop: Outreach, Pipeline, and Getting Found by AI (DCSTW)", date: "2026-10-20" },
+  { titlePrefix: "Outdoor Discussion Walk: Future of AI Education | a16z Academy", date: "2026-10-24" },
+  { titlePrefix: "Author Book Talk: How to Build an Undeniable Career in the Age of AI", date: "2026-10-28" },
+  { titlePrefix: "Design Stunning Websites Workshop", date: "2026-11-03" },
+  { titlePrefix: "Build a Website with ChatGPT (Beginner Friendly)", date: "2026-11-21" },
+  { titlePrefix: "Outdoor Discussion Walk : The Race to Superintelligence", date: "2026-12-05" },
+];
+
 function isCancelledEvent(e: Pick<Event, "title" | "date">): boolean {
-  return CANCELLED_EVENTS.some((c) => e.date === c.date && e.title.startsWith(c.titlePrefix));
+  return [...CANCELLED_EVENTS, ...RETIRED_EVENTS].some(
+    (c) => e.date === c.date && e.title.startsWith(c.titlePrefix),
+  );
 }
 
 export type CreateUserDb = Omit<InsertUser, "password"> & { password: string };
