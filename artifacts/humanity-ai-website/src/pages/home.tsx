@@ -34,6 +34,7 @@ import { AmbientBackground } from "@/components/ambient-bg";
 import { AINewsTicker, ArxivFeed } from "@/components/ai-news";
 import { FeaturedResearch } from "@/components/featured-research";
 import { VoicesShowcase } from "@/components/voices-showcase";
+import { AiForKidsSpotlight } from "@/components/ai-for-kids-spotlight";
 import { SlackCommunity } from "@/components/slack-community";
 import { NirmalBooksAnnouncement } from "@/components/nirmal-books-announcement";
 import { SLACK_INVITE_URL } from "@/lib/community";
@@ -261,6 +262,9 @@ export default function Home() {
 
       {/* Rolling AI News highlights — arXiv + AI news + markets, clickable to source */}
       <AINewsTicker />
+
+      {/* AI for Kids — Winter 2027 AI Explorers cohorts (sign-up via MSA) */}
+      <AiForKidsSpotlight />
 
       {/* Dark AI Hero — deep field where humanity meets AI */}
       <section
