@@ -25,7 +25,10 @@ import {
   SCHOLARSHIP,
 } from "../content/program";
 
-const WEEK_ICONS = [Sparkles, Wand2, Video, Code2, Bot, Trophy];
+// Synced from media/training-videos to public Blob Storage on every deploy.
+const SHOWCASE_MEDIA = "https://sthumanityplusai.blob.core.windows.net/training-videos";
+
+const WEEK_ICONS =[Sparkles, Wand2, Video, Code2, Bot, Trophy];
 
 export default function Home() {
   return (
@@ -105,6 +108,39 @@ export default function Home() {
           </motion.div>
         </div>
       </section>
+
+      {/* Showcase video */}
+      <Section tone="white" id="see-it" className="!pb-8 !pt-12 sm:!pt-16">
+        <div className="mx-auto max-w-4xl">
+          <Eyebrow>30-second tour</Eyebrow>
+          <H2>See the AI for Kids Hub in action</H2>
+          <Lede>
+            Watch one idea become a robot, a movie, a song and a picture, and see what kids learn
+            along the way, safely.
+          </Lede>
+          <figure className="mt-8">
+            <div className="overflow-hidden rounded-2xl bg-slate-900 shadow-xl ring-1 ring-slate-200">
+              <video
+                className="block aspect-video h-auto w-full"
+                controls
+                playsInline
+                preload="metadata"
+                poster={`${SHOWCASE_MEDIA}/aiforkids-hub-showcase.jpg`}
+                aria-label="AI for Kids Hub showcase video, 30 seconds, with narration and on-screen captions"
+              >
+                <source src={`${SHOWCASE_MEDIA}/aiforkids-hub-showcase.mp4`} type="video/mp4" />
+                Your browser can't play this video.{" "}
+                <a href={`${SHOWCASE_MEDIA}/aiforkids-hub-showcase.mp4`}>Download it instead</a>.
+              </video>
+            </div>
+            <figcaption className="mt-3 text-sm text-slate-600">
+              A kid describes a robot, the Hub builds and tests it, then remixes it into a narrated
+              movie, a song and a picture. Every character is cartoon or AI art; no real children
+              appear.
+            </figcaption>
+          </figure>
+        </div>
+      </Section>
 
       {/* At a glance */}
       <Section tone="white" className="!py-12">
